@@ -39,16 +39,33 @@ git -C "$HOME/.artiboard/src" pull --ff-only
 Personal install:
 
 ```bash
-mkdir -p "$HOME/.claude/skills" && rm -rf "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard" "$HOME/.claude/skills/artiboard"
+mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
 ```
 
 Project install (run from the repository root):
 
 ```bash
-mkdir -p .claude/skills && rm -rf .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard" .claude/skills/artiboard
+mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
 
-On Windows PowerShell, use `Copy-Item -Recurse -Force` with the same paths.
+These copy the skill's files over the installed ones, so an upgrade works without deleting the folder first. In a Claude Code setup whose permissions deny `rm -rf`, the old commands stopped at that step. A file removed upstream stays behind; the skill has three files, so this rarely matters.
+
+On Windows PowerShell, copy the folder's contents (`\*`), not the folder. `Copy-Item -Recurse` into a folder that already exists puts the copy inside it (`artiboard\artiboard`) and leaves the old files in place, so an upgrade silently changes nothing.
+
+Personal install:
+
+```powershell
+$dest = "$HOME\.claude\skills\artiboard"
+New-Item -ItemType Directory -Force $dest | Out-Null
+Copy-Item -Recurse -Force "$HOME\.artiboard\src\skills\artiboard\*" $dest
+```
+
+Project install (run from the repository root):
+
+```powershell
+New-Item -ItemType Directory -Force .claude\skills\artiboard | Out-Null
+Copy-Item -Recurse -Force "$HOME\.artiboard\src\skills\artiboard\*" .claude\skills\artiboard
+```
 
 The Claude Code plugin works too: `/plugin marketplace add yulmucoffee/artiboard`, then `/plugin install artiboard@artiboard`. The skill is then `/artiboard:artiboard`.
 
