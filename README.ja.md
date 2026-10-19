@@ -112,7 +112,7 @@ git clone --depth 1 https://github.com/yulmucoffee/artiboard.git "$HOME/.artiboa
 ```
 
 ```bash
-mkdir -p "$HOME/.claude/skills" && cp -R "$HOME/.artiboard/src/skills/artiboard" "$HOME/.claude/skills/artiboard"
+mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
 ```
 
 プロジェクトで新しいセッションを開き、「このプロジェクトにタスクボードを作って」と言ってください。
@@ -120,8 +120,10 @@ mkdir -p "$HOME/.claude/skills" && cp -R "$HOME/.artiboard/src/skills/artiboard"
 **方法 C: チームのリポジトリに**(リポジトリのルートで実行してコミット)
 
 ```bash
-mkdir -p .claude/skills && cp -R "$HOME/.artiboard/src/skills/artiboard" .claude/skills/artiboard
+mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
+
+アップグレードするときは `git -C "$HOME/.artiboard/src" pull --ff-only` を実行してから、同じコピーコマンドをもう一度実行します。Windows PowerShell では [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill) のコマンドを使ってください。
 
 <details>
 <summary><b>Claude Code プラグインを使う場合</b></summary>

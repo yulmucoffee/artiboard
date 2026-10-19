@@ -112,7 +112,7 @@ git clone --depth 1 https://github.com/yulmucoffee/artiboard.git "$HOME/.artiboa
 ```
 
 ```bash
-mkdir -p "$HOME/.claude/skills" && cp -R "$HOME/.artiboard/src/skills/artiboard" "$HOME/.claude/skills/artiboard"
+mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
 ```
 
 Open a new session in your project and say "set up a task board for this project".
@@ -120,8 +120,10 @@ Open a new session in your project and say "set up a task board for this project
 **Option C: for my team's repository** (run in the repository root, then commit)
 
 ```bash
-mkdir -p .claude/skills && cp -R "$HOME/.artiboard/src/skills/artiboard" .claude/skills/artiboard
+mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
+
+To upgrade, run `git -C "$HOME/.artiboard/src" pull --ff-only`, then the same copy command again. On Windows PowerShell, use the commands in [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill).
 
 <details>
 <summary><b>Prefer the Claude Code plugin?</b></summary>

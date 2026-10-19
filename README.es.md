@@ -112,7 +112,7 @@ git clone --depth 1 https://github.com/yulmucoffee/artiboard.git "$HOME/.artiboa
 ```
 
 ```bash
-mkdir -p "$HOME/.claude/skills" && cp -R "$HOME/.artiboard/src/skills/artiboard" "$HOME/.claude/skills/artiboard"
+mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
 ```
 
 Abre una sesión nueva en tu proyecto y di "crea un tablero de tareas para este proyecto".
@@ -120,8 +120,10 @@ Abre una sesión nueva en tu proyecto y di "crea un tablero de tareas para este 
 **Opción C: para el repositorio de mi equipo** (ejecútalo en la raíz del repositorio y haz commit)
 
 ```bash
-mkdir -p .claude/skills && cp -R "$HOME/.artiboard/src/skills/artiboard" .claude/skills/artiboard
+mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
+
+Para actualizar, ejecuta `git -C "$HOME/.artiboard/src" pull --ff-only` y luego el mismo comando de copia otra vez. En Windows PowerShell, usa los comandos de [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill).
 
 <details>
 <summary><b>¿Prefieres el plugin de Claude Code?</b></summary>

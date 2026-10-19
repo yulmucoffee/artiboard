@@ -112,7 +112,7 @@ git clone --depth 1 https://github.com/yulmucoffee/artiboard.git "$HOME/.artiboa
 ```
 
 ```bash
-mkdir -p "$HOME/.claude/skills" && cp -R "$HOME/.artiboard/src/skills/artiboard" "$HOME/.claude/skills/artiboard"
+mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
 ```
 
 在项目中打开新会话，说"为这个项目建一个任务看板"。
@@ -120,8 +120,10 @@ mkdir -p "$HOME/.claude/skills" && cp -R "$HOME/.artiboard/src/skills/artiboard"
 **方式 C：给团队仓库**（在仓库根目录运行，然后提交）
 
 ```bash
-mkdir -p .claude/skills && cp -R "$HOME/.artiboard/src/skills/artiboard" .claude/skills/artiboard
+mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
+
+升级时，先运行 `git -C "$HOME/.artiboard/src" pull --ff-only`，再运行同样的复制命令。在 Windows PowerShell 中，请使用 [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill) 里的命令。
 
 <details>
 <summary><b>更喜欢 Claude Code 插件？</b></summary>

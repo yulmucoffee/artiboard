@@ -112,7 +112,7 @@ git clone --depth 1 https://github.com/yulmucoffee/artiboard.git "$HOME/.artiboa
 ```
 
 ```bash
-mkdir -p "$HOME/.claude/skills" && cp -R "$HOME/.artiboard/src/skills/artiboard" "$HOME/.claude/skills/artiboard"
+mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
 ```
 
 프로젝트에서 새 세션을 열고 "이 프로젝트에 작업 보드 만들어줘"라고 말하면 됩니다.
@@ -120,8 +120,10 @@ mkdir -p "$HOME/.claude/skills" && cp -R "$HOME/.artiboard/src/skills/artiboard"
 **방법 C: 팀 저장소에** (저장소 루트에서 실행한 뒤 커밋)
 
 ```bash
-mkdir -p .claude/skills && cp -R "$HOME/.artiboard/src/skills/artiboard" .claude/skills/artiboard
+mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
+
+업그레이드할 때는 `git -C "$HOME/.artiboard/src" pull --ff-only`를 실행한 뒤 같은 복사 명령을 다시 실행하면 됩니다. Windows PowerShell에서는 [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill)의 명령을 쓰세요.
 
 <details>
 <summary><b>Claude Code 플러그인이 편하다면</b></summary>
