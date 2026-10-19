@@ -33,7 +33,24 @@ const shim=`<script>
   var user={id:function(){return Promise.resolve(null)},can:function(){return Promise.resolve(null)},
     isOwner:function(){return Promise.resolve(false)},canEdit:function(){return Promise.resolve(false)}};
   window.DEMO={use:function(n){return Promise.resolve(n==='db'?{collection:coll,doc:doc}:n==='user'?user:null)}};
-  (RAW.events||[]).forEach(function(ev){setTimeout(function(){ev.writes.forEach(function(w){var d=fix(w.data);
+  // English / 한국어 switch (demo only): RAW.ko maps each sample string to Korean. Switching rewrites every
+  // string in the store and meta/config.lang, so the page re-renders in that language like a real board would.
+  var KO=RAW.ko||{},EN={},lang='en';for(var e in KO)EN[KO[e]]=e;
+  function tr(v,dict){if(typeof v==='string')return Object.prototype.hasOwnProperty.call(dict,v)?dict[v]:v;
+    if(Array.isArray(v))return v.map(function(x){return tr(x,dict)});if(v&&typeof v==='object'){var o={};for(var k in v)o[k]=tr(v[k],dict);return o}return v}
+  var bar=document.createElement('span');bar.className='seg';bar.style.marginLeft='auto';bar.setAttribute('role','group');bar.setAttribute('aria-label','Language / 언어');
+  [['en','English'],['ko','한국어']].forEach(function(x){var b=document.createElement('button');b.type='button';b.textContent=x[1];b.lang=x[0];
+    b.setAttribute('data-lang',x[0]);b.addEventListener('click',function(){setLang(x[0])});bar.appendChild(b)});
+  var meta=document.querySelector('.meta');if(meta)meta.appendChild(bar);
+  function setLang(l){
+    if(l!==lang){var dict=l==='ko'?KO:EN;for(var p in store)store[p]=tr(store[p],dict);lang=l;
+      store['meta/config']=Object.assign({},store['meta/config'],{lang:l});notify()}
+    try{localStorage.setItem('demo-lang',l)}catch(e){}
+    [].forEach.call(bar.children,function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-lang')===lang))});
+  }
+  var want=null;try{want=localStorage.getItem('demo-lang')}catch(e){}
+  setLang(want==='ko'||want==='en'?want:/^ko\\b/i.test(navigator.language||'')?'ko':'en');
+  (RAW.events||[]).forEach(function(ev){setTimeout(function(){ev.writes.forEach(function(w){var d=fix(w.data);if(lang==='ko')d=tr(d,KO);
     store[w.path]=w.op==='update'?Object.assign({},store[w.path],d):d});notify()},ev.after*1000)});
 })(${data.trim()});
 </script>

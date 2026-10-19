@@ -35,7 +35,7 @@
 
 ## 미리 보기
 
-**[라이브 데모 열기 →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** 레시피 앱을 만드는 가상의 3인 팀과 태스크 14개입니다. 실제 보드 페이지를 페이지 안의 예시 데이터로 돌리니 마음껏 눌러 보세요. 태스크 집기, 스레드에 글 남기기, 찾기, `j`/`k` 이동. 몇 초 뒤 에이전트의 업데이트 두 개가 저절로 들어옵니다.
+**[라이브 데모 열기 →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** 레시피 앱을 만드는 가상의 3인 팀과 태스크 14개입니다. 실제 보드 페이지를 페이지 안의 예시 데이터로 돌리니 마음껏 눌러 보세요. 태스크 집기, 스레드에 글 남기기, 찾기, `j`/`k` 이동. 몇 초 뒤 에이전트의 업데이트 두 개가 저절로 들어옵니다. 위쪽의 English / 한국어 버튼으로 예시 데이터까지 데모 전체를 한국어로 바꿀 수 있습니다.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">
