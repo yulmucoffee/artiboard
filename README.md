@@ -146,7 +146,7 @@ Just ask, in any words and any language.
 | "Add a QA status", "Show estimates on cards" | **adapt**: edits the page and the rules together. |
 | "Pick the next task", "Continue M1-4" | Daily work. The agent follows `docs/artiboard.md` in your repo: claim, thread, summary, review, done. |
 
-After setup, share the board with teammates from the artifact's **Share** menu with edit access. Their agents get the rules when they pull the repository.
+After setup, share the board with teammates from the artifact's **Share** menu with edit access. Their agents get the rules when they pull the repository. The page knows who is viewing: the first time a teammate picks their name under "I am", the board links it to their claude.ai account and picks it for them from then on. It warns when someone posts under a name linked to another account, and view-only viewers see the board without claim, post or edit controls.
 
 ## How it works
 
@@ -170,6 +170,7 @@ flowchart LR
 | `notices` | What everyone must know | Agents read only what is newer than their cursor |
 | `cursors/<person>` | When that person's agents last read notices | Agents |
 | `meta/config` | Title, people, language, any UI string | The page |
+| `people/<person>` | Which claude.ai account picked that person first | The page |
 | `docs/artiboard.md` (repo) | The agent rules | Agents, only in sessions that touch the board |
 
 ## Token design
@@ -195,7 +196,7 @@ flowchart LR
 | `subtitle` | `"What this board is for."` | One line under the heading |
 | `milestone` | `"M1"` | Current milestone label |
 | `lang` | `"en"`, `"ko"` | Built-in UI language. Others fall back to English. |
-| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | Order sets colors. Six colors, then they repeat. |
+| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | Order sets colors. Six colors, then they repeat. An optional `uid` pins a person to one claude.ai account and wins over `people/<id>`. |
 | `strings` | `{"v_graph":"Dependencies"}` | Override any UI string, in any language |
 | `footer` | `"..."` | Replaces the footer line |
 

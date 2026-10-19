@@ -64,6 +64,7 @@ Decide what this project needs. When unsure, keep the default.
 
 | Keep | Why |
 | --- | --- |
+| `people/<id>` and the `user` capability | The page links each person to one claude.ai account. Agents never write `people/`. |
 | Lean `tasks/<id>` plus `details/<id>` | Agents list and query small documents and open long text only for the task in hand. |
 | `waitingOn` and the ready query | One query finds pickable work. The page repairs drift itself. |
 | `cursors/<person>` | Each start reads only notices newer than the last one seen. |
@@ -74,7 +75,7 @@ Decide what this project needs. When unsure, keep the default.
 
 ### 4. Publish the page
 
-Copy `assets/board.html` into your scratchpad. Set its `<title>` to the board name, two to four words, such as `Acme Board`. Edit the copy only if step 3 needs code changes. Publish it with the Artifact tool: `capabilities: {"db": {}}`, `icon: "kanban"`, a one-sentence `description`. Keep the URL.
+Copy `assets/board.html` into your scratchpad. Set its `<title>` to the board name, two to four words, such as `Acme Board`. Edit the copy only if step 3 needs code changes. Publish it with the Artifact tool: `capabilities: {"db": {}, "user": {}}`, `icon: "kanban"`, a one-sentence `description`. Keep the URL. `user` tells the page who is viewing: it links each person to the claude.ai account that first picks them in the "I am" picker (`people/<id>`), defaults to that person on later visits, warns when someone posts as a person linked to another account, and hides claim, post and edit controls from view-only viewers.
 
 ### 5. Seed the database
 
@@ -129,6 +130,7 @@ These are why the board stays cheap as people, agents and months pile up. Keep t
 ## Adapt later
 
 - People, language, labels, title, milestone: update `meta/config`. No republish.
+- Wrong account on a person (someone picked the wrong name first): delete `people/<id>`, and that person's account links again on its next pick. To pin a link, copy the right `uid` from `people/<id>` into that person's `meta/config.people` entry; a `uid` there wins. Never show or guess ids.
 - New milestone: batch the new `tasks` and `details`, update `meta/config.milestone`, post one notice. Done tasks stay but no query reads them.
 - Rule change: edit the repo rules file, update `meta/protocol` with `rev` + 1, and post one notice, together.
 - Page change or upgrade: read the live artifact first with the Artifact tool's `read` action, apply the change to that version, and republish to the same URL. Never republish just to change data.

@@ -318,6 +318,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       <span id="meWrap" style="display:inline-flex;align-items:center;gap:8px"><b id="meLabel"></b>
         <span class="seg" role="group" id="meSel"></span>
       </span>
+      <span id="meNote" hidden></span>
     </div>
     <div class="progress" id="progress" aria-hidden="true"></div>
     <div class="legend" id="legend"></div>
@@ -427,7 +428,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       summaryEmpty:'No summary yet. At handoff, review or done, write the current state, decisions and what is left in five lines. The next person and agent read only the summary and later messages.',
       acceptance:'Acceptance',spec:'Spec',msgPh:'Write as {p}',post:'Post',sendHint:'⌘/Ctrl+Enter to post',prev:'Previous task',next:'Next task',close:'Close',
       untitled:'(untitled)',footer:'Do not put secrets (keys, tokens, passwords) on this board. “New” markers are remembered in this browser only.',
-      ago_now:'just now',ago_m:'{n}m ago',ago_h:'{n}h ago',ago_d:'{n}d ago',newLabel:'New'
+      ago_now:'just now',ago_m:'{n}m ago',ago_h:'{n}h ago',ago_d:'{n}d ago',newLabel:'New',
+      pickMe:'Pick yourself once. The board remembers it for your account.',viewOnly:'View only. You can read the board but not change it.',
+      notYou:'{p} is linked to another account. What you post here will still show {p}.',linkedElse:'Your account is linked to {q}. What you post here will show {p}.'
     },
     ko:{
       loading:'불러오는 중이에요.',noDb:'이 화면에서는 판 데이터를 쓸 수 없어요. claude.ai에서 열어 주세요.',loadFail:'태스크를 불러오지 못했어요 ({e})',
@@ -459,7 +462,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       summaryEmpty:'아직 요약이 없어요. 인계·검토·완료 때 지금 상태, 결정, 남은 일을 5줄 안으로 적어요. 다음 사람과 에이전트는 요약과 그 뒤 메시지만 읽어요.',
       acceptance:'인수 조건',spec:'스펙',msgPh:'{p}(으)로 남기기',post:'남기기',sendHint:'⌘/Ctrl+Enter로 남기기',prev:'이전 태스크',next:'다음 태스크',close:'닫기',
       untitled:'(제목 없음)',footer:'이 판에는 비밀값(키, 토큰, 비밀번호)을 쓰지 않아요. ‘새 소식’ 표시는 이 브라우저에만 기억돼요.',
-      ago_now:'방금',ago_m:'{n}분 전',ago_h:'{n}시간 전',ago_d:'{n}일 전',newLabel:'새 소식'
+      ago_now:'방금',ago_m:'{n}분 전',ago_h:'{n}시간 전',ago_d:'{n}일 전',newLabel:'새 소식',
+      pickMe:'자기 이름을 한 번 고르세요. 판이 이 계정에 기억해요.',viewOnly:'보기 전용이에요. 판을 읽을 수만 있어요.',
+      notYou:'{p}에는 다른 계정이 연결돼 있어요. 여기서 남기는 글도 {p}(으)로 보여요.',linkedElse:'이 계정은 {q}에 연결돼 있어요. 여기서 남기면 {p}(으)로 보여요.'
     }
   };
   var STR=I18N.en;
@@ -472,6 +477,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var config={},people=[],db=null,tasks=[],notices=[],protocol=null,sel=null,msgs=[],msgErr=false,unsub=null,loaded=false,failed='',noticesLoaded=false;
   var feat=read('ab-feature')||'all',view=read('ab-view')||'doc';if(VIEWS.indexOf(view)<0)view='doc';
   var me=read('ab-me')||'';
+  // who is viewing, from the user capability: uid null = unknown (keep the honor-system picker), canWrite null = not told (keep controls)
+  var uid=null,canWrite=null,links={},picked=false;
   var q='',newOnly=false,cursor=null,order=[],openPrevSeen='',det=null,unsubDet=null,sumEditing=false;
   var seen=readJSON('ab-seen')||{},noticeSeen=read('ab-notice-seen')||'';
 
@@ -500,6 +507,22 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function person(id){for(var i=0;i<people.length;i++)if(people[i].id===id)return people[i];return null}
   function pname(id){var p=person(id);return p?(p.name||p.id):(id||T('unassigned'))}
   function pclass(id){for(var i=0;i<people.length;i++)if(people[i].id===id)return ' p'+(typeof people[i].color==='number'?people[i].color%6:i%6);return ''}
+  // a person's account: meta/config.people[].uid (set by hand) wins over people/<id>.uid (written the first time someone picks that person)
+  function uidOf(id){var p=person(id);return (p&&p.uid)||links[id]||null}
+  function linked(){if(!uid)return null;for(var i=0;i<people.length;i++)if(uidOf(people[i].id)===uid)return people[i].id;return null}
+  function identify(){var l=linked();if(l&&!picked)me=l}
+  function writable(){return !!db&&canWrite!==false}
+  function meWarn(){if(!uid||!me)return '';var u=uidOf(me),l=linked();return u&&u!==uid?T('notYou',{p:pname(me)}):l&&l!==me?T('linkedElse',{p:pname(me),q:pname(l)}):''}
+  function warnLine(){var w=meWarn();return w?el('p',{class:'err',text:w}):null}
+  // first-come link: lease the doc so two viewers picking the same person at once cannot both win
+  function link(id){
+    if(!uid||!id||!writable()||linked()||uidOf(id))return;
+    var ref=db.doc('people/'+id);
+    ref.acquire({holder:uid,ttlMs:5000}).then(function(r){if(!r.acquired)return;
+      return ref.get().then(function(s){if(s.exists&&s.data().uid)return;return ref.set({uid:uid,at:now()})})}).catch(refused);
+  }
+  // a viewer the platform said nothing about finds out on the first refused write; from then on the page is read-only
+  function refused(e){if(e&&e.code==='invalid_argument'&&canWrite==null){canWrite=false;renderAll()}}
   function who(o){return el('span',{class:'who'+(o?pclass(o)||'':' none'),text:o?pname(o):T('unassigned')})}
   function state(s){return el('span',{class:'state '+s,text:SL(s)})}
   function agentMark(t){return t.claimedBy&&t.claimedBy.agent&&st(t)!=='done'?el('span',{class:'agent-mark',text:T('agent')}):null}
@@ -515,7 +538,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var base=I18N[lang]||I18N.en;STR={};for(var k in I18N.en)STR[k]=I18N.en[k];for(k in base)STR[k]=base[k];
     if(config.strings)for(k in config.strings)STR[k]=config.strings[k];
     people=(Array.isArray(config.people)?config.people:[]).filter(function(p){return p&&p.id});
-    if(!person(me))me=people.length?people[0].id:'';
+    if(!person(me))me=people.length?people[0].id:'';identify();
     document.documentElement.lang=lang;
     staticText();
   }
@@ -552,11 +575,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function match(t){return matchQ(t)&&(!newOnly||isNew(t))}
   function filtering(){return !!q||newOnly}
 
-  function save(id,patch){if(!db)return Promise.resolve();patch.updatedAt=now();markSeen(id,patch.updatedAt);return db.doc('tasks/'+id).update(patch).catch(function(e){toast(T('saveFail',{e:errText(e)}))})}
+  function save(id,patch){if(!db)return Promise.resolve();patch.updatedAt=now();markSeen(id,patch.updatedAt);return db.doc('tasks/'+id).update(patch).catch(function(e){toast(T('saveFail',{e:errText(e)}));refused(e)})}
 
   // ---------- header and toolbar ----------
   function renderHead(){
     document.querySelectorAll('#meSel button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.me===me))});
+    var w=meWarn(),note=canWrite===false?T('viewOnly'):w||(uid&&db&&people.length>1&&!linked()?T('pickMe'):''),mn=$('meNote');
+    mn.textContent=note;mn.hidden=!note;mn.className=w&&canWrite!==false?'err':'muted';
     var c={};STATUS.forEach(function(s){c[s]=0});tasks.forEach(function(t){c[st(t)]++});
     $('mCount').textContent=!loaded?(failed||T('loading')):T('tasksCount',{n:tasks.length,d:c.done});
     var last=tasks.map(lastTouch).concat(notices.map(function(n){return n.at||''})).filter(Boolean).sort().pop();
@@ -580,7 +605,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     $('qResult').textContent=filtering()&&loaded?T('results',{n:tasks.filter(match).length}):'';
     $('noticeRead').hidden=!nn;
   }
-  $('meSel').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;me=b.dataset.me;write('ab-me',me);renderAll()});
+  $('meSel').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;me=b.dataset.me;picked=true;write('ab-me',me);link(me);renderAll()});
   $('tabs').addEventListener('click',function(e){var b=e.target.closest('button');if(b)setView(b.dataset.view)});
   $('newBtn').addEventListener('click',function(){newOnly=!newOnly;renderAll()});
   $('readAll').addEventListener('click',readAll);
@@ -636,17 +661,17 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var ul2=el('ul',{class:'picks'});
     rd.forEach(function(t){
       var unlocks=tasks.filter(function(o){return (o.deps||[]).indexOf(t.key)>=0}).map(function(o){return o.key});
-      ul2.appendChild(pickItem(t,'',unlocks.length?T('unlocks',{k:unlocks.join(', ')}):'',me?el('div',{class:'row'},[el('button',{type:'button',class:'btn small primary',text:T('claim',{p:pname(me)}),onclick:function(e){claim(t,e.currentTarget)}})]):null));
+      ul2.appendChild(pickItem(t,'',unlocks.length?T('unlocks',{k:unlocks.join(', ')}):'',me&&writable()?el('div',{class:'row'},[el('button',{type:'button',class:'btn small primary',text:T('claim',{p:pname(me)}),onclick:function(e){claim(t,e.currentTarget)}})]):null));
     });
     box.appendChild(ul2);
   }
   function claim(t,btn){
-    if(!db||!me)return;btn.disabled=true;
+    if(!writable()||!me)return;btn.disabled=true;
     db.doc('tasks/'+t.id).get().then(function(s){
       var d=s.exists?s.data():null;
       if(!d||d.claimedBy||(d.status||'todo')!=='todo'){toast(T('alreadyClaimed'));return}
       return save(t.id,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}}).then(function(){toast(T('claimed',{p:pname(me),k:t.key}))});
-    }).catch(function(e){toast(T('claimFail',{e:errText(e)}))}).then(function(){btn.disabled=false});
+    }).catch(function(e){toast(T('claimFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false});
   }
 
   var ORDER={blocked:0,review:1,doing:2,todo:3};
@@ -719,13 +744,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         el('div',{class:'text',text:n.text||''})
       ]));
     });
-    if(loaded&&db&&me){
+    if(loaded&&writable()&&me){
       var ta=el('textarea',{id:'noticeText','aria-label':T('noticeBtn'),placeholder:T('noticePh',{p:pname(me)})});ta.value=draft;
       var btn=el('button',{type:'button',class:'btn primary',text:T('noticeBtn')});
       btn.addEventListener('click',function(){var v=ta.value.trim();if(!v)return;btn.disabled=true;var at=now();
         db.doc('notices/n-'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:'note',text:v})
-          .then(function(){ta.value=''}).catch(function(e){toast(T('postFail',{e:errText(e)}))}).then(function(){btn.disabled=false})});
-      ul.appendChild(el('li',{class:'form'},[ta,el('div',{class:'form-row'},[btn])]));
+          .then(function(){ta.value=''}).catch(function(e){toast(T('postFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false})});
+      ul.appendChild(el('li',{class:'form'},[warnLine(),ta,el('div',{class:'form-row'},[btn])]));
       if(hadFocus)ta.focus();
     }
   }
@@ -945,12 +970,12 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function summaryBlock(t,keep){
     var sum=det&&det.summary||'';
     var head=el('h3',{style:'display:flex;gap:8px;align-items:baseline'},[T('summary'),det&&det.summaryAt?el('span',{style:'font-weight:400',text:stamp(det.summaryAt)}):null,
-      db&&!sumEditing?el('button',{type:'button',class:'linkbtn',text:sum?T('edit'):T('write'),onclick:function(){sumEditing=true;renderSheet();var a=$('sumText');if(a)a.focus()}}):null]);
+      writable()&&!sumEditing?el('button',{type:'button',class:'linkbtn',text:sum?T('edit'):T('write'),onclick:function(){sumEditing=true;renderSheet();var a=$('sumText');if(a)a.focus()}}):null]);
     if(!sumEditing)return el('div',{class:'block'},[head,sum?el('div',{class:'pre',text:sum}):el('p',{class:'muted',style:'font-size:13.5px',text:T('summaryEmpty')})]);
     var ta=el('textarea',{id:'sumText','aria-label':T('summary')});ta.value=keep.sumText!=null?keep.sumText:sum;
     var ok=el('button',{type:'button',class:'btn primary small',text:T('save')});
     ok.addEventListener('click',function(){var patch={summary:ta.value.trim(),summaryAt:now()};ok.disabled=true;
-      (det?db.doc('details/'+t.id).update(patch):db.doc('details/'+t.id).set(patch)).then(function(){sumEditing=false;renderSheet()}).catch(function(e){ok.disabled=false;toast(T('saveFail',{e:errText(e)}))})});
+      (det?db.doc('details/'+t.id).update(patch):db.doc('details/'+t.id).set(patch)).then(function(){sumEditing=false;renderSheet()}).catch(function(e){ok.disabled=false;toast(T('saveFail',{e:errText(e)}));refused(e)})});
     return el('div',{class:'block'},[head,ta,el('div',{class:'form-row'},[ok,el('button',{type:'button',class:'btn small',text:T('cancel'),onclick:function(){sumEditing=false;var a=$('sumText');if(a)a.value=sum;renderSheet()}})])]);
   }
 
@@ -975,6 +1000,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     br.addEventListener('change',function(){save(t.id,{branch:br.value.trim()||null})});
     var pr=el('input',{type:'url',id:'fPr',placeholder:'https://github.com/…/pull/N','aria-label':T('f_pr')});pr.value=activeId==='fPr'?keep.fPr:(t.pr||'');
     pr.addEventListener('change',function(){save(t.id,{pr:pr.value.trim()||null})});
+    s.disabled=o.disabled=br.disabled=pr.disabled=!writable();
 
     var spec=(det&&det.spec)||t.spec||'',acc=(det&&det.acceptance)||t.acceptance||'';
     var u=unmet(t),ds=t.deps||[];
@@ -1012,7 +1038,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     ]);
 
     var comp=null;
-    if(db&&me){
+    if(writable()&&me){
       var ta=el('textarea',{id:'msgText','aria-label':T('post'),placeholder:T('msgPh',{p:pname(me)})});ta.value=keep.msgText||'';
       var ty=el('select',{id:'msgType','aria-label':'type'});TYPES.forEach(function(x){ty.appendChild(el('option',{value:x,text:T('ty_'+x)}))});ty.value=keep.msgType||'note';
       var send=el('button',{type:'button',class:'btn primary',text:T('post')});
@@ -1020,9 +1046,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         markSeen(t.id,at);
         db.doc('tasks/'+t.id+'/messages/'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:ty.value,text:v})
           .then(function(){ta.value='';return db.doc('tasks/'+t.id).update({lastMessageAt:at,updatedAt:at})})
-          .catch(function(e){toast(T('postFail',{e:errText(e)}))}).then(function(){send.disabled=false})});
+          .catch(function(e){toast(T('postFail',{e:errText(e)}));refused(e)}).then(function(){send.disabled=false})});
       ta.addEventListener('keydown',function(e){if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();send.click()}});
-      comp=el('div',{class:'composer'},[ta,el('div',{class:'form-row'},[ty,send,el('span',{class:'muted',style:'font-size:12px',text:T('sendHint')})])]);
+      comp=el('div',{class:'composer'},[warnLine(),ta,el('div',{class:'form-row'},[ty,send,el('span',{class:'muted',style:'font-size:12px',text:T('sendHint')})])]);
     }
 
     var idx=order.indexOf(t.id);
@@ -1044,12 +1070,12 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // waitingOn (unfinished deps) lets an agent find pickable work with one query: status == todo, waitingOn == [].
   // While the board is open the page repairs any drift itself. It touches only waitingOn, not updatedAt, so it raises no "new" marker.
   // Every open board sees the same drift, so each waits a random moment and re-checks the latest snapshot:
-  // usually one board fixes it and the rest find nothing to do. A viewer who cannot write stops after the first refusal.
+  // usually one board fixes it and the rest find nothing to do. A view-only viewer never tries; one the platform said nothing about stops after the first refusal.
   var healing={},healTimer=null,healOff=false;
   function healWaiting(){
-    if(!db||healOff||healTimer)return;
+    if(!writable()||healOff||healTimer)return;
     healTimer=setTimeout(function(){
-      healTimer=null;
+      healTimer=null;if(!writable())return;
       tasks.forEach(function(t){
         var exp=unmet(t),cur=Array.isArray(t.waitingOn)?t.waitingOn:null;
         if(cur&&cur.length===exp.length&&cur.every(function(k,i){return k===exp[i]}))return;
@@ -1063,6 +1089,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   function start(){
     renderAll();
+    claude.use('user').then(function(u){if(!u)return;
+      return Promise.all([u.id(),u.can('data.write')]).then(function(r){uid=r[0]||null;canWrite=r[1];identify();renderAll()});
+    }).catch(function(){});
     claude.use('db').then(function(d){
       db=d;
       if(!db){failed=T('noDb');renderAll();return}
@@ -1087,6 +1116,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         if(!noticesLoaded){noticesLoaded=true;if(!read('ab-notice-init')){readNotices();write('ab-notice-init','1')}}
         renderHead();renderToolbar();if(view==='doc')renderFeed();
       },function(){});
+      db.collection('people').onSnapshot(function(s){links={};s.docs.forEach(function(x){var o=x.data();if(o&&typeof o.uid==='string')links[x.id]=o.uid});identify();renderAll()},function(){});
       db.doc('meta/protocol').onSnapshot(function(s){protocol=s.exists?s.data():null;if(view==='doc')renderRules()},function(){});
     });
   }

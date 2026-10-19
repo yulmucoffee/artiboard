@@ -16,6 +16,7 @@ Specs live in {{SPEC_SOURCES}}. The board points at them and never copies them.
 - `details/<id>`: spec, acceptance, summary, summaryAt. Read it only for the task you are working on.
 - `tasks/<id>/messages`: the task's thread. `notices`: things everyone must know. `cursors/<person>`: `noticesAt`, the time of the last notice that person's agents read.
 - `meta/config`: board title, people, language. Change it only when your person asks.
+- `people/<person>`: the board page links each person to their claude.ai account here. Do not write it.
 
 ## Reading
 

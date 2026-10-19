@@ -146,7 +146,7 @@ mkdir -p .claude/skills && cp -R "$HOME/.artiboard/src/skills/artiboard" .claude
 | "加一个 QA 状态""在卡片上显示估时" | **adapt**：同时修改页面和规则。 |
 | "领下一个任务""继续 M1-4" | 日常工作。Agent 遵循仓库里的 `docs/artiboard.md`：认领、讨论、摘要、评审、完成。 |
 
-安装完成后，从 artifact 的 **Share** 菜单以编辑权限分享给队友。队友的 agent 拉取仓库后就会读到规则。
+安装完成后，从 artifact 的 **Share** 菜单以编辑权限分享给队友。队友的 agent 拉取仓库后就会读到规则。 页面知道是谁在看：队友第一次在“I am”中选自己的名字时，看板会把它关联到其 claude.ai 账号，之后自动选中。有人用关联到其他账号的名字发帖时会给出警告；只读用户看不到领取、发帖和编辑按钮。
 
 ## 工作原理
 
@@ -170,6 +170,7 @@ flowchart LR
 | `notices` | 所有人都要知道的事 | Agent 只读游标之后的新内容 |
 | `cursors/<人>` | 此人的 agent 上次读公告的时间 | Agent |
 | `meta/config` | 标题、成员、语言、界面文案 | 页面 |
+| `people/<person>` | 最先选择该成员的 claude.ai 账号 | 页面 |
 | `docs/artiboard.md`（仓库） | Agent 规则 | 仅在使用看板的会话中由 agent 读取 |
 
 ## Token 设计
@@ -195,7 +196,7 @@ flowchart LR
 | `subtitle` | `"这块看板是做什么的。"` | 标题下的一行 |
 | `milestone` | `"M1"` | 当前里程碑 |
 | `lang` | `"en"`、`"ko"` | 内置界面语言，其他语言显示为英文。中文可用 `strings` 覆盖。 |
-| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | 顺序决定颜色。六种颜色后循环。 |
+| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | 顺序决定颜色。六种颜色后循环。 可选的 `uid` 把该成员固定到一个 claude.ai 账号，优先于 `people/<id>`。 |
 | `strings` | `{"v_graph":"依赖图"}` | 用任意语言覆盖任意界面文案 |
 | `footer` | `"..."` | 替换页脚文字 |
 

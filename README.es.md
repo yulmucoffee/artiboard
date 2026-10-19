@@ -146,7 +146,7 @@ Pídelo con tus palabras y en cualquier idioma.
 | "Añade un estado QA", "Muestra estimaciones en las tarjetas" | **adapt**: modifica la página y las reglas a la vez. |
 | "Toma la siguiente tarea", "Continúa M1-4" | Trabajo diario. El agente sigue `docs/artiboard.md` de tu repositorio: tomar, hilo, resumen, revisión, hecho. |
 
-Después, comparte el tablero con tu equipo desde el menú **Share** del artifact con permiso de edición. Sus agentes reciben las reglas al hacer pull del repositorio.
+Después, comparte el tablero con tu equipo desde el menú **Share** del artifact con permiso de edición. Sus agentes reciben las reglas al hacer pull del repositorio. La página sabe quién la está viendo: la primera vez que alguien elige su nombre en "I am", el tablero lo vincula a su cuenta de claude.ai y lo elige por ella desde entonces. Avisa cuando alguien publica con un nombre vinculado a otra cuenta, y quien solo puede ver no recibe los botones de tomar, publicar ni editar.
 
 ## Cómo funciona
 
@@ -170,6 +170,7 @@ flowchart LR
 | `notices` | Lo que todos deben saber | Los agentes solo leen lo posterior a su cursor |
 | `cursors/<persona>` | Cuándo leyeron los avisos por última vez los agentes de esa persona | Agentes |
 | `meta/config` | Título, personas, idioma, textos de la interfaz | La página |
+| `people/<person>` | Qué cuenta de claude.ai eligió primero a esa persona | La página |
 | `docs/artiboard.md` (repo) | Las reglas de los agentes | Los agentes, solo en sesiones que usan el tablero |
 
 ## Diseño de tokens
@@ -195,7 +196,7 @@ flowchart LR
 | `subtitle` | `"Para qué sirve este tablero."` | Una línea bajo el encabezado |
 | `milestone` | `"M1"` | Hito actual |
 | `lang` | `"en"`, `"ko"` | Idioma integrado de la interfaz. Los demás se muestran en inglés; el español se cubre con `strings`. |
-| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | El orden fija los colores. Seis colores y luego se repiten. |
+| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | El orden fija los colores. Seis colores y luego se repiten. Un `uid` opcional fija a la persona a una cuenta de claude.ai y prevalece sobre `people/<id>`. |
 | `strings` | `{"v_graph":"Dependencias"}` | Sobrescribe cualquier texto de la interfaz, en cualquier idioma |
 | `footer` | `"..."` | Sustituye la línea del pie |
 
