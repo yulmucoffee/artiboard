@@ -132,7 +132,7 @@ These are why the board stays cheap as people, agents and months pile up. Keep t
 - New milestone: batch the new `tasks` and `details`, update `meta/config.milestone`, post one notice. Done tasks stay but no query reads them.
 - Rule change: edit the repo rules file, update `meta/protocol` with `rev` + 1, and post one notice, together.
 - Page change or upgrade: read the live artifact first with the Artifact tool's `read` action, apply the change to that version, and republish to the same URL. Never republish just to change data.
-- Long-lived boards: when done tasks of past milestones pass a few hundred, move them to an `archive` collection in batches. The page and agents stop loading them.
+- Long-lived boards: one artifact database holds at most 25,000 documents, and every message, notice, task and detail is one document. Moving documents to an `archive` collection does not free any. When past milestones pass a few hundred done tasks, or a write fails with `quota_exceeded`, fold each finished milestone into one `archive/<milestone>` document (key, title, owner, PR and summary per task, under 256 KiB), then delete those tasks, their details, their messages and old notices in batches. Deleting is permanent, so show the user the counts and get a yes first.
 
 ## Rules for you
 

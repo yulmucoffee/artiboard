@@ -482,6 +482,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var SVGNS='http://www.w3.org/2000/svg';
   function sv(tag,a,kids){var n=document.createElementNS(SVGNS,tag);for(var k in a||{})n.setAttribute(k,a[k]);(kids||[]).forEach(function(c){n.appendChild(c)});return n}
   function $(id){return document.getElementById(id)}
+  // strings can come from meta/config, which anyone with write access edits: never innerHTML, only <kbd> becomes markup
+  function kbdText(n,s){n.textContent='';String(s).split(/(<kbd>[^<]*<\/kbd>)/).forEach(function(p){var m=/^<kbd>([^<]*)<\/kbd>$/.exec(p);if(m)n.appendChild(el('kbd',{text:m[1]}));else if(p)n.appendChild(document.createTextNode(p))})}
   function now(){return new Date().toISOString()}
   function keyNum(k){var m=/^([A-Za-z]+)(\d+)-(\d+)/.exec(k||'');return m?[m[1],+m[2],+m[3]]:[k||'',0,0]}
   function byKey(a,b){var x=keyNum(a.key),y=keyNum(b.key);return x[0]<y[0]?-1:x[0]>y[0]?1:(x[1]-y[1])||(x[2]-y[2])||((a.key||'')<(b.key||'')?-1:1)}
@@ -525,7 +527,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var ms=$('mMilestone');ms.textContent='';if(config.milestone){ms.appendChild(el('b',{text:T('milestone')}));ms.appendChild(document.createTextNode(' '+config.milestone))}
     var tb=document.querySelectorAll('#tabs button');tb[0].textContent=T('v_doc');tb[1].textContent=T('v_kanban');tb[2].textContent=T('v_graph');
     $('q').placeholder=T('search');$('q').setAttribute('aria-label',T('search'));$('qClear').setAttribute('aria-label',T('clearSearch'));
-    $('readAll').textContent=T('readAll');$('noticeRead').textContent=T('noticeRead');$('hint').innerHTML=T('hint');
+    $('readAll').textContent=T('readAll');$('noticeRead').textContent=T('noticeRead');kbdText($('hint'),T('hint'));
     ['now','people','items','notices','rules','kanban','graph'].forEach(function(k){$('h-'+k).textContent=T('h_'+k)});
     $('peopleSub').textContent=T('peopleSub');$('itemsSub').textContent=T('itemsSub');$('noticesSub').textContent=T('noticesSub');
     $('rulesSub').textContent=T('rulesSub');$('kanbanSub').textContent=T('kanbanSub');$('graphSub').textContent=T('graphSub');
@@ -1041,15 +1043,20 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // waitingOn (unfinished deps) lets an agent find pickable work with one query: status == todo, waitingOn == [].
   // While the board is open the page repairs any drift itself. It touches only waitingOn, not updatedAt, so it raises no "new" marker.
-  var healing={};
+  // Every open board sees the same drift, so each waits a random moment and re-checks the latest snapshot:
+  // usually one board fixes it and the rest find nothing to do. A viewer who cannot write stops after the first refusal.
+  var healing={},healTimer=null,healOff=false;
   function healWaiting(){
-    if(!db)return;
-    tasks.forEach(function(t){
-      var exp=unmet(t),cur=Array.isArray(t.waitingOn)?t.waitingOn:null;
-      if(cur&&cur.length===exp.length&&cur.every(function(k,i){return k===exp[i]}))return;
-      var sig=t.id+':'+exp.join(',');if(healing[sig])return;healing[sig]=1;
-      db.doc('tasks/'+t.id).update({waitingOn:exp}).catch(function(){});
-    });
+    if(!db||healOff||healTimer)return;
+    healTimer=setTimeout(function(){
+      healTimer=null;
+      tasks.forEach(function(t){
+        var exp=unmet(t),cur=Array.isArray(t.waitingOn)?t.waitingOn:null;
+        if(cur&&cur.length===exp.length&&cur.every(function(k,i){return k===exp[i]}))return;
+        var sig=t.id+':'+exp.join(',');if(healing[sig]||healOff)return;healing[sig]=1;
+        db.doc('tasks/'+t.id).update({waitingOn:exp}).catch(function(e){if(e&&e.code==='invalid_argument')healOff=true});
+      });
+    },500+Math.random()*2500);
   }
 
   function renderAll(){renderHead();renderToolbar();renderView();if(sel)renderSheet()}
