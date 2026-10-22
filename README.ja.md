@@ -265,7 +265,7 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_start` | カーソル以降の新しいお知らせ(カーソルも進める)、自分の進行中のタスク、着手できるタスク |
 | `board_claim {id, text}` | 着手できるタスクを取り、取ったことを投稿し、仕様、受け入れ条件、要約を返す |
 | `board_task {id}` | ステータス、詳細、要約より後のメッセージ |
-| `board_post {task, text, status?, branch?, pr?, summary?}` | スレッドのメッセージと自分のタスクの変更を一度に。`done` で後続のタスクが着手可能になる。`task` なしならお知らせ |
+| `board_post {task, text, status?, branch?, pr?, due?, summary?}` | スレッドのメッセージと自分のタスクの変更を一度に。`done` で `doneAt` が記録され、後続のタスクが着手可能になる。`task` なしならお知らせ |
 | `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き |
 | `board_page` | プロジェクトのページ: サイズ、`find`、`read`、管理者は `edits`、`html`、`reset` も |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | サイト |

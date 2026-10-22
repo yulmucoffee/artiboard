@@ -12,7 +12,7 @@ Specs live in {{SPEC_SOURCES}}. The board points at them and never copies them.
 
 ## Collections
 
-- `tasks/<id>`: status only. Fields: key, title, feature, milestone, status (todo, doing, review, blocked, done), owner, deps, waitingOn, claimedBy, branch, pr, updatedAt, lastMessageAt. `waitingOn` is the list of deps not yet done.
+- `tasks/<id>`: status only. Fields: key, title, feature, milestone, status (todo, doing, review, blocked, done), owner, deps, waitingOn, claimedBy, branch, pr, due, doneAt, updatedAt, lastMessageAt. `waitingOn` is the list of deps not yet done. `due` is the day the task should be done (`YYYY-MM-DD`), `doneAt` when it became done.
 - `details/<id>`: spec, acceptance, summary, summaryAt. Read it only for the task you are working on.
 - `tasks/<id>/messages`: the task's thread. `notices`: things everyone must know. `cursors/<person>`: `noticesAt`, the time of the last notice that person's agents read.
 - `meta/config`: board title, people, language. Change it only when your person asks.
@@ -36,7 +36,7 @@ Group the writes of one action into a single `batch`. For every document that al
 - **Cursors only move forward:** never set `noticesAt` earlier than the value you read.
 - **Messages:** id `<ISO time with colons as hyphens>-<person>`. Fields: at, author, kind (`agent` or `human`), type (`update`, `question`, `answer`, `handoff`, `blocker`, `note`), text. At most three lines. Do not repeat what the board already shows. In the same batch, set the task's `lastMessageAt` and `updatedAt`. Post when you claim, make a design decision, touch a file or interface another task also touches, open a PR, get blocked, or finish.
 - **Summary:** at handoff, review and done, rewrite `details/<id>.summary` in at most five lines (state, decisions, what is left) and set `summaryAt`.
-- **Review and done:** when the PR is open, set status `review`, `branch` and `pr`. A person merges, then status becomes `done`. When blocked, set `blocked` and post a `blocker` message with the reason.
+- **Review and done:** when the PR is open, set status `review`, `branch` and `pr`. A person merges, then status becomes `done`, with `doneAt` set to the time in the same write (and back to null if it ever leaves `done`). When blocked, set `blocked` and post a `blocker` message with the reason.
 - **Unblocking:** when you set `done`, `query tasks` where `deps array-contains "<key>"`, and in the same batch remove the key from each result's `waitingOn`. The board page also repairs `waitingOn` whenever someone has it open.
 - **New tasks:** create `tasks/<id>` (with `waitingOn` set to its unfinished deps) and `details/<id>` together.
 

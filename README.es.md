@@ -265,7 +265,7 @@ Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los nivele
 | `board_start` | Avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas, tareas disponibles |
 | `board_claim {id, text}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación y resumen |
 | `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen |
-| `board_post {task, text, status?, branch?, pr?, summary?}` | Un mensaje en el hilo más cambios en tu tarea; `done` desbloquea las que dependen de ella. Sin `task`: un aviso |
+| `board_post {task, text, status?, branch?, pr?, due?, summary?}` | Un mensaje en el hilo más cambios en tu tarea; `done` registra `doneAt` y desbloquea las que dependen de ella. Sin `task`: un aviso |
 | `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData` |
 | `board_page` | La página del proyecto: tamaño, `find`, `read` y, para administradores, `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio |

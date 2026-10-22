@@ -188,6 +188,16 @@ td.deps{min-width:110px;font-size:13px}
 td.deps .ok{color:var(--muted)}
 td.deps .wait{color:var(--warn);font-weight:600}
 td.when{white-space:nowrap;font-size:13px;color:var(--muted)}
+td.date{white-space:nowrap}
+.me-fixed{font-weight:600;padding:0 6px}
+.date{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.date.today{color:var(--warn);font-weight:600}
+.date.late{color:var(--danger);font-weight:600}
+.lane .done-list summary{cursor:pointer}
+.lane .done-list ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.lane .done-list li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.lane .done-list button.link{background:none;border:0;padding:0;text-align:left;color:var(--text2);line-height:1.45}
+.lane .done-list button.link:hover{text-decoration:underline;text-underline-offset:3px}
 
 /* notices */
 .feed{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:10px}
@@ -431,7 +441,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       ready:'Ready to pick',readyNone:'No unassigned task has all its dependencies done.',unlocks:'Unlocks {k} when done.',claim:'Claim',claimTitle:'Claim as {p}',
       alreadyClaimed:'Someone just claimed it.',claimed:'{p} claimed {k}.',claimFail:'Could not claim ({e})',saveFail:'Could not save ({e})',postFail:'Could not post ({e})',
       laneOpen:'{n} open',laneEmpty:'Nothing assigned. Pick from “Ready to pick” above.',laneNoMatch:'Nothing matches the filter.',laneDone:'Done {n}',waitingDeps:'waiting on {k}',
-      all:'All',filterGroup:'Filter by feature',th:['Key','Item','Depends on','Owner','Status','Updated'],doneOf:'{d}/{n} done',none:'none',noMatch:'No task matches the filter.',
+      f_due:'Due',f_doneAt:'Done',dueOn:'due {d}',dueToday:'due today',dueLate:'due {d} · late',doneOn:'done {d}',wd:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+      all:'All',filterGroup:'Filter by feature',th:['Key','Item','Depends on','Owner','Status','Date','Updated'],doneOf:'{d}/{n} done',none:'none',noMatch:'No task matches the filter.',
       noNotices:'No notices yet.',noticePh:'Post a notice as {p}',noticeBtn:'Post notice',noRules:'No rules document (meta/protocol) yet.',rulesIntro:'About',
       empty:'None',readyTag:'Ready',
       critLabel:'Longest remaining chain: {n} steps',critNote:' — this chain sets when {m} can finish. ',critNoteAll:' — this chain sets when the work can finish. ',allDone:'Every task is done.',noChain:'No remaining chain. What is left does not wait on anything.',
@@ -465,7 +476,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       ready:'바로 집을 수 있는 일',readyNone:'선행이 끝난 미배정 태스크가 없어요.',unlocks:'끝나면 {k}이(가) 풀려요.',claim:'집기',claimTitle:'{p}(으)로 집기',
       alreadyClaimed:'방금 다른 쪽이 집었어요.',claimed:'{k}을(를) {p}(이)가 집었어요.',claimFail:'집지 못했어요 ({e})',saveFail:'저장하지 못했어요 ({e})',postFail:'남기지 못했어요 ({e})',
       laneOpen:'진행 중인 일 {n}개',laneEmpty:'맡은 일이 없어요. 위 ‘바로 집을 수 있는 일’에서 고르세요.',laneNoMatch:'찾는 조건에 맞는 일이 없어요.',laneDone:'완료 {n}개',waitingDeps:'선행 {k} 대기',
-      all:'전체',filterGroup:'기능으로 거르기',th:['번호','항목','선행','담당','상태','최근'],doneOf:'{d}/{n} 완료',none:'없음',noMatch:'찾는 조건에 맞는 태스크가 없어요.',
+      f_due:'할 날',f_doneAt:'끝난 날',dueOn:'{d}까지',dueToday:'오늘까지',dueLate:'{d}까지 · 지남',doneOn:'{d} 완료',wd:['일','월','화','수','목','금','토'],
+      all:'전체',filterGroup:'기능으로 거르기',th:['번호','항목','선행','담당','상태','날짜','최근'],doneOf:'{d}/{n} 완료',none:'없음',noMatch:'찾는 조건에 맞는 태스크가 없어요.',
       noNotices:'아직 공지가 없어요.',noticePh:'{p}(으)로 공지 남기기',noticeBtn:'공지 남기기',noRules:'규칙 문서(meta/protocol)가 아직 없어요.',rulesIntro:'이 판은',
       empty:'없음',readyTag:'집을 수 있음',
       critLabel:'남은 최장 경로 {n}단계',critNote:' — 이 사슬이 {m} 끝을 정해요. ',critNoteAll:' — 이 사슬이 전체 끝을 정해요. ',allDone:'모든 태스크가 끝났어요.',noChain:'남은 사슬이 없어요. 남은 일은 서로 기다리지 않아요.',
@@ -493,7 +505,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var feat=read('ab-feature')||'all',view=read('ab-view')||'doc';if(VIEWS.indexOf(view)<0)view='doc';
   var me=read('ab-me')||'';
   // who is viewing, from the user capability: uid null = unknown (keep the honor-system picker), canWrite null = not told (keep controls)
-  var uid=null,canWrite=null,links={},picked=false;
+  var uid=null,canWrite=null,links={};
   var live=null,noticesAll=false,composing=false,protoUnsub=null,protoLoaded=false;
   var q='',newOnly=false,cursor=null,order=[],openPrevSeen='',det=null,unsubDet=null,sumEditing=false;
   var seen=readJSON('ab-seen')||{},noticeSeen=read('ab-notice-seen')||'';
@@ -522,13 +534,29 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function stamp(iso){var d=new Date(iso);if(!iso||isNaN(d))return '';return (d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())}
   function ago(iso){var d=new Date(iso);if(!iso||isNaN(d))return '';var s=(Date.now()-d)/1000;if(s<60)return T('ago_now');if(s<3600)return T('ago_m',{n:Math.floor(s/60)});if(s<86400)return T('ago_h',{n:Math.floor(s/3600)});if(s<86400*7)return T('ago_d',{n:Math.floor(s/86400)});return stamp(iso)}
   function lastTouch(t){return [t.lastMessageAt,t.updatedAt].filter(Boolean).sort().pop()||''}
+  // due is a local calendar day (YYYY-MM-DD); doneAt is the moment the task became done
+  function localDay(iso){var d=new Date(iso);if(!iso||isNaN(d))return '';return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+  function dayLabel(ymd){var m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(ymd||'');if(!m)return '';return (+m[2])+'-'+m[3]+'('+T('wd')[new Date(+m[1],m[2]-1,+m[3]).getDay()]+')'}
+  function dueOf(t){return typeof t.due==='string'&&/^\d{4}-\d\d-\d\d$/.test(t.due)?t.due:''}
+  function byDue(a,b){var x=dueOf(a)||'9',y=dueOf(b)||'9';return x<y?-1:x>y?1:byKey(a,b)}
+  function byDone(a,b){var x=a.doneAt||'',y=b.doneAt||'';return x<y?1:x>y?-1:byKey(a,b)}
+  function dateChip(t){
+    if(st(t)==='done'){var d=localDay(t.doneAt);return d?el('span',{class:'date',text:T('doneOn',{d:dayLabel(d)})}):null}
+    var u=dueOf(t),td=localDay(now());if(!u)return null;
+    return el('span',{class:'date'+(u<td?' late':u===td?' today':''),text:u===td?T('dueToday'):T(u<td?'dueLate':'dueOn',{d:dayLabel(u)})});
+  }
   function person(id){for(var i=0;i<people.length;i++)if(people[i].id===id)return people[i];return null}
   function pname(id){var p=person(id);return p?(p.name||p.id):(id||T('unassigned'))}
   function pclass(id){for(var i=0;i<people.length;i++)if(people[i].id===id)return ' p'+(typeof people[i].color==='number'?people[i].color%6:i%6);return ''}
   // a person's account: meta/config.people[].uid (set by hand) wins over people/<id>.uid (written the first time someone picks that person)
   function uidOf(id){var p=person(id);return (p&&p.uid)||links[id]||null}
   function linked(){if(!uid)return null;for(var i=0;i<people.length;i++)if(uidOf(people[i].id)===uid)return people[i].id;return null}
-  function identify(){var l=linked();if(l&&!picked)me=l}
+  // the signed-in account decides who the viewer is: a linked account is that person; an unlinked one is nobody
+  // until it picks an unlinked person, which links it for good (a board of one links its only person at once)
+  function identify(){
+    var l=linked();if(l){me=l;return}if(!uid)return;
+    if(people.length===1&&!uidOf(people[0].id)){me=people[0].id;link(me)}else me='';
+  }
   function writable(){return !!db&&canWrite!==false}
   function meWarn(){if(!uid||!me)return '';var u=uidOf(me),l=linked();return u&&u!==uid?T('notYou',{p:pname(me)}):l&&l!==me?T('linkedElse',{p:pname(me),q:pname(l)}):''}
   function warnLine(){var w=meWarn();return w?el('p',{class:'err',text:w}):null}
@@ -575,8 +603,12 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     $('filters').setAttribute('aria-label',T('filterGroup'));
     var th=$('thead');th.textContent='';T('th').forEach(function(x){th.appendChild(el('th',{text:x}))});
     $('footer').textContent=config.footer||T('footer');
-    var ms2=$('meSel');ms2.textContent='';ms2.setAttribute('aria-label',T('iAm'));
-    people.forEach(function(p){ms2.appendChild(el('button',{type:'button','data-me':p.id,'aria-pressed':String(p.id===me),text:p.name||p.id}))});
+  }
+  // a linked account sees its own name and nothing to choose; without an account (honor system) any person can be chosen
+  function renderMe(){
+    var ms=$('meSel'),l=linked();ms.textContent='';ms.setAttribute('aria-label',T('iAm'));
+    if(l){ms.appendChild(el('span',{class:'me-fixed',text:pname(l)}));return}
+    people.forEach(function(p){if(uid&&uidOf(p.id))return;ms.appendChild(el('button',{type:'button','data-me':p.id,'aria-pressed':String(p.id===me),text:p.name||p.id}))});
   }
 
   // ---------- "new" markers (this browser only) ----------
@@ -597,7 +629,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // ---------- header and toolbar ----------
   function renderHead(){
-    document.querySelectorAll('#meSel button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.me===me))});
+    renderMe();
     var w=meWarn(),note=canWrite===false?T('viewOnly'):w||(uid&&db&&people.length>1&&!linked()?T('pickMe'):''),mn=$('meNote');
     mn.textContent=note;mn.hidden=!note;mn.className=w&&canWrite!==false?'err':'muted';
     var c={};STATUS.forEach(function(s){c[s]=0});tasks.forEach(function(t){c[st(t)]++});
@@ -625,7 +657,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     $('qResult').textContent=filtering()&&loaded?T('results',{n:tasks.filter(match).length}):'';
     $('noticeRead').hidden=!nn;
   }
-  $('meSel').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;me=b.dataset.me;picked=true;write('ab-me',me);link(me);renderAll()});
+  $('meSel').addEventListener('click',function(e){var b=e.target.closest('button');if(!b||(uid&&(linked()||uidOf(b.dataset.me))))return;me=b.dataset.me;write('ab-me',me);link(me);renderAll()});
   $('tabs').addEventListener('click',function(e){var b=e.target.closest('button');if(b)setView(b.dataset.view)});
   $('newBtn').addEventListener('click',function(){newOnly=!newOnly;renderAll()});
   $('readAll').addEventListener('click',readAll);
@@ -642,7 +674,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // ---------- document view ----------
   function pickItem(t,cls,note,action){
     return el('li',{class:'pick'+(cls?' '+cls:'')},[
-      el('div',{class:'row'},[el('span',{class:'key',text:t.key}),el('span',{class:'tag',text:t.feature||''}),t.owner?who(t.owner):null,agentMark(t),newDot(isNew(t))]),
+      el('div',{class:'row'},[el('span',{class:'key',text:t.key}),el('span',{class:'tag',text:t.feature||''}),dateChip(t),t.owner?who(t.owner):null,agentMark(t),newDot(isNew(t))]),
       el('button',{type:'button',class:'title',text:t.title||T('untitled'),onclick:function(){open(t.id)}}),
       note?el('div',{class:'note',text:note}):null,
       action
@@ -694,27 +726,33 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     }).catch(function(e){toast(T('claimFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false});
   }
 
-  var ORDER={blocked:0,review:1,doing:2,todo:3};
+  var ORDER={blocked:0,review:1,doing:2,todo:3},doneOpen={};
   function renderLanes(){
     var root=$('lanes');root.textContent='';
     people.forEach(function(p){
       var mine=tasks.filter(function(t){return t.owner===p.id});
       var openAll=mine.filter(function(t){return st(t)!=='done'});
-      var openList=openAll.filter(match).sort(function(a,b){return (ORDER[st(a)]-ORDER[st(b)])||byKey(a,b)});
+      var openList=openAll.filter(match).sort(function(a,b){return (ORDER[st(a)]-ORDER[st(b)])||byDue(a,b)});
       var ul=el('ul',{class:'todo'});
       openList.forEach(function(t){
         var u=unmet(t),bits=[t.feature];
         if(u.length)bits.push(T('waitingDeps',{k:u.join(', ')}));
         if(t.branch)bits.push(t.branch);
         ul.appendChild(el('li',{},[
-          el('span',{class:'t'},[state(st(t)),el('span',{class:'key',text:t.key}),el('button',{type:'button',class:'link',text:t.title||T('untitled'),onclick:function(){open(t.id)}}),agentMark(t),newDot(isNew(t))]),
+          el('span',{class:'t'},[state(st(t)),el('span',{class:'key',text:t.key}),el('button',{type:'button',class:'link',text:t.title||T('untitled'),onclick:function(){open(t.id)}}),dateChip(t),agentMark(t),newDot(isNew(t))]),
           el('span',{class:'d',text:bits.filter(Boolean).join(' · ')})
         ]));
       });
+      // done work stays folded under the lane, newest first, with the day it was finished
+      var doneList=mine.filter(function(t){return st(t)==='done'&&match(t)}).sort(byDone);
+      var foot=doneList.length?el('details',{class:'done-list',open:doneOpen[p.id]?'':null,ontoggle:function(e){doneOpen[p.id]=e.currentTarget.open}},[
+        el('summary',{text:T('laneDone',{n:mine.length-openAll.length})}),
+        el('ul',{},doneList.map(function(t){return el('li',{},[el('span',{class:'key',text:t.key}),el('button',{type:'button',class:'link',text:t.title||T('untitled'),onclick:function(){open(t.id)}}),dateChip(t)])}))
+      ]):T('laneDone',{n:mine.length-openAll.length});
       root.appendChild(el('div',{class:'lane'+pclass(p.id)},[
         el('div',{class:'head'},[el('strong',{text:p.name||p.id}),p.id===me&&people.length>1?el('span',{class:'me',text:T('meTag')}):null,p.role?el('span',{class:'muted',text:p.role}):null,el('span',{class:'muted',text:T('laneOpen',{n:openAll.length})})]),
         !loaded?el('p',{class:'empty',text:failed||T('loading')}):openList.length?ul:el('p',{class:'empty',text:openAll.length?T('laneNoMatch'):T('laneEmpty')}),
-        el('div',{class:'foot',text:T('laneDone',{n:mine.length-openAll.length})})
+        el('div',{class:'foot'},[foot])
       ]));
     });
   }
@@ -727,13 +765,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       fr.appendChild(el('button',{type:'button',class:'chip','aria-pressed':String(feat===f),text:(f==='all'?T('all'):f)+' '+n,onclick:function(){feat=f;write('ab-feature',f);renderTable();applyCursor()}}));
     });
     var body=$('rows');body.textContent='';order=[];
-    if(!loaded){body.appendChild(el('tr',{},[el('td',{colspan:'6',class:'empty',text:failed||T('loading')})]));return}
+    if(!loaded){body.appendChild(el('tr',{},[el('td',{colspan:'7',class:'empty',text:failed||T('loading')})]));return}
     (feat==='all'?fs:[feat]).forEach(function(f){
       var all=tasks.filter(function(t){return featOf(t)===f});
       var list=all.filter(match).sort(byKey);
       if(!list.length)return;
       var dn=all.filter(function(t){return st(t)==='done'}).length;
-      body.appendChild(el('tr',{class:'group'},[el('th',{colspan:'6',scope:'colgroup'},[f,el('span',{class:'n',text:T('doneOf',{d:dn,n:all.length})})])]));
+      body.appendChild(el('tr',{class:'group'},[el('th',{colspan:'7',scope:'colgroup'},[f,el('span',{class:'n',text:T('doneOf',{d:dn,n:all.length})})])]));
       list.forEach(function(t){
         order.push(t.id);
         var u=unmet(t),ds=t.deps||[];
@@ -744,11 +782,12 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           el('td',{class:'deps'},[deps]),
           el('td',{},[who(t.owner),' ',agentMark(t)]),
           el('td',{},[state(st(t))]),
+          el('td',{class:'date'},[dateChip(t)]),
           el('td',{class:'when',text:ago(lastTouch(t))})
         ]));
       });
     });
-    if(!order.length)body.appendChild(el('tr',{},[el('td',{colspan:'6',class:'empty',text:T('noMatch')})]));
+    if(!order.length)body.appendChild(el('tr',{},[el('td',{colspan:'7',class:'empty',text:T('noMatch')})]));
   }
 
   function renderFeed(){
@@ -818,7 +857,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           el('div',{class:'row'},[el('span',{class:'key',text:t.key}),el('span',{class:'tag',text:t.feature||''}),newDot(isNew(t))]),
           el('div',{class:'title',text:t.title||T('untitled')}),
           st(t)!=='done'&&u.length?el('div',{class:'warnline',text:T('waitingDeps',{k:u.join(', ')})}):null,
-          el('div',{class:'row'},[who(t.owner),agentMark(t),ready(t)?el('span',{class:'tag',style:'color:var(--accent);font-weight:600',text:T('readyTag')}):null])
+          el('div',{class:'row'},[who(t.owner),dateChip(t),agentMark(t),ready(t)?el('span',{class:'tag',style:'color:var(--accent);font-weight:600',text:T('readyTag')}):null])
         ]));
       });
       cols.appendChild(el('div',{class:'col'},[el('h3',{},[state(s),el('span',{class:'n',text:String(list.length)})]),cards]));
@@ -1017,7 +1056,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     root.textContent='';
 
     var s=el('select',{id:'fStatus','aria-label':T('f_status')});STATUS.forEach(function(x){s.appendChild(el('option',{value:x,text:SL(x)}))});s.value=st(t);
-    s.addEventListener('change',function(){var p={status:s.value};if(s.value==='todo')p.claimedBy=null;save(t.id,p)});
+    s.addEventListener('change',function(){var p={status:s.value};if(s.value==='todo')p.claimedBy=null;
+      if(s.value==='done'&&st(t)!=='done')p.doneAt=now();else if(s.value!=='done'&&t.doneAt)p.doneAt=null;save(t.id,p)});
     var o=el('select',{id:'fOwner','aria-label':T('f_owner')});o.appendChild(el('option',{value:'',text:T('unassigned')}));
     people.forEach(function(p){o.appendChild(el('option',{value:p.id,text:p.name||p.id}))});
     if(t.owner&&!person(t.owner))o.appendChild(el('option',{value:t.owner,text:t.owner}));
@@ -1027,7 +1067,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     br.addEventListener('change',function(){save(t.id,{branch:br.value.trim()||null})});
     var pr=el('input',{type:'url',id:'fPr',placeholder:'https://github.com/…/pull/N','aria-label':T('f_pr')});pr.value=activeId==='fPr'?keep.fPr:(t.pr||'');
     pr.addEventListener('change',function(){save(t.id,{pr:pr.value.trim()||null})});
-    s.disabled=o.disabled=br.disabled=pr.disabled=!writable();
+    var du=el('input',{type:'date',id:'fDue','aria-label':T('f_due')});du.value=dueOf(t);
+    du.addEventListener('change',function(){save(t.id,{due:du.value||null})});
+    s.disabled=o.disabled=br.disabled=pr.disabled=du.disabled=!writable();
 
     var spec=(det&&det.spec)||t.spec||'',acc=(det&&det.acceptance)||t.acceptance||'';
     var u=unmet(t),ds=t.deps||[];
@@ -1050,11 +1092,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
     var body=el('div',{class:'body'},[
       el('div',{class:'block'},[
-        el('div',{style:'display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center'},[el('span',{class:'tag',text:t.feature||''}),state(st(t)),who(t.owner),agentMark(t)]),
+        el('div',{style:'display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center'},[el('span',{class:'tag',text:t.feature||''}),state(st(t)),who(t.owner),dateChip(t),agentMark(t)]),
         el('h2',{id:'sheetTitle',text:t.title||T('untitled')}),
         st(t)!=='done'&&u.length?el('p',{style:'color:var(--warn);font-size:13.5px',text:T('depsPending',{k:u.join(', ')})}):null
       ]),
-      el('div',{class:'fields'},[el('span',{class:'k',text:T('f_status')}),s,el('span',{class:'k',text:T('f_owner')}),o,el('span',{class:'k',text:T('f_branch')}),br,el('span',{class:'k',text:T('f_pr')}),pr]),
+      el('div',{class:'fields'},[el('span',{class:'k',text:T('f_status')}),s,el('span',{class:'k',text:T('f_owner')}),o,el('span',{class:'k',text:T('f_branch')}),br,el('span',{class:'k',text:T('f_pr')}),pr,
+        el('span',{class:'k',text:T('f_due')}),du,
+        st(t)==='done'&&t.doneAt?el('span',{class:'k',text:T('f_doneAt')}):null,st(t)==='done'&&t.doneAt?el('span',{text:stamp(t.doneAt)}):null]),
       claimLine,
       t.pr&&/^https:\/\//.test(t.pr)?el('a',{href:t.pr,target:'_blank',rel:'noopener',text:T('openPrLink'),style:'font-size:13.5px'}):null,
       summaryBlock(t,keep),

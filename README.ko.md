@@ -265,7 +265,7 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_start` | 커서 이후의 새 공지(커서도 옮김), 내가 맡은 열린 태스크, 준비된 태스크 |
 | `board_claim {id, text}` | 준비된 태스크를 집고, 집었다는 글을 남기고, 스펙, 인수 조건, 요약을 돌려줍니다 |
 | `board_task {id}` | 상태, 세부 내용, 요약 이후의 메시지 |
-| `board_post {task, text, status?, branch?, pr?, summary?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. `done`이면 뒤따르는 태스크가 풀립니다. `task`가 없으면 공지 |
+| `board_post {task, text, status?, branch?, pr?, due?, summary?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀립니다. `task`가 없으면 공지 |
 | `board_get`, `board_query`, `board_batch` | 문서를 `ArtifactData`와 같은 방식으로 읽고 씁니다 |
 | `board_page` | 프로젝트 페이지: 크기, `find`, `read`, 관리자는 `edits`, `html`, `reset`까지 |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 사이트 |

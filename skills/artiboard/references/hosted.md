@@ -35,11 +35,11 @@ node "$HOME/.artiboard/src/server/cli.js" init --person <id> --name <name>
 2. Draft tasks as in SKILL.md "Read the project, then draft" (key, title, feature, deps, spec, acceptance), show the table and wait for a yes. Find keys already used with `board_query tasks` where `milestone == "<M>"`, `fields: ["key"]`, limit 200. Then `board_batch`, at most 100 writes per call, `if_absent: true` on each, no null fields:
 
    ```json
-   {"op":"set","path":"tasks/M1-3","if_absent":true,"data":{"key":"M1-3","title":"…","feature":"…","milestone":"M1","status":"todo","deps":["M1-1"],"waitingOn":["M1-1"],"updatedAt":"<ISO>"}}
+   {"op":"set","path":"tasks/M1-3","if_absent":true,"data":{"key":"M1-3","title":"…","feature":"…","milestone":"M1","status":"todo","deps":["M1-1"],"waitingOn":["M1-1"],"due":"2026-11-02","updatedAt":"<ISO>"}}
    {"op":"set","path":"details/M1-3","if_absent":true,"data":{"spec":"docs/api.md §2","acceptance":"…"}}
    ```
 
-   `waitingOn` = deps not done. Post one notice with `board_post {project, text}`. For a new milestone, also update `meta/config.milestone` (`board_get`, then `update` with `if_version`).
+   `waitingOn` = deps not done. `due` (`YYYY-MM-DD`) only when the plan names a day; leave it out otherwise. Post one notice with `board_post {project, text}`. For a new milestone, also update `meta/config.milestone` (`board_get`, then `update` with `if_version`).
 3. Fill `references/protocol-hosted.md` in the board's language and write it to `docs/artiboard.md`. Replace every `{{…}}`; `{{BOARD_URL}}` is the `site` from `board_whoami`. An older `docs/artiboard.md` is replaced the same way; keep its repo-specific lines.
 4. Add the pointer block to `CLAUDE.md` for Claude Code and to `AGENTS.md` for Codex: both when the team uses both, otherwise whichever the repo has (create `AGENTS.md` if Codex is used and it is missing). Replace any existing block between the markers:
 

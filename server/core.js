@@ -77,7 +77,7 @@ export const PROTOCOL = {
   en: `People and their coding agents (Claude Code, Codex) share this board. Agents read and write it through the artiboard MCP server and follow docs/artiboard.md in the repository. This card is the copy for people.
 
 0. Documents
-- tasks/<key>: status only (key, title, feature, milestone, status, owner, deps, waitingOn, claimedBy, branch, pr, updatedAt).
+- tasks/<key>: status only (key, title, feature, milestone, status, owner, deps, waitingOn, claimedBy, branch, pr, due, doneAt, updatedAt). due is the day it should be done (YYYY-MM-DD), doneAt when it was done.
 - details/<key>: where the spec lives, acceptance, summary. tasks/<key>/messages: the task's thread.
 - notices: what everyone must know. cursors/<person>: the last notice that person's agents read.
 
@@ -94,7 +94,7 @@ export const PROTOCOL = {
   ko: `사람과 각자의 코딩 에이전트(Claude Code, Codex)가 이 판을 같이 씁니다. 에이전트는 artiboard MCP 서버로 읽고 쓰고, 저장소의 docs/artiboard.md를 따릅니다. 이 카드는 사람이 보는 사본이에요.
 
 0. 문서
-- tasks/<번호>: 상태만 (key, title, feature, milestone, status, owner, deps, waitingOn, claimedBy, branch, pr, updatedAt).
+- tasks/<번호>: 상태만 (key, title, feature, milestone, status, owner, deps, waitingOn, claimedBy, branch, pr, due, doneAt, updatedAt). due는 할 날(YYYY-MM-DD), doneAt은 끝난 시각이에요.
 - details/<번호>: 스펙 위치, 인수 조건, 요약. tasks/<번호>/messages: 태스크 스레드.
 - notices: 모두 알아야 할 것. cursors/<사람>: 그 사람의 에이전트가 마지막으로 읽은 공지.
 
