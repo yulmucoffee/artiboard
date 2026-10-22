@@ -114,6 +114,18 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
 .dialog .fixed b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
 .dialog .foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .dialog .hint{font-size:12.5px;color:var(--muted);line-height:1.5}
+
+/* what changed, version by version */
+.ver{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:1px 9px}
+.ver:hover{border-color:var(--edge);color:var(--ink)}
+.log{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.log>li{padding:14px 20px;border-top:1px solid var(--line-soft);display:grid;gap:4px;min-width:0}
+.log>li:first-child{border-top:0}
+.log .h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.log .v{font-family:var(--f-mono);font-weight:600;font-size:13.5px}
+.log .when{font-size:12.5px;color:var(--muted)}
+.log .when a{color:inherit}
+.log ul{margin:0;padding-left:1.15em;color:var(--text2);font-size:13.5px;display:grid;gap:2px;overflow-wrap:anywhere}
 @media (max-width:640px){form.row,form.row.members{grid-template-columns:1fr}h1{font-size:24px}}
 </style>
 </head>
@@ -121,6 +133,7 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
 <div class="page">
   <header>
     <h1 id="hSite"></h1>
+    <a class="ver" id="ver" href="#changes" hidden></a>
     <span class="me"><button type="button" class="who" id="meBtn" hidden></button><button type="button" class="linkbtn" id="signOut" hidden></button></span>
   </header>
   <section>
@@ -150,6 +163,10 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
       <p class="err" id="mErr" hidden></p>
     </form>
   </section>
+  <section id="changes" hidden>
+    <div class="sec-head"><h2 id="hChanges"></h2></div>
+    <ol class="log" id="log"></ol>
+  </section>
 </div>
 <div id="dialogRoot"></div>
 <script src="/shim.js"></script>
@@ -170,6 +187,7 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
       tokenK:'Token',linkK:'One-time link (one hour, one use)',claudeK:'Claude Code',codexK:'Codex (the token stays in the shell environment)',browserK:'Browser: open {u} and paste the token, or open the link.',copy:'Copy',copied:'Copied',close:'Close',
       profile:'Profile',pName:'Display name',pTitle:'What you do (shown on every board)',pTitlePh:'e.g. backend, design',save:'Save',cancel:'Cancel',saved:'Saved.',
       pHint:'Your name and role show on every board you sit on. The person id and the access level are set by site admins.',pFixed:'Person {p} · {a}',
+      changes:'Updates',older:'Show {n} earlier versions',fewer:'Show fewer',
       fail:'Could not do that ({e})'},
     ko:{boards:'작업판',loading:'불러오는 중이에요.',loadFail:'불러오지 못했어요 ({e})',none:'아직 프로젝트가 없어요. 아래에서 만드세요.',signOut:'로그아웃',
       new:'새 프로젝트',title:'이름',titlePh:'예: 결제 화면 개편',id:'주소 (영문 소문자 · 숫자 · -)',idPh:'예: checkout',create:'만들기',
@@ -185,6 +203,7 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
       tokenK:'토큰',linkK:'일회용 링크 (한 시간, 한 번)',claudeK:'Claude Code',codexK:'Codex (토큰은 셸 환경 변수에 둬요)',browserK:'브라우저: {u} 을 열고 토큰을 붙여 넣거나, 링크를 열어요.',copy:'복사',copied:'복사했어요',close:'닫기',
       profile:'프로필',pName:'표시 이름',pTitle:'하는 일 (모든 판에 보여요)',pTitlePh:'예: 백엔드, 디자인',save:'저장',cancel:'취소',saved:'저장했어요.',
       pHint:'이름과 역할은 내가 있는 모든 판의 사람 목록에 보여요. 아이디와 권한은 사이트 관리자가 정해요.',pFixed:'아이디 {p} · {a}',
+      changes:'업데이트 내역',older:'이전 버전 {n}개 보기',fewer:'접기',
       fail:'하지 못했어요 ({e})'}
   };
   var L=I18N.en;
@@ -235,6 +254,34 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
     }
     load();
     document.addEventListener('visibilitychange',function(){if(!document.hidden){load();if(me.role==='admin')loadMembers()}});
+
+    // what changed, version by version, from the changelog.json shipped with this site
+    fetch('/changelog.json',{cache:'no-cache'}).then(function(r){return r.ok?r.json():null}).then(function(c){
+      var vs=(c&&Array.isArray(c.versions)?c.versions:[]).filter(function(v){return v&&v.version});
+      if(!vs.length)return;
+      var ver=$('ver');ver.textContent='v'+vs[0].version;ver.hidden=false;
+      $('hChanges').textContent=T('changes');$('changes').hidden=false;
+      var repo=typeof c.repo==='string'&&/^https:\/\//.test(c.repo)?c.repo.replace(/\/$/,''):'',all=false,SHOW=3;
+      function when(v){
+        var prs=(Array.isArray(v.prs)?v.prs:[]).filter(function(n){return typeof n==='number'});
+        return el('span',{class:'when'},[v.date||''].concat(prs.length?[' · ']:[]).concat(prs.map(function(n,i){
+          var t=(i?' ':'')+'#'+n;return repo?el('a',{href:repo+'/pull/'+n,target:'_blank',rel:'noopener',text:t}):t})));
+      }
+      function draw(){
+        var ol=$('log');ol.textContent='';
+        (all?vs:vs.slice(0,SHOW)).forEach(function(v){
+          var lines=v.lines&&(v.lines[s.config.lang]||v.lines.en)||[];
+          ol.appendChild(el('li',{},[el('div',{class:'h'},[el('span',{class:'v',text:'v'+v.version}),when(v)]),
+            el('ul',{},lines.map(function(t){return el('li',{text:t})}))]));
+        });
+        if(vs.length>SHOW){
+          var b=el('button',{type:'button',class:'linkbtn',text:all?T('fewer'):T('older',{n:vs.length-SHOW})});
+          b.addEventListener('click',function(){all=!all;draw()});
+          ol.appendChild(el('li',{},[b]));
+        }
+      }
+      draw();
+    }).catch(function(){});
 
     var title=$('nTitle'),id=$('nId'),touched=false;
     title.addEventListener('input',function(){if(touched)return;var g=title.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);id.value=g;hint(g)});

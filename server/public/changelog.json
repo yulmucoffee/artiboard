@@ -1,0 +1,238 @@
+{
+  "repo": "https://github.com/yulmucoffee/artiboard",
+  "versions": [
+    {
+      "version": "1.7.0",
+      "date": "2026-10-22",
+      "prs": [
+        14
+      ],
+      "lines": {
+        "en": [
+          "Admins add members, issue tokens and sign-in links, change access, revoke and remove from a Members panel on the project list.",
+          "Everyone sets their own display name and role in Profile; it shows on every board they sit on."
+        ],
+        "ko": [
+          "관리자가 프로젝트 목록 화면의 멤버 패널에서 멤버 추가, 토큰 발급, 로그인 링크, 권한 변경, 회수, 삭제를 해요.",
+          "누구나 프로필에서 표시 이름과 역할을 직접 정하고, 자기가 있는 모든 판에 그대로 보여요."
+        ]
+      }
+    },
+    {
+      "version": "1.6.0",
+      "date": "2026-10-22",
+      "prs": [
+        11
+      ],
+      "lines": {
+        "en": [
+          "The project list shows what changed in each version: the newest three open, older ones behind a toggle.",
+          "Every pull request adds a two-to-three-line entry in English and Korean and bumps the version; the tests check both."
+        ],
+        "ko": [
+          "프로젝트 목록 화면에 버전별 업데이트 내역이 보여요. 최근 세 버전은 펼쳐 두고 이전 버전은 눌러서 봐요.",
+          "PR마다 한국어 · 영어 2~3줄 요약을 넣고 버전을 올려요. 테스트가 빠진 걸 잡아요."
+        ]
+      }
+    },
+    {
+      "version": "1.5.1",
+      "date": "2026-10-22",
+      "prs": [
+        13
+      ],
+      "lines": {
+        "en": [
+          "The READMEs describe the new board page and show fresh light and dark screenshots of it."
+        ],
+        "ko": [
+          "README가 새 보드 화면을 소개하고, 라이트 · 다크 스크린샷을 새로 찍어 넣었어요."
+        ]
+      }
+    },
+    {
+      "version": "1.5.0",
+      "date": "2026-10-22",
+      "prs": [
+        12
+      ],
+      "lines": {
+        "en": [
+          "The board page gets a recent-activity feed, late and due-today flags, sortable columns, a \"mine\" filter and a light / dark theme switch.",
+          "board_start lists every task assigned to you and finds ready work from the dependency tasks themselves, even when nobody has the page open.",
+          "Agents can hand a task back for anyone with status \"todo\", and the tool listing every session reads is about 13% shorter."
+        ],
+        "ko": [
+          "보드 화면에 최근 활동, 늦은 일 · 오늘 마감 표시, 정렬되는 표, '내 것' 필터, 라이트 · 다크 테마 전환이 생겼어요.",
+          "board_start가 나에게 배정된 태스크를 모두 보여 주고, 페이지를 아무도 안 열어도 의존 태스크를 직접 보고 바로 할 일을 찾아요.",
+          "에이전트가 상태를 '할 일'로 돌려 태스크를 누구나 가져가게 놓을 수 있고, 세션마다 읽는 도구 목록이 13%쯤 짧아졌어요."
+        ]
+      }
+    },
+    {
+      "version": "1.4.0",
+      "date": "2026-10-22",
+      "prs": [
+        10
+      ],
+      "lines": {
+        "en": [
+          "Board rules now ship with artiboard and reach agents through board_start; each project keeps only its own agreements and shared notes, edited on the page.",
+          "Tasks get a start day next to the due day, projects list their GitHub repositories so agents find a repository's ready work, and every section of the page folds."
+        ],
+        "ko": [
+          "보드 공통 규칙은 artiboard에 들어 있고 board_start로 에이전트에게 가요. 프로젝트는 자기 약속과 공유 메모만 페이지에서 고쳐요.",
+          "태스크에 시작일이 생기고, 프로젝트에 GitHub 저장소를 이으면 에이전트가 그 저장소의 할 일을 찾아요. 페이지의 모든 구역을 접을 수 있어요."
+        ]
+      }
+    },
+    {
+      "version": "1.3.1",
+      "date": "2026-10-22",
+      "prs": [
+        9
+      ],
+      "lines": {
+        "en": [
+          "Vercel deploys run in the region set with VERCEL_REGION; before, they fell back to the project's default region."
+        ],
+        "ko": [
+          "Vercel 배포가 VERCEL_REGION으로 정한 지역에서 돌아요. 전에는 프로젝트 기본 지역으로 돌아갔어요."
+        ]
+      }
+    },
+    {
+      "version": "1.3.0",
+      "date": "2026-10-22",
+      "prs": [
+        8
+      ],
+      "lines": {
+        "en": [
+          "Who you are on the board follows your signed-in account; the \"I am\" picker stays only where the platform cannot tell.",
+          "Tasks gain a due day and a done time, shown in every view with late days in red. board_post takes due and stamps doneAt."
+        ],
+        "ko": [
+          "보드의 '나'가 로그인한 계정을 따라가요. 누구인지 알 수 없는 곳에서만 이름을 골라요.",
+          "태스크에 할 날과 끝난 시각이 생겨 모든 보기에 보여요. 지난 날은 빨갛게 표시되고, board_post로 할 날을 넣으면 완료할 때 끝난 시각이 찍혀요."
+        ]
+      }
+    },
+    {
+      "version": "1.2.1",
+      "date": "2026-10-22",
+      "prs": [
+        7
+      ],
+      "lines": {
+        "en": [
+          "Errors no longer pass database details to browsers or agents, and unknown project addresses look like known ones.",
+          "Every write path checks who is who, and revoking a member signs them out everywhere."
+        ],
+        "ko": [
+          "오류 응답에 DB 내부 내용이 나가지 않고, 없는 프로젝트 주소도 있는 주소처럼 보여 id를 알아낼 수 없어요.",
+          "모든 쓰기에서 누가 누구인지 확인하고, 멤버를 해지하면 모든 곳에서 로그아웃돼요."
+        ]
+      }
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-10-22",
+      "prs": [
+        6
+      ],
+      "lines": {
+        "en": [
+          "A board can live on a self-hosted site (SQLite or Supabase) as well as in a claude.ai artifact.",
+          "Claude Code and Codex reach it through an MCP server with a personal token. Run it on this computer, with Docker or on Vercel."
+        ],
+        "ko": [
+          "보드를 claude.ai 아티팩트뿐 아니라 직접 띄운 사이트(SQLite 또는 Supabase)에도 둘 수 있어요.",
+          "Claude Code와 Codex가 개인 토큰으로 MCP 서버에 붙어요. 이 컴퓨터, Docker, Vercel 어디에나 띄울 수 있어요."
+        ]
+      }
+    },
+    {
+      "version": "1.1.2",
+      "date": "2026-10-19",
+      "prs": [
+        4,
+        5
+      ],
+      "lines": {
+        "en": [
+          "Installing or upgrading the skill copies files over the old ones instead of deleting the folder with rm -rf.",
+          "The README and PowerShell commands upgrade an existing install instead of nesting a second copy inside it."
+        ],
+        "ko": [
+          "스킬 설치 · 업그레이드가 rm -rf로 폴더를 지우지 않고 파일을 덮어써요.",
+          "README와 PowerShell 명령이 기존 설치 안에 사본을 하나 더 만들지 않고 제대로 업그레이드해요."
+        ]
+      }
+    },
+    {
+      "version": "1.1.1",
+      "date": "2026-10-19",
+      "prs": [
+        3
+      ],
+      "lines": {
+        "en": [
+          "The public demo has an English / 한국어 switch that follows the browser language on a first visit."
+        ],
+        "ko": [
+          "공개 데모에 English / 한국어 전환이 생겼어요. 처음엔 브라우저 언어를 따라가요."
+        ]
+      }
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-10-19",
+      "prs": [
+        2
+      ],
+      "lines": {
+        "en": [
+          "The board links each person to a claude.ai account and picks \"I am\" for you.",
+          "Viewers who can only read see no claim, post or edit controls."
+        ],
+        "ko": [
+          "보드가 사람마다 claude.ai 계정을 이어 '나'를 알아서 골라요.",
+          "읽기만 할 수 있는 사람에게는 집기 · 남기기 · 고치기 버튼이 보이지 않아요."
+        ]
+      }
+    },
+    {
+      "version": "1.0.1",
+      "date": "2026-10-19",
+      "prs": [
+        1
+      ],
+      "lines": {
+        "en": [
+          "Text from board settings can no longer run script, and open boards stop rewriting the same documents at once.",
+          "Agent rules are clearer about failed claims, notice cursors and tasks someone else holds."
+        ],
+        "ko": [
+          "보드 설정에서 온 글이 스크립트로 실행되지 않고, 열려 있는 보드들이 같은 문서를 한꺼번에 고쳐 쓰지 않아요.",
+          "에이전트 규칙이 실패한 집기, 공지 커서, 남이 잡은 태스크를 더 분명하게 다뤄요."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-10-19",
+      "prs": [],
+      "lines": {
+        "en": [
+          "artiboard: a claude.ai artifact becomes a task board, drawn in code so keeping it current costs no model tokens.",
+          "Document, kanban and dependency-graph views, plus a public demo board and screenshots."
+        ],
+        "ko": [
+          "artiboard 첫 버전. claude.ai 아티팩트 하나가 작업판이 되고, 화면을 코드로 그려 갱신에 모델 토큰이 들지 않아요.",
+          "문서 · 칸반 · 선행 그래프 보기와 공개 데모 보드, 스크린샷."
+        ]
+      }
+    }
+  ]
+}
