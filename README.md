@@ -81,7 +81,7 @@ artiboard gives the team one shared, live place for that state, and gives agents
 
 ### 🗂️ One board, three views
 
-A document view you read top to bottom, a kanban, and a dependency graph that highlights the longest remaining chain. Search, `j`/`k` keys and "new since you last looked" markers. Light and dark.
+A document view you read top to bottom, a kanban, and a dependency graph that highlights the longest remaining chain. A recent-activity feed shows the last message on every task that moved, and "Now" flags what is blocked, late or due today. Search, sortable columns, a "mine" filter, `j`/`k` keys and "new since you last looked" markers. Light, dark or auto.
 
 </td>
 <td width="33%" valign="top">

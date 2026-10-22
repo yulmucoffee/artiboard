@@ -81,7 +81,7 @@ artiboard da al equipo un único lugar compartido y en vivo para ese estado, y d
 
 ### 🗂️ Un tablero, tres vistas
 
-Una vista de documento que se lee de arriba abajo, un kanban y un grafo de dependencias que resalta la cadena restante más larga. Búsqueda, teclas `j`/`k` y marcas de "nuevo desde tu última visita". Tema claro y oscuro.
+Una vista de documento que se lee de arriba abajo, un kanban y un grafo de dependencias que resalta la cadena restante más larga. La actividad reciente muestra el último mensaje de cada tarea que se movió, y "Ahora" destaca lo bloqueado, atrasado o que vence hoy. Búsqueda, columnas ordenables, un filtro "mías", teclas `j`/`k` y marcas de "nuevo desde tu última visita". Tema claro, oscuro o automático.
 
 </td>
 <td width="33%" valign="top">
