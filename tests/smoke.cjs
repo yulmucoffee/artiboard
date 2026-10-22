@@ -14,7 +14,7 @@ const seed=()=>({
   'details/M1-1':{spec:'docs/db.md',acceptance:'Migrations run',summary:''}
 });
 // user: the namespace claude.use('user') resolves (null = no identity, today's picker); deny: every write rejects like a view-only viewer's
-function boot({user=null,docs={},me=null,deny=false}={}){
+function boot({user=null,docs={},me=null,deny=false,storage={}}={}){
   const store={...seed(),...docs},subs=[],writes=[],errors=[];
   const notify=()=>subs.slice().forEach(s=>s());
   const put=(p,f)=>{if(deny)return Promise.reject({code:'invalid_argument'});writes.push(p);store[p]=f(store[p]);setTimeout(notify,0);return Promise.resolve()};
@@ -24,7 +24,7 @@ function boot({user=null,docs={},me=null,deny=false}={}){
   function doc(p){return {get:async()=>({exists:!!store[p],data:()=>store[p]}),onSnapshot(cb){const run=()=>cb({exists:!!store[p],data:()=>store[p]});subs.push(run);run();return()=>subs.splice(subs.indexOf(run),1)},
     acquire:async()=>({acquired:true}),update:o=>put(p,c=>({...c,...o})),set:o=>put(p,()=>o)}}
   const dom=new JSDOM('<!doctype html><body>'+html+'</body>',{runScripts:'dangerously',url:'https://board.test/',pretendToBeVisual:true,
-    beforeParse(w){w.Math.random=()=>0;if(me)w.localStorage.setItem('ab-me',me);
+    beforeParse(w){w.Math.random=()=>0;if(me)w.localStorage.setItem('ab-me',me);for(const k in storage)w.localStorage.setItem(k,storage[k]);
       w.claude={use:n=>Promise.resolve(n==='db'?{collection:coll,doc}:n==='user'?user:null)};w.HTMLElement.prototype.scrollIntoView=()=>{}}});
   const w=dom.window;w.addEventListener('error',e=>errors.push(e.message));
   return {w,d:w.document,store,writes,errors,notify,key:k=>w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:k,bubbles:true})),pick:id=>{const x=w.document.querySelector('#meSel [data-me="'+id+'"]');if(x)x.click();return !!x}};
@@ -34,7 +34,9 @@ const tick=()=>new Promise(r=>setTimeout(r,25));const heal=()=>new Promise(r=>se
 let failed=0;const ok=(c,m)=>{console.log((c?'ok   ':'FAIL ')+m);if(!c)failed++};
 const note=d=>{const n=d.getElementById('meNote');return n.hidden?'':n.textContent};
 const writeNotice=d=>d.querySelector('#feed li.more .btn');
-const openRules=(d,w)=>{const r=d.getElementById('rulesBox');r.open=true;r.dispatchEvent(new w.Event('toggle'))};
+const unfold=(d,k)=>d.querySelector('section[data-fold="'+k+'"] .fold').click();
+const isFolded=(d,k)=>d.querySelector('section[data-fold="'+k+'"]').classList.contains('folded');
+const change=(d,id,v)=>{const n=d.getElementById(id);n.value=v;n.dispatchEvent(new d.defaultView.Event('change'))};
 const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNode.querySelector('strong').textContent};
 (async()=>{
   console.log('# no viewer identity (user capability absent)');
@@ -42,10 +44,22 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   await tick();await heal();
   ok(d.getElementById('hTitle').textContent==='Test Board','title comes from meta/config');
   ok(d.querySelectorAll('.lane').length===3,'one lane per person');
-  ok(d.querySelectorAll('tr.item').length===4,'item table lists every task');
-  ok(!d.querySelectorAll('.rule').length,'rules stay folded until opened');
-  openRules(d,w);await tick();
-  ok(d.querySelectorAll('.rule').length===3,'rules render as cards');
+  ok(d.querySelectorAll('tr.item').length===3,'item table lists every open task');
+  d.querySelector('#filters .chip.toggle').click();await tick();
+  ok(d.querySelectorAll('tr.item').length===4&&w.localStorage.getItem('ab-show-done')==='1','done tasks show on demand, remembered');
+  d.querySelector('tr.group .fold').click();await tick();
+  ok(d.querySelectorAll('tr.item').length===2&&d.querySelector('tr.group .fold').getAttribute('aria-expanded')==='false','a feature group folds from its name');
+  d.querySelector('tr.group .fold').click();await tick();
+  ok(isFolded(d,'rules')&&isFolded(d,'guide')&&!d.querySelectorAll('.rule').length,'both rules sections start folded');
+  unfold(d,'rules');await tick();
+  ok(d.querySelectorAll('#rulesBody .rule').length===3&&!!d.querySelector('#rulesBody .rules-note'),'an older meta/protocol shows as the rules, with a note');
+  store['meta/rules']={text:'1. Roles\n- ana: data\n2. Specs\n- docs/',rev:2,by:'ana',updatedAt:T0};b.notify();await tick();
+  ok(d.querySelectorAll('#rulesBody .rule').length===2&&!d.querySelector('#rulesBody .rules-note')&&/rev 2 · ana/.test(d.getElementById('rulesN').textContent),'project rules render from meta/rules');
+  unfold(d,'guide');await tick();
+  ok(d.querySelectorAll('#guide .rule').length===5,'the board guide is the same on every board');
+  unfold(d,'people');await tick();
+  ok(isFolded(d,'people')&&d.querySelector('section[data-fold="people"] .fold').getAttribute('aria-expanded')==='false'&&JSON.parse(w.localStorage.getItem('ab-fold')).people===true,'a section folds and the choice is remembered');
+  unfold(d,'people');await tick();
   ok(JSON.stringify(store['tasks/M1-3'].waitingOn)==='["M1-2"]','page repairs a missing waitingOn');
   ok(!note(d)&&!!writeNotice(d),'picker works as before, with no identity note');
   writeNotice(d).click();await tick();
@@ -68,6 +82,50 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   store['meta/config']={...store['meta/config'],strings:{hint:'<kbd>j</kbd> move <img src=x onerror="window.pwned=1">'}};b.notify();await tick();
   ok(!d.querySelector('#hint img')&&d.querySelectorAll('#hint kbd').length===1&&!w.pwned,'config strings cannot inject markup');
   const all=[b];
+
+  console.log('# what this browser remembers is read back');
+  b=boot({storage:{'ab-fold':'{"people":true,"rules":false}','ab-show-done':'1','ab-view':'kanban','ab-seen-init':'1','ab-seen':JSON.stringify({'M1-1':T0,'M1-2':T0,'M1-3':T0,'M1-4':T0})}});all.push(b);await tick();await heal();
+  ok(isFolded(b.d,'people')&&!isFolded(b.d,'rules'),'folded sections stay folded after a reload');
+  ok(!b.d.getElementById('viewKanban').hidden,'the chosen view comes back');
+  ok(!/New/.test(b.d.getElementById('newBtn').textContent),'tasks seen before are not new again');
+  b.key('1');await tick();
+  ok(b.d.querySelectorAll('tr.item').length===4,'showing done work is remembered');
+
+  console.log('# repos, settings, rules editing, long lanes');
+  const many={};for(let i=1;i<=7;i++)many['tasks/L-'+i]={key:'L-'+i,title:'Lane '+i,feature:'Ops',status:'doing',owner:'ben',deps:[],waitingOn:[],updatedAt:T0};
+  b=boot({user:fakeUser('u_ana',true),docs:{...many,'people/ana':{uid:'u_ana',at:T0},
+    'meta/config':{...seed()['meta/config'],repos:[{repo:'https://github.com/acme/api.git',label:'backend'},'git@github.com:acme/web.git','not a repo']},
+    'tasks/M1-2':{...seed()['tasks/M1-2'],status:'review',owner:'ana',repo:'backend',pr:'backend#12 https://github.com/acme/web/pull/3'}}});all.push(b);await tick();await tick();
+  const links=[...b.d.querySelectorAll('#repos .repo')];
+  ok(links.length===2&&links[0].href==='https://github.com/acme/api'&&links[1].href==='https://github.com/acme/web'&&/backend/.test(links[0].textContent),'the header links each repo in any form agents write, and skips what is not one');
+  const pick=b.d.querySelector('.pick.review');
+  ok(!!pick.querySelector('.repotag')&&[...pick.querySelectorAll('a')].map(a=>a.href).join()==='https://github.com/acme/api/pull/12,https://github.com/acme/web/pull/3','PR references resolve through the repo labels');
+  const ben=[...b.d.querySelectorAll('.lane')][1];
+  ok(ben.querySelectorAll('.todo li').length===5&&/2 more/.test(ben.querySelector('.morebtn').textContent),'a long lane shows five and offers the rest');
+  ben.querySelector('.morebtn').click();await tick();
+  ok([...b.d.querySelectorAll('.lane')][1].querySelectorAll('.todo li').length===7,'and opens them');
+  b.d.getElementById('setBtn').click();await tick();
+  change(b.d,'sRepos','https://github.com/acme/api.git backend\nnope');b.d.querySelector('.setform .btn.primary').click();await tick();
+  ok(/nope/.test(b.d.querySelector('.setform .err').textContent)&&!b.writes.includes('meta/config'),'settings refuse a line that is not a repo');
+  change(b.d,'sRepos','https://github.com/acme/api.git backend\nacme/docs');b.d.querySelector('.setform .btn.primary').click();await tick();
+  ok(JSON.stringify(b.store['meta/config'].repos)==='[{"repo":"acme/api","label":"backend"},{"repo":"acme/docs"}]'&&!b.d.querySelector('.setform'),'settings save the repos and close');
+  ok(b.store['meta/config'].people.length===3,'settings leave people alone');
+  b.d.querySelector('tr.item[data-k="M1-1"]').click();await tick();
+  change(b.d,'fStart','2026-01-06');await tick();change(b.d,'fRepo','backend');await tick();
+  ok(b.store['tasks/M1-1'].start==='2026-01-06'&&b.store['tasks/M1-1'].repo==='backend','the sheet saves a start day and a repo');
+  b.key('Escape');await tick();
+  ok(/1-06/.test(b.d.querySelector('tr.item[data-k="M1-1"] td.date').textContent),'the table shows the start day');
+  unfold(b.d,'rules');await tick();
+  b.d.getElementById('rulesEdit').click();await tick();
+  b.d.getElementById('rulesText').value='1. Roles\n- ana: api';b.d.querySelector('#rulesBody .btn.primary').click();await tick();await tick();
+  ok(b.store['meta/rules'].rev===1&&b.store['meta/rules'].by==='ana'&&/1\. Roles/.test(b.store['meta/rules'].text),'people write the project rules on the page');
+  ok(Object.keys(b.store).some(k=>k.startsWith('notices/')&&/rev 1/.test(b.store[k].text||'')),'and a notice tells everyone');
+  ok(!isFolded(b.d,'notes')&&/No notes yet/.test(b.d.getElementById('notesBody').textContent),'project notes sit open, empty until written');
+  const before=Object.keys(b.store).filter(k=>k.startsWith('notices/')).length;
+  b.d.getElementById('notesEdit').click();await tick();
+  b.d.getElementById('notesText').value='This week\n1. Monday\n- deploy';b.d.querySelector('#notesBody .btn.primary').click();await tick();await tick();
+  ok(b.store['meta/notes'].rev===1&&b.d.querySelectorAll('#notesBody .rule').length===2,'notes save and render as cards');
+  ok(Object.keys(b.store).filter(k=>k.startsWith('notices/')).length===before,'notes change often, so they post no notice unless asked');
 
   console.log('# linked viewer');
   b=boot({user:fakeUser('u_ben',true),docs:{'people/ben':{uid:'u_ben',at:T0}},me:'ana'});all.push(b);await tick();await tick();

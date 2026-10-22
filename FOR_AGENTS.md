@@ -2,7 +2,7 @@
 
 You are Claude Code, Codex or a compatible agent. A user gave you this repository and asked you to set up artiboard. Follow these steps in order. Speak to the user in their language.
 
-artiboard is one skill. It builds a shared task board, then installs short agent rules into the user's project. The board's page draws everything from the board's database in code, so it costs no model tokens to keep it current. The board lives either in a private claude.ai artifact (Claude only) or on a self-hosted site that any agent reaches through the `artiboard` MCP server (Claude Code, Codex).
+artiboard is one skill. It builds a shared task board, then adds a short pointer to it in the user's project. The board's page draws everything from the board's database in code, so it costs no model tokens to keep it current. The board lives either in a private claude.ai artifact (Claude only) or on a self-hosted site that any agent reaches through the `artiboard` MCP server (Claude Code, Codex).
 
 ## Rules for you
 
@@ -85,12 +85,12 @@ The Claude Code plugin works too: `/plugin marketplace add yulmucoffee/artiboard
 
 ## Step 3. Check the install
 
-Confirm that `SKILL.md`, `assets/board.html`, `references/protocol.md`, `references/protocol-hosted.md` and `references/hosted.md` exist in the folder you copied to. A new session picks the skill up. In the current session, read `SKILL.md` directly and follow it.
+Confirm that `SKILL.md`, `assets/board.html`, `references/protocol.md`, `references/project-rules.md` and `references/hosted.md` exist in the folder you copied to. An older install may still hold `references/protocol-hosted.md`; it is no longer used and can go. A new session picks the skill up. In the current session, read `SKILL.md` directly and follow it.
 
 ## Step 4. Run it
 
-If the user wants a board now, follow `SKILL.md` from "Setup". It asks where the board lives, team size (1, 2, 3 or a number), how work is split, the board language and where tasks come from, then drafts tasks, publishes or creates the board, seeds it and installs the rules file.
+If the user wants a board now, follow `SKILL.md` from "Setup". It asks where the board lives, team size (1, 2, 3 or a number), how work is split, the board language and where tasks come from, then drafts tasks and the project's rules, publishes or creates the board, seeds it and adds a short pointer to `CLAUDE.md` (and `AGENTS.md`).
 
 ## Step 5. Report
 
-Tell the user, briefly: where the skill is installed, the board URL if you made one, how teammates join (the artifact's Share menu, or a token from a site admin), and that teammates' agents read the rules after pulling the repository.
+Tell the user, briefly: where the skill is installed, the board URL if you made one, how teammates join (the artifact's Share menu, or a token from a site admin), and that teammates' agents find the board through the pointer after pulling the repository.

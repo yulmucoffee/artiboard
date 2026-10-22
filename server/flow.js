@@ -1,11 +1,13 @@
 // The everyday agent actions, each one tool call: start a session, read a task, claim, post.
 // They answer in short text lines, check versions on the server and stamp times with the server clock,
 // so an agent spends no tokens on reads before a write, on version numbers or on `date`.
-import { BoardError, now, stampId, toBoardError } from './core.js';
+import { BOARD_RULES, BoardError, now, repoName, reposOf, stampId, toBoardError } from './core.js';
 
 // 2026-10-21T08:57:33.000Z -> 10-21 08:57Z
 const short = (iso) => (typeof iso === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(iso) ? `${iso.slice(5, 10)} ${iso.slice(11, 16)}Z` : '');
 const oneLine = (s) => String(s ?? '').replace(/\s*\n\s*/g, ' ').trim();
+const DAY = /^\d{4}-\d\d-\d\d$/;
+const day = (v) => (typeof v === 'string' && DAY.test(v) ? v : '');
 function keyOrder(a, b) {
   const p = (k) => { const m = /^(.*?)(\d+)-(\d+)$/.exec(k || ''); return m ? [m[1], +m[2], +m[3]] : [k || '', 0, 0]; };
   const x = p(a), y = p(b);
@@ -23,16 +25,34 @@ async function retrying(fn) {
   }
 }
 
+// A task's repo is a label from meta/config.repos or an owner/name; both name one repository.
+function taskRepo(d, repos) {
+  if (!d.repo) return null;
+  const hit = repos.find((r) => r.label === d.repo);
+  return hit ? repoName(hit.repo) : repoName(d.repo);
+}
+
+// Dates in lines are short (10-24); the server's day is UTC, so "late" only shows once the day is over everywhere.
+function dateBits(d) {
+  if (d.status === 'done') return [];
+  const today = now().slice(0, 10), bits = [];
+  if (day(d.start) && (d.status || 'todo') === 'todo') bits.push(`start ${d.start.slice(5)}`);
+  if (day(d.due)) bits.push(`due ${d.due.slice(5)}${d.due < today ? ' late' : ''}`);
+  return bits;
+}
+
 function taskLine(d, id, withStatus) {
   const bits = [d.key || id];
   if (withStatus) bits.push(d.status || 'todo');
   if (d.feature) bits.push(`[${d.feature}]`);
+  if (d.repo) bits.push(`repo:${d.repo}`);
   if (d.branch && withStatus) bits.push(d.branch);
   if (d.pr && withStatus) bits.push(d.pr);
-  if (d.due && d.status !== 'done') bits.push(`due ${d.due}`);
+  bits.push(...dateBits(d));
   return `${bits.join(' ')} ${d.title || ''}`.trim();
 }
 const msgLine = (m) => `${short(m.at)} ${m.author || '?'}${m.type && m.type !== 'note' ? ` ${m.type}` : ''}: ${oneLine(m.text)}`;
+const repoList = (repos) => repos.map((r) => `${r.repo}${r.label ? ` (${r.label})` : ''}`).join(' · ');
 
 function detailLines(det) {
   const d = det?.data || {};
@@ -48,14 +68,29 @@ export function makeFlow(store) {
   const query = (project, collection, opts) => store.query(project, collection, opts);
   const apply = (member, project, writes) => store.apply(member.uid, project, writes);
 
-  // Session start: notices after this person's cursor (and move the cursor), their open tasks, and ready work.
-  async function start(member, project, { ready = 8, peek = false } = {}) {
+  // The project a repository belongs to: the one whose meta/config.repos lists it.
+  async function projectFor(repo) {
+    const want = repoName(repo);
+    if (!want) throw new BoardError('invalid_argument', 'repo is not a GitHub repository: pass owner/name or the git remote URL');
+    const hits = (await store.overview()).filter((p) => reposOf(p).some((r) => repoName(r.repo) === want)).map((p) => p.id);
+    if (!hits.length) throw new BoardError('not_found', `no project lists ${want}; board_projects shows each project's repos`);
+    if (hits.length > 1) throw new BoardError('invalid_argument', `${want} is on ${hits.join(', ')}; pass project`);
+    return hits[0];
+  }
+
+  // Session start: the rules, notices after this person's cursor (and move the cursor), their open tasks, and ready work.
+  // With a repo, ready work is the tasks of that repository and the tasks that name none.
+  async function start(member, { project, repo, ready = 8, peek = false, rules = true } = {}) {
+    if (!project && !repo) throw new BoardError('invalid_argument', 'pass project, or repo (owner/name from git remote) to find it');
+    if (!project) project = await projectFor(repo);
     const me = member.person;
-    const [config, cursor, mine, todo] = await Promise.all([
+    const [config, cursor, mine, todo, own, notes] = await Promise.all([
       get(project, 'meta/config'),
       get(project, `cursors/${me}`),
       query(project, 'tasks', { where: [{ field: 'owner', op: '==', value: me }, { field: 'status', op: 'in', value: OPEN }], limit: 50 }),
       ready ? query(project, 'tasks', { where: [{ field: 'status', op: '==', value: 'todo' }, { field: 'waitingOn', op: '==', value: [] }], limit: 200 }) : [],
+      rules ? get(project, 'meta/rules') : null,
+      rules ? get(project, 'meta/notes') : null,
     ]);
     const since = cursor?.data?.noticesAt || null;
     const notices = since
@@ -64,9 +99,29 @@ export function makeFlow(store) {
     const newest = notices.map((n) => n.data.at).filter((a) => typeof a === 'string').sort().pop();
     if (!peek && newest && (!since || newest > since)) await moveCursor(member, project, cursor, newest).catch(() => {});
 
-    const c = config?.data || {};
-    const free = todo.filter((t) => !t.data.claimedBy).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
+    // repo, given with a project, may also be one of its labels; one the project does not list turns the filter off
+    const c = config?.data || {}, repos = reposOf(c);
+    let want = repo ? repoName(repos.find((r) => r.label === repo)?.repo ?? repo) : null, stray = '';
+    if (repo && (!want || !repos.some((r) => repoName(r.repo) === want))) {
+      stray = `repo ${want || '(not a GitHub repository)'} is not linked to ${project}; showing all ready work (link it in meta/config.repos)`;
+      want = null;
+    }
+    let free = todo.filter((t) => !t.data.claimedBy).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
+    const elsewhere = want ? free.filter((t) => { const r = taskRepo(t.data, repos); return r && r !== want; }).length : 0;
+    if (want) free = free.filter((t) => { const r = taskRepo(t.data, repos); return !r || r === want; });
+
     const out = [`${me} · ${project}${c.milestone ? ` · ${c.milestone}` : ''}`];
+    if (repos.length) out.push(`repos: ${repoList(repos)}`);
+    if (stray) out.push(stray);
+    if (rules) {
+      out.push(BOARD_RULES);
+      const r = own?.data;
+      if (typeof r?.text === 'string' && r.text.trim()) out.push(`project rules (rev ${r.rev || 1}${r.by ? ` · ${r.by}` : ''}${r.updatedAt ? ` ${short(r.updatedAt).slice(0, 5)}` : ''}):`, r.text.trim());
+      else out.push('project rules: none yet');
+      // the shared status (schedule, where things stand) is long and changes daily: pointed at, not printed
+      const n = notes?.data;
+      if (typeof n?.text === 'string' && n.text.trim()) out.push(`project notes: meta/notes (rev ${n.rev || 1}${n.updatedAt ? ` ${short(n.updatedAt).slice(0, 5)}` : ''}); board_get it when you need the schedule or status`);
+    }
     out.push(notices.length ? `notices${since ? ' (new)' : ' (latest)'}:` : 'notices: none new');
     notices.forEach((n) => out.push(msgLine(n.data)));
     if (mine.length) {
@@ -74,7 +129,8 @@ export function makeFlow(store) {
       mine.sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id)).forEach((t) => out.push(taskLine(t.data, t.id, true)));
     }
     if (ready) {
-      out.push(free.length ? `ready (${free.length > ready ? `${ready} of ` : ''}${free.length}):` : 'ready: none');
+      const more = elsewhere ? `; ${elsewhere} more in other repos` : '';
+      out.push(free.length ? `ready (${free.length > ready ? `${ready} of ` : ''}${free.length}${more}):` : `ready: none${more}`);
       free.slice(0, ready).forEach((t) => out.push(taskLine(t.data, t.id)));
     }
     return out.join('\n');
@@ -104,9 +160,9 @@ export function makeFlow(store) {
         })).reverse()
       : [];
     const who = d.claimedBy?.who ? `${d.claimedBy.who}${d.claimedBy.agent ? ' (agent)' : ''}` : d.owner || 'unassigned';
-    const out = [`${d.key || id} ${d.status || 'todo'} · ${who}${d.branch ? ` · ${d.branch}` : ''}${d.pr ? ` · ${d.pr}` : ''}`, d.title || ''];
+    const out = [`${d.key || id} ${d.status || 'todo'} · ${who}${d.repo ? ` · repo:${d.repo}` : ''}${d.branch ? ` · ${d.branch}` : ''}${d.pr ? ` · ${d.pr}` : ''}`, d.title || ''];
     if (d.deps?.length) out.push(`deps ${d.deps.join(', ')}${d.waitingOn?.length ? ` · waiting on ${d.waitingOn.join(', ')}` : ''}`);
-    const dates = [d.due && `due ${d.due}`, d.doneAt && `done ${short(d.doneAt)}`].filter(Boolean);
+    const dates = [day(d.start) && `start ${d.start}`, day(d.due) && `due ${d.due}`, d.doneAt && `done ${short(d.doneAt)}`].filter(Boolean);
     if (dates.length) out.push(dates.join(' · '));
     out.push(...detailLines(det));
     if (thread) {
@@ -131,7 +187,7 @@ export function makeFlow(store) {
       await apply(member, project, [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: {
           status: 'doing', owner: me, claimedBy: { who: me, agent: true, ...(session && { session }), at }, updatedAt: at, lastMessageAt: at } },
-        { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, data: {
+        { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
           at, author: me, kind: 'agent', type: 'update', text: text || CLAIMED[config?.data?.lang] || CLAIMED.en } },
       ]);
       return 'claimed';
@@ -139,24 +195,29 @@ export function makeFlow(store) {
     return [`${result} ${id}`, ...detailLines(det)].join('\n');
   }
 
-  // A thread message, optionally with a status, branch, PR, due day or summary change; without a task, a notice.
+  // A thread message, optionally with a status, branch, PR, start or due day, repo or summary change; without a task, a notice.
+  // Only the task's holder changes it, except its due day, which anyone may move (the thread records who and from what).
   // status done stamps doneAt (leaving done clears it) and takes the key out of every dependent's waitingOn.
-  async function post(member, project, { task: id, text, type, status, branch, pr, due, summary }) {
+  async function post(member, project, { task: id, text, type, status, branch, pr, start, due, repo, summary }) {
     const me = member.person;
     if (!id) {
-      if (status || branch !== undefined || pr !== undefined || due !== undefined || summary !== undefined) throw new BoardError('invalid_argument', 'status, branch, pr, due and summary need a task');
+      if (status || branch !== undefined || pr !== undefined || start !== undefined || due !== undefined || repo !== undefined || summary !== undefined) {
+        throw new BoardError('invalid_argument', 'status, branch, pr, start, due, repo and summary need a task');
+      }
+      if (!text?.trim()) throw new BoardError('invalid_argument', 'a notice needs text');
       const at = now();
       await apply(member, project, [{ op: 'set', path: `notices/n-${stampId(at, me)}`, if_absent: true,
         data: { at, author: me, kind: 'agent', type: type || 'note', text } }]);
       return 'posted notice';
     }
-    const changes = status !== undefined || branch !== undefined || pr !== undefined || due !== undefined;
+    const holderOnly = status !== undefined || branch !== undefined || pr !== undefined || start !== undefined || repo !== undefined || summary !== undefined;
+    if (!text?.trim() && !holderOnly && due === undefined) throw new BoardError('invalid_argument', 'pass text, or a change');
     return retrying(async () => {
       const [t, det] = await Promise.all([get(project, `tasks/${id}`), summary !== undefined ? get(project, `details/${id}`) : null]);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
       const d = t.data, key = d.key || id, holder = holderOf(d);
-      if ((changes || summary !== undefined) && holder && holder !== me) {
-        throw new BoardError('not_yours', `${key} is held by ${holder}; post without status, branch, pr or summary, or ask your person`);
+      if (holderOnly && holder && holder !== me) {
+        throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day; ask in its thread or your person for the rest`);
       }
       const at = now();
       const patch = { updatedAt: at, lastMessageAt: at };
@@ -166,11 +227,20 @@ export function makeFlow(store) {
       if (status !== undefined && status !== 'done' && d.doneAt) patch.doneAt = null;
       if (branch !== undefined) patch.branch = branch || null;
       if (pr !== undefined) patch.pr = pr || null;
+      if (start !== undefined) patch.start = start || null;
       if (due !== undefined) patch.due = due || null;
+      if (repo !== undefined) patch.repo = repo || null;
+      // with no text, the thread still says what changed
+      const said = text?.trim() || [
+        status && `status ${status}`, branch !== undefined && `branch ${branch || 'none'}`, pr !== undefined && `pr ${pr || 'none'}`,
+        start !== undefined && `start ${start || 'none'}${day(d.start) ? ` (was ${d.start})` : ''}`,
+        due !== undefined && `due ${due || 'none'}${day(d.due) ? ` (was ${d.due})` : ''}`,
+        repo !== undefined && `repo ${repo || 'none'}`, summary !== undefined && 'summary updated',
+      ].filter(Boolean).join(' · ') || 'updated';
       const writes = [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: patch },
-        { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, data: {
-          at, author: me, kind: 'agent', type: type || (status === 'blocked' ? 'blocker' : 'update'), text } },
+        { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
+          at, author: me, kind: 'agent', type: type || (status === 'blocked' ? 'blocker' : 'update'), text: said } },
       ];
       if (summary !== undefined) {
         const s = { summary, summaryAt: at };
@@ -192,5 +262,5 @@ export function makeFlow(store) {
     });
   }
 
-  return { start, task, claim, post };
+  return { start, task, claim, post, projectFor };
 }

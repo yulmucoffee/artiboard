@@ -19,7 +19,7 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
   async function overview() { return rpc('ab_overview', {}); }
   async function projectIds() { return check(await sb.from('ab_projects').select('id').order('id')).map((p) => p.id); }
 
-  async function createProject(actor, { id, title, lang = 'en' }) {
+  async function createProject(actor, { id, title, lang = 'en', repos = [] }) {
     if (typeof id !== 'string' || !PROJECT_ID.test(id)) throw new BoardError('invalid_argument', 'project id must be 1 to 40 lowercase letters, digits or hyphens');
     title = String(title || '').trim();
     if (!title || title.length > 120) throw new BoardError('invalid_argument', 'title must be 1 to 120 characters');
@@ -32,7 +32,7 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
     const { error } = await sb.from('ab_projects').insert({ id, title, created_by: actor ?? null });
     if (error) throw error.code === '23505' ? new BoardError('already_exists', `project ${id} already exists`) : toBoardError(error);
     try {
-      await apply(null, id, projectSeed({ title, lang, members: await listMembers(), author }));
+      await apply(null, id, projectSeed({ title, lang, members: await listMembers(), author, repos }));
     } catch (e) {
       await sb.from('ab_projects').delete().eq('id', id);
       throw e;

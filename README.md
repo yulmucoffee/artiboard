@@ -163,14 +163,14 @@ Just ask, in any words and any language.
 
 | You say | What happens |
 | --- | --- |
-| "Set up a task board for this project", "작업 보드 만들어줘" | **setup**: asks where the board lives, team size, split, language and task source. Drafts tasks from your docs and shows them for a yes. Publishes or creates the board, seeds it, writes `docs/artiboard.md` and a short pointer in `CLAUDE.md` (and `AGENTS.md` for Codex). |
+| "Set up a task board for this project", "작업 보드 만들어줘" | **setup**: asks where the board lives, team size, split, language and task source. Drafts tasks and the project's rules from your docs and shows them for a yes. Publishes or creates the board, links your GitHub repositories, seeds it and adds a short pointer to `CLAUDE.md` (and `AGENTS.md` for Codex). |
 | "Add Cy to the board", "Switch the board to Japanese" | **adapt**: updates the board's config. No republish. |
 | "Add a QA status", "Show estimates on cards" | **adapt**: edits the page and the rules together. On a self-hosted board, through `board_page` edits. |
 | "Move our board to our own server" | **move**: copies an artifact board's documents to a self-hosted project. |
 | "보드 로그인 링크 줘", "Give me a board sign-in link" | A one-time browser sign-in link for a self-hosted board. |
-| "Pick the next task", "Continue M1-4" | Daily work. The agent follows `docs/artiboard.md` in your repo: claim, thread, summary, review, done. |
+| "Pick the next task", "Continue M1-4" | Daily work. The agent starts with `board_start` (on an artifact board, `docs/artiboard.md`), which brings the board rules, the project's rules and its work: claim, thread, summary, review, done. |
 
-After setup, share the board with teammates from the artifact's **Share** menu with edit access. Their agents get the rules when they pull the repository. The page knows who is viewing: the first time a teammate picks their name under "I am", the board links it to their claude.ai account and picks it for them from then on. It warns when someone posts under a name linked to another account, and view-only viewers see the board without claim, post or edit controls.
+After setup, share the board with teammates from the artifact's **Share** menu with edit access. Their agents find the board through the pointer when they pull the repository. The page knows who is viewing: the first time a teammate picks their name under "I am", the board links it to their claude.ai account and picks it for them from then on. It warns when someone posts under a name linked to another account, and view-only viewers see the board without claim, post or edit controls.
 
 ## Self-host
 
@@ -248,7 +248,7 @@ Then ask the agent to "set up the board for this repo".
 artiboard serve [--port N] [--host H]
 artiboard init --person ID [--name N] [--project ID --title T]
 artiboard member add|token|link|revoke|access|join|remove|list
-artiboard project add|drop|list
+artiboard project add|repos|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
@@ -262,13 +262,13 @@ Run `node server/cli.js` with no command for every option. Access levels are `ad
 
 | Tool | Does |
 | --- | --- |
-| `board_start` | New notices since your cursor (and moves it), your open tasks, ready tasks |
+| `board_start {project or repo}` | The board rules and the project's rules, new notices since your cursor (and moves it), your open tasks, ready tasks. With `repo` (a git remote) it finds the project and lists that repository's work |
 | `board_claim {id, text}` | Claims a ready task, posts the claim, returns spec, acceptance, summary |
 | `board_task {id}` | Status, details, and the messages after the summary |
-| `board_post {task, text, status?, branch?, pr?, due?, summary?}` | A thread message plus changes to your task; `done` stamps `doneAt` and unblocks dependents. Without `task`: a notice |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | A thread message plus changes to your task; anyone may move a task's `due`. `done` stamps `doneAt` and unblocks dependents. Without `task`: a notice |
 | `board_get`, `board_query`, `board_batch` | Documents, as `ArtifactData` reads and writes them |
 | `board_page` | The project's page: size, `find`, `read`, and for admins `edits`, `html`, `reset` |
-| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | The site |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | The site; each project lists its GitHub repositories |
 
 The everyday tools answer in short lines, check versions and stamp times on the server, so a claim or an update is one call of under a hundred tokens.
 
@@ -295,16 +295,18 @@ flowchart LR
 | `tasks/<id>/messages` | The thread: updates, questions, handoffs, blockers | Agents read the last eight; people read all |
 | `notices` | What everyone must know | Agents read only what is newer than their cursor |
 | `cursors/<person>` | When that person's agents last read notices | Agents |
-| `meta/config` | Title, people, language, any UI string | The page |
+| `meta/config` | Title, people, language, GitHub repositories, any UI string | The page |
+| `meta/rules` | The project's own rules: who owns what, where specs live, branches, what to announce | People on the page; agents when board work starts |
+| `meta/notes` | Shared status: schedule, where things stand, open questions | People on the page; agents only when needed |
 | `people/<person>` | Which claude.ai account picked that person first | The page |
-| `docs/artiboard.md` (repo) | The agent rules | Agents, only in sessions that touch the board |
+| `docs/artiboard.md` (repo, artifact boards) | The board rules, copied verbatim (a self-hosted site gives them in `board_start`) | Agents, only in sessions that touch the board |
 
 ## Token design
 
 | Rule | Effect |
 | --- | --- |
 | Code draws the board | Views, charts, counts, readiness and "new" markers cost zero model tokens, at any team size. |
-| Rules live in the repo, loaded on demand | Every session pays for a three-line pointer. Only board sessions read the rules. Repo text is also trusted and reviewed, unlike board text anyone can edit. |
+| Rules arrive with board work | Every session pays for a three-line pointer. The board rules, the same on every board, and the project's short rules arrive only when board work starts; status notes are read only when needed. The board rules come with artiboard, so no project keeps or edits a copy. |
 | Query, never list | Finding work is one query (`status == todo`, `waitingOn == []`). Notices come in as a delta after your cursor. |
 | Small documents | Task documents hold status. Long text is opened for one task at a time. |
 | Summaries over threads | Handoffs rewrite a five-line summary, so the next reader skips old messages. |
@@ -325,13 +327,14 @@ flowchart LR
 | `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | Order sets colors. Six colors, then they repeat. An optional `uid` pins a person to one claude.ai account and wins over `people/<id>`. |
 | `strings` | `{"v_graph":"Dependencies"}` | Override any UI string, in any language |
 | `footer` | `"..."` | Replaces the footer line |
+| `repos` | `[{"repo":"acme/api","label":"api"}]` | The project's GitHub repositories. Agents find the board from their git remote, and each task can name its own in `repo`. |
 
 </details>
 
 <details>
 <summary><b>What the skill may change per project</b></summary>
 
-Free: title, people, roles, language, labels, feature names, key scheme, message wording, notice topics. Through page edits: statuses, extra visible fields, new views. Kept in every adaptation: lean tasks plus details, `waitingOn` and the ready query, cursors, one batch per action with `if_version`, id formats, rules in the repo, board text treated as data.
+Free: title, people, roles, language, labels, feature names, key scheme, message wording, notice topics. Through page edits: statuses, extra visible fields, new views. Kept in every adaptation: lean tasks plus details, `waitingOn` and the ready query, cursors, one batch per action with `if_version`, id formats, board rules that come with artiboard (projects add only `meta/rules`), board text treated as data.
 
 </details>
 
@@ -341,7 +344,7 @@ Free: title, people, roles, language, labels, feature names, key scheme, message
 ```text
 skills/artiboard/SKILL.md               the skill: setup, adapt, upgrade, token rules
 skills/artiboard/assets/board.html      the board page (renders from the artifact database)
-skills/artiboard/references/          rules templates (artifact, hosted) and the self-hosting guide for agents
+skills/artiboard/references/          board rules for artifact boards, how to write project rules, the self-hosting guide for agents
 server/                                 the self-hosted site: HTTP app, MCP server, SQLite and Supabase stores, CLI, page runtime
 api/, vercel.json                       Vercel functions for a Supabase-backed site
 supabase/                               the Supabase schema (migrations) and local config

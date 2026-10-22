@@ -45,6 +45,7 @@ h2{font-size:19px;font-weight:700;margin:0}
 .card .id{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
 .card .sub{color:var(--text2);font-size:13.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .card .nums{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12.5px;color:var(--muted)}
+.card .repos{display:flex;flex-wrap:wrap;gap:2px 10px;font-family:var(--f-mono);font-size:12px;color:var(--text2)}
 .progress{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--line-soft)}
 .progress span{display:block;height:100%}
 .empty{color:var(--muted)}
@@ -100,6 +101,8 @@ form .hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:0}
   var BAR={done:'var(--ink)',review:'var(--muted)',doing:'var(--warn)',blocked:'var(--danger)',todo:'var(--line)'};
   function $(id){return document.getElementById(id)}
   function el(tag,a,kids){var n=document.createElement(tag);for(var k in a||{}){if(a[k]==null)continue;if(k==='text')n.textContent=a[k];else if(k==='class')n.className=a[k];else n.setAttribute(k,a[k])}(kids||[]).forEach(function(c){if(c!=null)n.appendChild(typeof c==='string'?document.createTextNode(c):c)});return n}
+  // owner/name of each GitHub repository the project lists (meta/config.repos)
+  function repos(p){return (Array.isArray(p.repos)?p.repos:[]).map(function(r){return typeof r==='string'?r:r&&r.repo}).filter(function(r){return typeof r==='string'&&/^[\w.-]+\/[\w.-]+$/.test(r)})}
   function ago(iso){var d=new Date(iso);if(!iso||isNaN(d))return '';var s=(Date.now()-d)/1000;if(s<60)return T('now');if(s<3600)return T('m',{n:Math.floor(s/60)});if(s<86400)return T('h',{n:Math.floor(s/3600)});return T('d',{n:Math.floor(s/86400)})}
 
   window.abSession.then(function(s){
@@ -126,6 +129,7 @@ form .hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:0}
           list.appendChild(el('a',{class:'card',href:'/p/'+p.id},[
             el('div',{class:'top'},[el('strong',{text:p.title}),el('span',{class:'id',text:'/p/'+p.id})]),
             p.subtitle?el('p',{class:'sub',text:p.subtitle}):null,
+            repos(p).length?el('div',{class:'repos'},repos(p).map(function(r){return el('span',{text:r})})):null,
             p.total?bar:null,
             el('div',{class:'nums'},nums.map(function(t){return el('span',{text:t})}).concat(p.last?[el('span',{text:T('last',{t:ago(p.last)})})]:[]))
           ]));
