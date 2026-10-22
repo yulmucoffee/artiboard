@@ -1,0 +1,10 @@
+.env*
+node_modules
+supabase
+tests
+examples
+docs
+.claude
+.github
+Dockerfile
+docker-compose.yml

@@ -11,16 +11,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757)
 ![claude.ai](https://img.shields.io/badge/claude.ai-artifact_+_db-2B6BEF)
+![Codex](https://img.shields.io/badge/Codex-MCP-111111)
+![Self-host](https://img.shields.io/badge/self--host-SQLite_·_Supabase-3ECF8E)
 
 [English](README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · **简体中文** · [Español](README.es.md)
 
-### 说一句"建一个任务看板"，整个团队和每个 Claude agent 就在同一块看板上工作。
+### 说一句"建一个任务看板"，整个团队和每个 agent 就在同一块看板上工作。
 
-**一个 claude.ai artifact 就是看板：任务、讨论串、公告，还有依赖图。**<br/>
-页面代码直接从 artifact 的数据库绘制一切，所以无需花费任何 token 就始终是最新的。<br/>
+**一个页面就是看板：任务、讨论串、公告，还有依赖图。** 可以把它留作 claude.ai artifact，也可以自行托管，供 Claude Code 和 Codex 使用。<br/>
+页面代码直接从看板的数据库绘制一切，所以无需花费任何 token 就始终是最新的。<br/>
 Agent 遵循放在你仓库里的几条精简规则：用查询代替全量读取，每个动作一次批量写入，用摘要代替冗长的讨论串。
 
-[演示](#演示) · [快速开始](#快速开始) · [使用](#使用) · [工作原理](#工作原理) · [Token 设计](#token-设计) · [给 agent 的说明](FOR_AGENTS.md)
+[演示](#演示) · [快速开始](#快速开始) · [使用](#使用) · [自托管](#自托管) · [工作原理](#工作原理) · [Token 设计](#token-设计) · [给 agent 的说明](FOR_AGENTS.md)
 
 </div>
 
@@ -101,7 +103,17 @@ artiboard 把这些状态集中到团队共享的一块实时看板上，并给 
 
 ## 快速开始
 
-看板使用 `Artifact` 和 `ArtifactData` 工具，因此需要用 claude.ai 登录的 Claude Code（桌面应用或 CLI）。
+看板可以放在两个地方之一。两者使用同一个页面、同样的文档和同样的规则，skill 两种都能搭建。
+
+| | claude.ai artifact | 自托管站点 |
+| --- | --- | --- |
+| Agent | 用 claude.ai 登录的 Claude Code（`Artifact`、`ArtifactData`） | Claude Code、Codex、任何 MCP 客户端（`artiboard` MCP 服务器） |
+| 数据 | Artifact 的数据库 | SQLite（一个文件）或 Supabase |
+| 运行在 | claude.ai，无需自己运行任何东西 | 这台电脑、你的域名（Docker）或 Vercel |
+| 队友加入方式 | Artifact 的 Share 菜单 | `artiboard member add` 生成的令牌 |
+| 看板 | 每块看板一个 artifact | 一个站点，每个项目一块看板，位于 `/p/<project>` |
+
+如果要自托管看板，请先启动站点：[自托管](#自托管)。
 
 **方式 A：交给 Claude。** 使用上面框里的那句话。Claude 会按照 [FOR_AGENTS.md](FOR_AGENTS.md) 操作。
 
@@ -123,6 +135,14 @@ mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/
 mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
 
+**方式 D：Codex。** 同一个 skill 也能在 Codex 中使用。复制到 `~/.codex/skills/artiboard` 可用于所有项目，复制到仓库里的 `.agents/skills/artiboard` 则只用于该仓库：
+
+```bash
+mkdir -p "$HOME/.codex/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.codex/skills/artiboard/"
+```
+
+Codex 用于自托管看板（它没有 claude.ai artifact）。
+
 升级时，先运行 `git -C "$HOME/.artiboard/src" pull --ff-only`，再运行同样的复制命令。在 Windows PowerShell 中，请使用 [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill) 里的命令。
 
 <details>
@@ -143,12 +163,115 @@ mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboar
 
 | 你说 | 会发生什么 |
 | --- | --- |
-| "为这个项目建一个任务看板" | **setup**：询问人数、分工、语言和任务来源。从文档中起草任务并请你确认。发布看板、写入数据，并写好 `docs/artiboard.md` 和 `CLAUDE.md` 里的简短指引。 |
+| "为这个项目建一个任务看板" | **setup**：询问看板放在哪里、人数、分工、语言和任务来源。从文档中起草任务并请你确认。发布或创建看板、写入数据，并写好 `docs/artiboard.md` 和 `CLAUDE.md`（Codex 还有 `AGENTS.md`）里的简短指引。 |
 | "把 Cy 加到看板""把看板改成英文" | **adapt**：只更新看板配置，不重新发布。 |
-| "加一个 QA 状态""在卡片上显示估时" | **adapt**：同时修改页面和规则。 |
+| "加一个 QA 状态""在卡片上显示估时" | **adapt**：同时修改页面和规则。在自托管看板上，通过 `board_page` 编辑完成。 |
+| "把我们的看板搬到自己的服务器上" | **move**：把 artifact 看板的文档复制到一个自托管项目。 |
+| "给我一个看板登录链接" | 为自托管看板生成一个一次性的浏览器登录链接。 |
 | "领下一个任务""继续 M1-4" | 日常工作。Agent 遵循仓库里的 `docs/artiboard.md`：认领、讨论、摘要、评审、完成。 |
 
 安装完成后，从 artifact 的 **Share** 菜单以编辑权限分享给队友。队友的 agent 拉取仓库后就会读到规则。 页面知道是谁在看：队友第一次在“I am”中选自己的名字时，看板会把它关联到其 claude.ai 账号，之后自动选中。有人用关联到其他账号的名字发帖时会给出警告；只读用户看不到领取、发帖和编辑按钮。
+
+## 自托管
+
+自托管站点在 `/` 提供项目列表，在 `/p/<project>` 为每个项目提供一块看板，在 `/mcp` 提供 MCP 服务器。看板页面就是 artifact 发布的那个 `board.html`，由一个小型运行时（`server/public/shim.js`）代替 claude.ai：它负责让人登录、读写站点数据，并把每次变更推送到打开的页面。需要 Node 22.13 或更高版本。
+
+**在这台电脑上**（SQLite，数据在 `~/.artiboard/board.db`）：
+
+```bash
+cd "$HOME/.artiboard/src" && npm install --omit=dev
+```
+
+```bash
+node server/cli.js init --person ana --name Ana --project acme --title "Acme Board"
+```
+
+```bash
+node server/cli.js serve
+```
+
+`init` 会创建第一个管理员，并打印一个令牌以及连接 Claude Code 和 Codex 的命令。打开 `http://localhost:4100` 粘贴令牌，或者让你的 agent 给你一个登录链接。要让同一网络里的队友进来，用 `--host 0.0.0.0` 启动，并把 `BOARD_URL` 设为他们使用的地址。
+
+**用 Docker 部署到你的域名**（SQLite，由 Caddy 提供 TLS）：把一条 DNS 记录指向服务器，在 [docker-compose.yml](docker-compose.yml) 里填上你的域名，然后运行：
+
+```bash
+docker compose up -d
+```
+
+```bash
+docker compose exec board node server/cli.js init --person ana --name Ana
+```
+
+**用 Vercel 和 Supabase：** 创建一个 Supabase 项目，然后推送 schema 并设置站点环境：
+
+```bash
+supabase link --project-ref <ref> && supabase db push
+```
+
+在 Vercel 项目上设置 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY` 和 `BOARD_URL`，添加你的域名，执行 `vercel link`，然后执行 `npm run deploy:vercel`（`VERCEL_REGION=icn1` 让函数靠近位于首尔的数据库）。在 Supabase Auth 中把 `<BOARD_URL>/` 加入重定向 URL。只要把这些变量写进一个文件，管理命令就能在任何地方运行：`node server/cli.js --env site.env member list`。同一个服务器也可以在任何主机上以 Supabase 运行：设置三个 `SUPABASE_*` 变量，然后 `serve`。
+
+**连接 agent。** 每个人拿到一个令牌（`member add` 或 `member token`），然后运行：
+
+```bash
+claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
+```
+
+```bash
+codex mcp add artiboard --url https://board.example.com/mcp --bearer-token-env-var ARTIBOARD_TOKEN
+```
+
+使用 Codex 时，请在 shell 配置文件里保留 `export ARTIBOARD_TOKEN=abt_…`。Codex 每次调用可能覆盖文档的工具（`board_batch`、`board_page`）前都会先询问；要让 `board_batch` 无需询问直接运行，把下面这段加到 `~/.codex/config.toml`：
+
+```toml
+[mcp_servers.artiboard.tools.board_batch]
+approval_mode = "approve"
+```
+
+然后让 agent "为这个仓库设置看板"。
+
+**自定义**方式与 claude.ai 上完全相同。标题、成员、语言和任意界面文案都在 `meta/config` 里，修改即时生效。页面本身按项目区分：管理员的 agent 通过 `board_page` 工具做小而精确的编辑来修改它（状态、字段、视图），或者由管理员运行 `artiboard page set --project acme --file page.html`。`page reset` 会恢复为内置页面，内置页面随站点一起更新。
+
+| 设置 | 默认值 | 含义 |
+| --- | --- | --- |
+| `BOARD_URL` | `http://localhost:4100` | 人和 agent 使用的地址 |
+| `PORT`, `HOST` | `4100`, `127.0.0.1` | `serve` 监听的位置 |
+| `ARTIBOARD_DB` | `~/.artiboard/board.db` | SQLite 文件 |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | 改为把数据存放在 Supabase |
+| `ARTIBOARD_SITE` | `artiboard` | 界面上显示的站点名称 |
+| `ARTIBOARD_LANG` | `en` | 新看板和站点界面的语言（`en`、`ko`） |
+
+<details>
+<summary><b>管理命令</b></summary>
+
+```text
+artiboard serve [--port N] [--host H]
+artiboard init --person ID [--name N] [--project ID --title T]
+artiboard member add|token|link|revoke|access|join|remove|list
+artiboard project add|drop|list
+artiboard page show|set|reset --project ID
+artiboard import --project ID --file FILE [--map old=new]
+```
+
+不带命令运行 `node server/cli.js` 可查看全部选项。访问级别有 `admin`、`member`（可写）和 `viewer`（只读），并在整个站点范围内生效：每个成员都能看到所有项目。成员从不需要密码：令牌让 agent 登录，页面则用令牌或一次性链接换取浏览器会话。
+
+</details>
+
+<details>
+<summary><b>MCP 工具</b></summary>
+
+| 工具 | 作用 |
+| --- | --- |
+| `board_start` | 游标之后的新公告（并移动游标）、你未完成的任务、可领取的任务 |
+| `board_claim {id, text}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准和摘要 |
+| `board_task {id}` | 状态、详情，以及摘要之后的消息 |
+| `board_post {task, text, status?, branch?, pr?, summary?}` | 一条讨论串消息，加上对你任务的修改；`done` 会解除依赖它的任务的阻塞。不带 `task` 时：发布公告 |
+| `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同 |
+| `board_page` | 项目的页面：大小、`find`、`read`，管理员还有 `edits`、`html`、`reset` |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 站点 |
+
+日常工具用简短的几行回答，并在服务器端校验版本、记录时间，所以一次认领或更新就是一次不到一百个 token 的调用。
+
+</details>
 
 ## 工作原理
 
@@ -217,11 +340,16 @@ flowchart LR
 ```text
 skills/artiboard/SKILL.md               skill：安装、调整、升级、token 规则
 skills/artiboard/assets/board.html      看板页面（从 artifact 数据库绘制）
-skills/artiboard/references/protocol.md 安装到你仓库的规则文件模板
+skills/artiboard/references/          规则模板（artifact 版、托管版）以及给 agent 的自托管指南
+server/                                 自托管站点：HTTP 应用、MCP 服务器、SQLite 与 Supabase 存储、CLI、页面运行时
+api/, vercel.json                       基于 Supabase 的站点所用的 Vercel 函数
+supabase/                               Supabase schema（迁移）和本地配置
+Dockerfile, docker-compose.yml          容器中的 SQLite 站点，在你的域名上位于 Caddy 之后
 examples/                               用 board.html 和 demo-data.json 生成公开演示: build-demo.cjs, demo-data.json, demo.html
 FOR_AGENTS.md                           给 AI agent 的分步安装说明
 .claude-plugin/                         Claude Code 插件清单
 tests/smoke.cjs                         看板页面的 jsdom 冒烟测试
+tests/server.test.js                    托管站点的端到端测试（SQLite；配置后也测 Supabase）
 docs/assets/                            横幅
 ```
 
@@ -233,6 +361,12 @@ docs/assets/                            横幅
 ```bash
 npm install --no-save jsdom@24.1.1 && node tests/smoke.cjs
 ```
+
+```bash
+npm install && npm test
+```
+
+`npm test` 会用一个临时 SQLite 文件运行托管站点。如果有本地 Supabase（`supabase start`），加上 `AB_SUPABASE=1` 以及它的 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY` 和 `SUPABASE_SECRET_KEY`，即可在上面运行同样的测试。
 
 修改页面后重新生成演示：
 

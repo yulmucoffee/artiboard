@@ -11,16 +11,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757)
 ![claude.ai](https://img.shields.io/badge/claude.ai-artifact_+_db-2B6BEF)
+![Codex](https://img.shields.io/badge/Codex-MCP-111111)
+![Self-host](https://img.shields.io/badge/self--host-SQLite_·_Supabase-3ECF8E)
 
 [English](README.md) · [한국어](README.ko.md) · [日本語](README.ja.md) · [简体中文](README.zh-CN.md) · **Español**
 
-### Di "crea un tablero de tareas". Obtén un tablero desde el que trabajan todo tu equipo y cada agente de Claude.
+### Di "crea un tablero de tareas". Obtén un tablero desde el que trabajan todo tu equipo y cada agente.
 
-**Un solo artifact de claude.ai se convierte en el tablero: tareas, hilos, avisos y un grafo de dependencias.**<br/>
-La página dibuja todo desde la base de datos del artifact con código, así que se mantiene al día sin gastar un solo token.<br/>
+**Una sola página se convierte en el tablero: tareas, hilos, avisos y un grafo de dependencias.** Mantenlo como artifact de claude.ai o alójalo tú mismo para Claude Code y Codex.<br/>
+La página dibuja todo desde la base de datos del tablero con código, así que se mantiene al día sin gastar un solo token.<br/>
 Los agentes siguen unas pocas reglas ligeras que viven en tu repositorio: consultar en vez de listar, un lote por acción, resúmenes en vez de hilos largos.
 
-[Demo](#demo) · [Inicio rápido](#inicio-rápido) · [Uso](#uso) · [Cómo funciona](#cómo-funciona) · [Diseño de tokens](#diseño-de-tokens) · [Para agentes](FOR_AGENTS.md)
+[Demo](#demo) · [Inicio rápido](#inicio-rápido) · [Uso](#uso) · [Autoalojamiento](#autoalojamiento) · [Cómo funciona](#cómo-funciona) · [Diseño de tokens](#diseño-de-tokens) · [Para agentes](FOR_AGENTS.md)
 
 </div>
 
@@ -101,7 +103,17 @@ Las vistas las dibuja el código, nunca un modelo. Los agentes leen solo la part
 
 ## Inicio rápido
 
-Necesitas Claude Code con sesión iniciada en claude.ai (la app de escritorio o la CLI), porque el tablero usa las herramientas `Artifact` y `ArtifactData`.
+Un tablero vive en uno de dos sitios. Los dos usan la misma página, los mismos documentos y las mismas reglas, y la skill prepara cualquiera de ellos.
+
+| | Artifact de claude.ai | Sitio autoalojado |
+| --- | --- | --- |
+| Agentes | Claude Code con sesión iniciada en claude.ai (`Artifact`, `ArtifactData`) | Claude Code, Codex, cualquier cliente MCP (servidor MCP `artiboard`) |
+| Datos | La base de datos del artifact | SQLite (un archivo) o Supabase |
+| Dónde corre | claude.ai, nada que ejecutar | Este ordenador, tu dominio (Docker) o Vercel |
+| Cómo entra el equipo | El menú Share del artifact | Un token de `artiboard member add` |
+| Tableros | Un artifact por tablero | Un sitio, un tablero por proyecto en `/p/<project>` |
+
+Para un tablero autoalojado, levanta primero el sitio: [Autoalojamiento](#autoalojamiento).
 
 **Opción A: que lo haga Claude.** Usa el texto del recuadro de arriba. Claude sigue [FOR_AGENTS.md](FOR_AGENTS.md).
 
@@ -123,6 +135,14 @@ Abre una sesión nueva en tu proyecto y di "crea un tablero de tareas para este 
 mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
 
+**Opción D: Codex.** La misma skill funciona en Codex. Cópiala a `~/.codex/skills/artiboard` para todos los proyectos, o a `.agents/skills/artiboard` dentro de un repositorio:
+
+```bash
+mkdir -p "$HOME/.codex/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.codex/skills/artiboard/"
+```
+
+Codex trabaja con tableros autoalojados (no tiene artifacts de claude.ai).
+
 Para actualizar, ejecuta `git -C "$HOME/.artiboard/src" pull --ff-only` y luego el mismo comando de copia otra vez. En Windows PowerShell, usa los comandos de [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill).
 
 <details>
@@ -143,12 +163,115 @@ Pídelo con tus palabras y en cualquier idioma.
 
 | Dices | Qué pasa |
 | --- | --- |
-| "Crea un tablero de tareas para este proyecto" | **setup**: pregunta el tamaño del equipo, el reparto, el idioma y el origen de las tareas. Redacta tareas a partir de tu documentación y te las muestra para que digas sí. Publica el tablero, lo llena y escribe `docs/artiboard.md` y una indicación corta en `CLAUDE.md`. |
+| "Crea un tablero de tareas para este proyecto" | **setup**: pregunta dónde vive el tablero, el tamaño del equipo, el reparto, el idioma y el origen de las tareas. Redacta tareas a partir de tu documentación y te las muestra para que digas sí. Publica o crea el tablero, lo llena y escribe `docs/artiboard.md` y una indicación corta en `CLAUDE.md` (y en `AGENTS.md` para Codex). |
 | "Añade a Cy al tablero", "Pon el tablero en inglés" | **adapt**: actualiza la configuración del tablero. Sin volver a publicar. |
-| "Añade un estado QA", "Muestra estimaciones en las tarjetas" | **adapt**: modifica la página y las reglas a la vez. |
+| "Añade un estado QA", "Muestra estimaciones en las tarjetas" | **adapt**: modifica la página y las reglas a la vez. En un tablero autoalojado, mediante ediciones con `board_page`. |
+| "Mueve nuestro tablero a nuestro propio servidor" | **move**: copia los documentos de un tablero en artifact a un proyecto autoalojado. |
+| "Dame un enlace para entrar al tablero" | Un enlace de un solo uso para iniciar sesión en el navegador en un tablero autoalojado. |
 | "Toma la siguiente tarea", "Continúa M1-4" | Trabajo diario. El agente sigue `docs/artiboard.md` de tu repositorio: tomar, hilo, resumen, revisión, hecho. |
 
 Después, comparte el tablero con tu equipo desde el menú **Share** del artifact con permiso de edición. Sus agentes reciben las reglas al hacer pull del repositorio. La página sabe quién la está viendo: la primera vez que alguien elige su nombre en "I am", el tablero lo vincula a su cuenta de claude.ai y lo elige por ella desde entonces. Avisa cuando alguien publica con un nombre vinculado a otra cuenta, y quien solo puede ver no recibe los botones de tomar, publicar ni editar.
+
+## Autoalojamiento
+
+Un sitio autoalojado sirve una lista de proyectos en `/`, un tablero por proyecto en `/p/<project>` y un servidor MCP en `/mcp`. La página del tablero es el mismo `board.html` que publica el artifact, con un pequeño runtime (`server/public/shim.js`) que hace las veces de claude.ai: inicia la sesión de las personas, lee y escribe los datos del sitio y envía cada cambio a las páginas abiertas. Necesita Node 22.13 o posterior.
+
+**En este ordenador** (SQLite, datos en `~/.artiboard/board.db`):
+
+```bash
+cd "$HOME/.artiboard/src" && npm install --omit=dev
+```
+
+```bash
+node server/cli.js init --person ana --name Ana --project acme --title "Acme Board"
+```
+
+```bash
+node server/cli.js serve
+```
+
+`init` crea el primer administrador e imprime un token junto con los comandos que conectan Claude Code y Codex. Abre `http://localhost:4100` y pega el token, o pide a tu agente un enlace de inicio de sesión. Para que entre tu equipo desde tu red, sirve con `--host 0.0.0.0` y pon en `BOARD_URL` la dirección que usan.
+
+**En tu dominio con Docker** (SQLite, TLS con Caddy): apunta un registro DNS al servidor, pon tu dominio en [docker-compose.yml](docker-compose.yml) y luego:
+
+```bash
+docker compose up -d
+```
+
+```bash
+docker compose exec board node server/cli.js init --person ana --name Ana
+```
+
+**En Vercel con Supabase:** crea un proyecto de Supabase y luego sube el esquema y configura el entorno del sitio:
+
+```bash
+supabase link --project-ref <ref> && supabase db push
+```
+
+Define `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` y `BOARD_URL` en el proyecto de Vercel, añade tu dominio, ejecuta `vercel link` y luego `npm run deploy:vercel` (`VERCEL_REGION=icn1` mantiene las funciones cerca de una base de datos en Seúl). En Supabase Auth, añade `<BOARD_URL>/` a las URL de redirección. Los comandos de administración se ejecutan desde cualquier lugar con esas variables en un archivo: `node server/cli.js --env site.env member list`. El mismo servidor también funciona con Supabase desde cualquier host: define las tres variables `SUPABASE_*` y ejecuta `serve`.
+
+**Conecta los agentes.** Cada persona recibe un token (`member add` o `member token`) y ejecuta:
+
+```bash
+claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
+```
+
+```bash
+codex mcp add artiboard --url https://board.example.com/mcp --bearer-token-env-var ARTIBOARD_TOKEN
+```
+
+Para Codex, deja `export ARTIBOARD_TOKEN=abt_…` en el perfil de tu shell. Codex pregunta antes de cada llamada a una herramienta que puede sobrescribir documentos (`board_batch`, `board_page`); para que `board_batch` se ejecute sin preguntar, añade esto a `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.artiboard.tools.board_batch]
+approval_mode = "approve"
+```
+
+Luego pide al agente "prepara el tablero para este repositorio".
+
+**Personaliza** exactamente como en claude.ai. El título, las personas, el idioma y cualquier texto de la interfaz viven en `meta/config` y cambian en vivo. La página en sí es por proyecto: el agente de un administrador la cambia con ediciones pequeñas y exactas mediante la herramienta `board_page` (estados, campos, vistas), o un administrador ejecuta `artiboard page set --project acme --file page.html`. `page reset` vuelve a la página incluida, que se actualiza con el sitio.
+
+| Ajuste | Por defecto | Significado |
+| --- | --- | --- |
+| `BOARD_URL` | `http://localhost:4100` | La dirección que usan personas y agentes |
+| `PORT`, `HOST` | `4100`, `127.0.0.1` | Dónde escucha `serve` |
+| `ARTIBOARD_DB` | `~/.artiboard/board.db` | El archivo SQLite |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | Guarda los datos en Supabase en su lugar |
+| `ARTIBOARD_SITE` | `artiboard` | El nombre del sitio en pantalla |
+| `ARTIBOARD_LANG` | `en` | Idioma de los tableros nuevos y de las pantallas del sitio (`en`, `ko`) |
+
+<details>
+<summary><b>Comandos de administración</b></summary>
+
+```text
+artiboard serve [--port N] [--host H]
+artiboard init --person ID [--name N] [--project ID --title T]
+artiboard member add|token|link|revoke|access|join|remove|list
+artiboard project add|drop|list
+artiboard page show|set|reset --project ID
+artiboard import --project ID --file FILE [--map old=new]
+```
+
+Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y valen para todo el sitio: cada miembro ve todos los proyectos. Los miembros nunca reciben contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador.
+
+</details>
+
+<details>
+<summary><b>Herramientas MCP</b></summary>
+
+| Herramienta | Qué hace |
+| --- | --- |
+| `board_start` | Avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas, tareas disponibles |
+| `board_claim {id, text}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación y resumen |
+| `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen |
+| `board_post {task, text, status?, branch?, pr?, summary?}` | Un mensaje en el hilo más cambios en tu tarea; `done` desbloquea las que dependen de ella. Sin `task`: un aviso |
+| `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData` |
+| `board_page` | La página del proyecto: tamaño, `find`, `read` y, para administradores, `edits`, `html`, `reset` |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio |
+
+Las herramientas de uso diario responden en líneas cortas, comprueban versiones y ponen la hora en el servidor, así que tomar o actualizar una tarea es una sola llamada de menos de cien tokens.
+
+</details>
 
 ## Cómo funciona
 
@@ -217,11 +340,16 @@ Libremente: título, personas, roles, idioma, textos, nombres de funciones, esqu
 ```text
 skills/artiboard/SKILL.md               la skill: instalación, adaptación, actualización, reglas de tokens
 skills/artiboard/assets/board.html      la página del tablero (dibuja desde la base de datos del artifact)
-skills/artiboard/references/protocol.md plantilla del archivo de reglas que se instala en tu repo
+skills/artiboard/references/          plantillas de reglas (artifact, autoalojado) y la guía de autoalojamiento para agentes
+server/                                 el sitio autoalojado: app HTTP, servidor MCP, almacenes SQLite y Supabase, CLI, runtime de la página
+api/, vercel.json                       funciones de Vercel para un sitio con Supabase
+supabase/                               el esquema de Supabase (migraciones) y la configuración local
+Dockerfile, docker-compose.yml          un sitio SQLite en un contenedor, detrás de Caddy en tu dominio
 examples/                               genera la demo pública a partir de board.html y demo-data.json: build-demo.cjs, demo-data.json, demo.html
 FOR_AGENTS.md                           instalación paso a paso para agentes de IA
 .claude-plugin/                         manifiestos del plugin de Claude Code
 tests/smoke.cjs                         prueba de humo de la página con jsdom
+tests/server.test.js                    pruebas de extremo a extremo de un sitio alojado (SQLite, y Supabase si está configurado)
 docs/assets/                            banners
 ```
 
@@ -233,6 +361,12 @@ docs/assets/                            banners
 ```bash
 npm install --no-save jsdom@24.1.1 && node tests/smoke.cjs
 ```
+
+```bash
+npm install && npm test
+```
+
+`npm test` ejecuta el sitio alojado sobre un archivo SQLite desechable. Con un Supabase local (`supabase start`), añade `AB_SUPABASE=1` y sus `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` y `SUPABASE_SECRET_KEY` para ejecutar las mismas pruebas allí.
 
 Regenera la demo después de cambiar la página:
 

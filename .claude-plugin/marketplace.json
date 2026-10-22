@@ -8,7 +8,7 @@
     {
       "name": "artiboard",
       "source": "./",
-      "description": "A shared task board for people and their Claude agents, as one claude.ai artifact."
+      "description": "A shared task board for people and their coding agents: a claude.ai artifact, or self-hosted for Claude Code and Codex."
     }
   ]
 }

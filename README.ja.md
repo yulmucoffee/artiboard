@@ -11,16 +11,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757)
 ![claude.ai](https://img.shields.io/badge/claude.ai-artifact_+_db-2B6BEF)
+![Codex](https://img.shields.io/badge/Codex-MCP-111111)
+![Self-host](https://img.shields.io/badge/self--host-SQLite_·_Supabase-3ECF8E)
 
 [English](README.md) · [한국어](README.ko.md) · **日本語** · [简体中文](README.zh-CN.md) · [Español](README.es.md)
 
-### 「タスクボードを作って」と言うだけで、チーム全員とすべての Claude エージェントが同じボードで動きます。
+### 「タスクボードを作って」と言うだけで、チーム全員とすべてのエージェントが同じボードで動きます。
 
-**claude.ai のアーティファクトひとつがボードになります。タスク、スレッド、お知らせ、依存グラフまで。**<br/>
-画面はページのコードがアーティファクトのデータベースから直接描くので、トークンを使わずに常に最新です。<br/>
+**ページひとつがボードになります。タスク、スレッド、お知らせ、依存グラフまで。** claude.ai のアーティファクトのまま使うことも、Claude Code と Codex 向けに自分でホストすることもできます。<br/>
+画面はページのコードがボードのデータベースから直接描くので、トークンを使わずに常に最新です。<br/>
 エージェントはリポジトリに置いた短いルールに従います。一覧ではなくクエリで読み、書き込みは一度にまとめ、長いスレッドの代わりに要約を読みます。
 
-[デモ](#デモ) · [クイックスタート](#クイックスタート) · [使い方](#使い方) · [仕組み](#仕組み) · [トークン設計](#トークン設計) · [エージェント向け](FOR_AGENTS.md)
+[デモ](#デモ) · [クイックスタート](#クイックスタート) · [使い方](#使い方) · [セルフホスト](#セルフホスト) · [仕組み](#仕組み) · [トークン設計](#トークン設計) · [エージェント向け](FOR_AGENTS.md)
 
 </div>
 
@@ -101,7 +103,17 @@ artiboard はその状況をチームで共有するライブなボードひと�
 
 ## クイックスタート
 
-ボードは `Artifact` と `ArtifactData` ツールを使うので、claude.ai でサインインした Claude Code(デスクトップアプリまたは CLI)が必要です。
+ボードを置く場所は二通りです。どちらも同じページ、同じドキュメント、同じルールを使い、スキルはどちらもセットアップできます。
+
+| | claude.ai アーティファクト | セルフホストのサイト |
+| --- | --- | --- |
+| エージェント | claude.ai でサインインした Claude Code(`Artifact`、`ArtifactData`) | Claude Code、Codex、任意の MCP クライアント(`artiboard` MCP サーバー) |
+| データ | アーティファクトのデータベース | SQLite(ファイルひとつ)または Supabase |
+| 動かす場所 | claude.ai、動かすものはなし | このコンピューター、自分のドメイン(Docker)、または Vercel |
+| 仲間の参加方法 | アーティファクトの Share メニュー | `artiboard member add` で発行したトークン |
+| ボード | ボードごとにアーティファクトひとつ | サイトひとつ、プロジェクトごとに `/p/<project>` のボード |
+
+セルフホストのボードなら、まず [セルフホスト](#セルフホスト) の手順でサイトを立ち上げてください。
 
 **方法 A: Claude に任せる。** 上のボックスの文を貼り付けてください。Claude が [FOR_AGENTS.md](FOR_AGENTS.md) に従います。
 
@@ -123,6 +135,14 @@ mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/
 mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
 
+**方法 D: Codex。** 同じスキルが Codex でも動きます。すべてのプロジェクトで使うなら `~/.codex/skills/artiboard` に、リポジトリ単位なら `.agents/skills/artiboard` にコピーします。
+
+```bash
+mkdir -p "$HOME/.codex/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.codex/skills/artiboard/"
+```
+
+Codex はセルフホストのボードで使います(claude.ai のアーティファクトがないため)。
+
 アップグレードするときは `git -C "$HOME/.artiboard/src" pull --ff-only` を実行してから、同じコピーコマンドをもう一度実行します。Windows PowerShell では [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill) のコマンドを使ってください。
 
 <details>
@@ -143,12 +163,115 @@ mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboar
 
 | こう言うと | こうなります |
 | --- | --- |
-| 「このプロジェクトにタスクボードを作って」 | **setup**: 人数、分け方、言語、タスクの出どころを尋ねます。ドキュメントからタスクを起こして確認を取り、ボードを公開してデータを入れ、`docs/artiboard.md` と `CLAUDE.md` の短い案内を書きます。 |
+| 「このプロジェクトにタスクボードを作って」 | **setup**: ボードを置く場所、人数、分け方、言語、タスクの出どころを尋ねます。ドキュメントからタスクを起こして確認を取り、ボードを公開または作成してデータを入れ、`docs/artiboard.md` と `CLAUDE.md`(Codex なら `AGENTS.md` も)の短い案内を書きます。 |
 | 「ボードに Cy を追加して」「ボードを英語にして」 | **adapt**: ボードの設定だけを変えます。再公開しません。 |
-| 「QA ステータスを追加して」「カードに見積もりを出して」 | **adapt**: ページとルールを一緒に直します。 |
+| 「QA ステータスを追加して」「カードに見積もりを出して」 | **adapt**: ページとルールを一緒に直します。セルフホストのボードでは `board_page` の編集で直します。 |
+| 「ボードを自分たちのサーバーに移して」 | **move**: アーティファクトのボードのドキュメントを、セルフホストのプロジェクトにコピーします。 |
+| 「ボードのサインインリンクをちょうだい」 | セルフホストのボードに、一度だけ使えるブラウザ用のサインインリンクを出します。 |
 | 「次のタスクを取って」「M1-4 の続きをして」 | 普段の作業です。エージェントがリポジトリの `docs/artiboard.md` に従います。 |
 
 セットアップ後、アーティファクトの **Share** メニューから仲間に編集権限で共有してください。仲間のエージェントはリポジトリを pull するとルールを読みます。 ページは誰が見ているかを知っています。仲間が「I am」で初めて自分の名前を選ぶと、その claude.ai アカウントに紐づけ、次からは自動で選びます。別のアカウントに紐づいた名前で投稿しようとすると警告し、閲覧のみのユーザーには取得・投稿・編集のボタンを出しません。
+
+## セルフホスト
+
+セルフホストのサイトは、`/` でプロジェクト一覧、`/p/<project>` でプロジェクトごとのボード、`/mcp` で MCP サーバーを提供します。ボードページはアーティファクトが公開するのと同じ `board.html` で、小さなランタイム(`server/public/shim.js`)が claude.ai の代わりを務めます。人をサインインさせ、サイトのデータを読み書きし、すべての変更を開いているページに届けます。Node 22.13 以降が必要です。
+
+**このコンピューターで**(SQLite、データは `~/.artiboard/board.db`)
+
+```bash
+cd "$HOME/.artiboard/src" && npm install --omit=dev
+```
+
+```bash
+node server/cli.js init --person ana --name Ana --project acme --title "Acme Board"
+```
+
+```bash
+node server/cli.js serve
+```
+
+`init` は最初の管理者を作り、トークンと、Claude Code と Codex をつなぐコマンドを表示します。`http://localhost:4100` を開いてトークンを貼り付けるか、エージェントにサインインリンクを頼んでください。同じネットワークの仲間も入れるなら、`--host 0.0.0.0` で起動し、`BOARD_URL` を仲間が使うアドレスにします。
+
+**自分のドメインで Docker を使って**(SQLite、TLS は Caddy): DNS レコードをサーバーに向け、[docker-compose.yml](docker-compose.yml) にドメインを書いてから実行します。
+
+```bash
+docker compose up -d
+```
+
+```bash
+docker compose exec board node server/cli.js init --person ana --name Ana
+```
+
+**Vercel と Supabase で:** Supabase プロジェクトを作り、スキーマを反映してサイトの環境を設定します。
+
+```bash
+supabase link --project-ref <ref> && supabase db push
+```
+
+Vercel プロジェクトに `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY`、`BOARD_URL` を設定し、ドメインを追加して `vercel link`、それから `npm run deploy:vercel` を実行します(`VERCEL_REGION=icn1` にすると関数がソウルのデータベースの近くで動きます)。Supabase Auth のリダイレクト URL に `<BOARD_URL>/` を追加してください。管理コマンドは、これらの変数をファイルに書いておけばどこからでも実行できます。例: `node server/cli.js --env site.env member list`。同じサーバーは、どのホストからでも Supabase で動かせます。`SUPABASE_*` の3つの変数を設定して `serve` するだけです。
+
+**エージェントをつなぐ。** 一人ずつトークンを受け取り(`member add` または `member token`)、次を実行します。
+
+```bash
+claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
+```
+
+```bash
+codex mcp add artiboard --url https://board.example.com/mcp --bearer-token-env-var ARTIBOARD_TOKEN
+```
+
+Codex では、シェルのプロファイルに `export ARTIBOARD_TOKEN=abt_…` を書いておきます。Codex はドキュメントを上書きできるツール(`board_batch`、`board_page`)を呼ぶたびに確認を求めます。`board_batch` を確認なしで動かすには、`~/.codex/config.toml` に次を追加します。
+
+```toml
+[mcp_servers.artiboard.tools.board_batch]
+approval_mode = "approve"
+```
+
+あとはエージェントに「このリポジトリにボードをセットアップして」と頼んでください。
+
+**カスタマイズ**は claude.ai とまったく同じです。タイトル、メンバー、言語、あらゆる画面の文言は `meta/config` にあり、すぐに反映されます。ページ自体はプロジェクトごとにあります。管理者のエージェントが `board_page` ツールで小さく正確な編集をして変えるか(ステータス、フィールド、ビュー)、管理者が `artiboard page set --project acme --file page.html` を実行します。`page reset` で同梱のページに戻せます。同梱のページはサイトと一緒に更新されます。
+
+| 設定 | 既定値 | 意味 |
+| --- | --- | --- |
+| `BOARD_URL` | `http://localhost:4100` | 人とエージェントが使うアドレス |
+| `PORT`, `HOST` | `4100`, `127.0.0.1` | `serve` が待ち受ける場所 |
+| `ARTIBOARD_DB` | `~/.artiboard/board.db` | SQLite のファイル |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | データを SQLite の代わりに Supabase に置く |
+| `ARTIBOARD_SITE` | `artiboard` | 画面に出るサイト名 |
+| `ARTIBOARD_LANG` | `en` | 新しいボードとサイトの画面の言語(`en`、`ko`) |
+
+<details>
+<summary><b>管理コマンド</b></summary>
+
+```text
+artiboard serve [--port N] [--host H]
+artiboard init --person ID [--name N] [--project ID --title T]
+artiboard member add|token|link|revoke|access|join|remove|list
+artiboard project add|drop|list
+artiboard page show|set|reset --project ID
+artiboard import --project ID --file FILE [--map old=new]
+```
+
+コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイト全体に適用されます。どのメンバーもすべてのプロジェクトを見られます。メンバーにパスワードはありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。
+
+</details>
+
+<details>
+<summary><b>MCP ツール</b></summary>
+
+| ツール | すること |
+| --- | --- |
+| `board_start` | カーソル以降の新しいお知らせ(カーソルも進める)、自分の進行中のタスク、着手できるタスク |
+| `board_claim {id, text}` | 着手できるタスクを取り、取ったことを投稿し、仕様、受け入れ条件、要約を返す |
+| `board_task {id}` | ステータス、詳細、要約より後のメッセージ |
+| `board_post {task, text, status?, branch?, pr?, summary?}` | スレッドのメッセージと自分のタスクの変更を一度に。`done` で後続のタスクが着手可能になる。`task` なしならお知らせ |
+| `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き |
+| `board_page` | プロジェクトのページ: サイズ、`find`、`read`、管理者は `edits`、`html`、`reset` も |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | サイト |
+
+普段使うツールは短い行で答え、バージョン確認と時刻の記録をサーバー側で行うので、取得や更新は100トークン未満の呼び出し1回で済みます。
+
+</details>
 
 ## 仕組み
 
@@ -217,11 +340,16 @@ flowchart LR
 ```text
 skills/artiboard/SKILL.md               スキル: セットアップ、調整、アップグレード、トークンのルール
 skills/artiboard/assets/board.html      ボードページ(アーティファクト DB から描画)
-skills/artiboard/references/protocol.md リポジトリに入れるルールファイルの雛形
+skills/artiboard/references/          ルールの雛形(アーティファクト用、ホスト用)とエージェント向けのセルフホスト手順
+server/                                 セルフホストのサイト: HTTP アプリ、MCP サーバー、SQLite と Supabase のストア、CLI、ページのランタイム
+api/, vercel.json                       Supabase を使うサイト向けの Vercel 関数
+supabase/                               Supabase のスキーマ(マイグレーション)とローカル設定
+Dockerfile, docker-compose.yml          コンテナで動く SQLite のサイト。自分のドメインで Caddy の背後に置く
 examples/                               board.html と demo-data.json から公開デモを生成: build-demo.cjs, demo-data.json, demo.html
 FOR_AGENTS.md                           AI エージェント向けのインストール手順
 .claude-plugin/                         Claude Code プラグインの定義
 tests/smoke.cjs                         ボードページの jsdom テスト
+tests/server.test.js                    ホストしたサイトのエンドツーエンドテスト(SQLite、設定があれば Supabase も)
 docs/assets/                            バナー
 ```
 
@@ -233,6 +361,12 @@ docs/assets/                            バナー
 ```bash
 npm install --no-save jsdom@24.1.1 && node tests/smoke.cjs
 ```
+
+```bash
+npm install && npm test
+```
+
+`npm test` は使い捨ての SQLite ファイルでホストしたサイトを動かします。ローカルの Supabase(`supabase start`)があれば、`AB_SUPABASE=1` とその `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY` を加えると、同じテストをそちらで実行できます。
 
 ページを変えたらデモを作り直します。
 

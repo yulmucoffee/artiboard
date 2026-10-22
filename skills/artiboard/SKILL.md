@@ -1,29 +1,36 @@
 ---
 name: artiboard
-description: Set up, adapt or upgrade a shared task board for one or more people and their Claude agents, built as a single private claude.ai artifact with its own database. Use when the user wants a task board, kanban or coordination board that agents read and write ("set up artiboard", "make a task board for this project", "a board my agents and my teammate's agents can share", "작업 보드 만들어줘", "에이전트끼리 소통할 보드", "タスクボードを作って"), or wants to change people, language, statuses or fields of an existing artiboard. Requires the Artifact and ArtifactData tools.
-argument-hint: "[setup|adapt|upgrade]"
+description: Set up, adapt or upgrade a shared task board for people and their coding agents, either as a private claude.ai artifact with its own database (Claude only) or on a self-hosted site (SQLite or Supabase, on a team domain or this computer) that Claude Code and Codex reach through the artiboard MCP server. Use when the user wants a task board, kanban or coordination board that agents read and write ("set up artiboard", "make a task board for this project", "a board my agents and my teammate's agents can share", "작업 보드 만들어줘", "에이전트끼리 소통할 보드", "보드 로그인 링크 줘", "タスクボードを作って"), wants to change people, language, statuses, fields or the page of an existing board, or wants to move an artifact board to a self-hosted site.
+argument-hint: "[setup|adapt|upgrade|move]"
 ---
 
 # artiboard
 
-One artifact is the board. Its page code draws every view (document, kanban, dependency graph) straight from the artifact database, so the board stays live without republishing and without spending model tokens. Agents read and write the database with ArtifactData and follow short rules that live in the repository and are read only when doing board work.
+One page is the board. Its code draws every view (document, kanban, dependency graph) straight from the board's database, so the board stays live without republishing and without spending model tokens. Agents follow short rules that live in the repository and are read only when doing board work.
+
+The board lives in one of two places, with the same page, the same documents and the same rules:
+
+- **claude.ai artifact.** One private artifact per board. Agents use the Artifact and ArtifactData tools, so only Claude (Claude Code signed in with claude.ai) can work on it. Nothing to run.
+- **Self-hosted site.** Every project is a board at `<site>/p/<project>`, kept in SQLite or Supabase, on a team domain or this computer. Agents use the site's `artiboard` MCP server with a personal token, so Claude Code, Codex and any MCP client can work on it. Everything for this case is in `references/hosted.md`.
 
 Speak to the user in their language. Write the board, the rules file and the notices in the language the team picks.
 
 ## Before you start
 
-- You need the `Artifact` and `ArtifactData` tools (Claude Code signed in with claude.ai: the desktop app, or the CLI). If they appear only as deferred tools, load them with ToolSearch. If they are missing, stop and say the board needs them.
-- Files in this skill: `assets/board.html` (the page), `references/protocol.md` (the agent rules template).
-- If the project already has an artiboard block in `CLAUDE.md`, daily board work follows the rules file it points to. Use this skill only to set up, adapt or upgrade.
+- Files in this skill: `assets/board.html` (the page), `references/protocol.md` (agent rules for an artifact board), `references/protocol-hosted.md` (agent rules for a self-hosted board), `references/hosted.md` (everything about self-hosted sites).
+- If the project already has an artiboard block in `CLAUDE.md` or `AGENTS.md`, daily board work follows the rules file it points to. Use this skill only to set up, adapt, upgrade or move.
+- Find where the board lives: the repo's artiboard block names an artifact URL (`claude.ai/…`) or a site (`<site>/p/<project>`). For a new board, ask (step 1 below). Without the `Artifact` and `ArtifactData` tools (Codex, or Claude Code not signed in with claude.ai) only a self-hosted board is possible. With them listed only as deferred tools, load them with ToolSearch.
+- **Self-hosted:** follow `references/hosted.md` for every mode. The rest of this file is the artifact board, apart from "Read the project, then draft", "Adapt to the project" and "Token rules", which apply to both.
 
-Pick the mode from the request: **setup** (no board yet), **adapt** (change people, language, labels, statuses, fields or the task list of a board), **upgrade** (bring a board page up to this template). For adapt and upgrade, find the board URL in the repo's artiboard block or ask for it.
+Pick the mode from the request: **setup** (no board yet), **adapt** (change people, language, labels, statuses, fields, the page or the task list of a board), **upgrade** (bring a board page up to this template), **move** (an artifact board to a self-hosted site, `references/hosted.md`). For adapt and upgrade, find the board in the repo's artiboard block or ask for it.
 
 ## Setup
 
 ### 1. Ask
 
-Ask with one AskUserQuestion call. Skip any question the request already answers.
+Ask with one AskUserQuestion call (or plain questions, without that tool). Skip any question the request already answers.
 
+0. **Where the board lives.** "claude.ai artifact (Claude only, nothing to run)" or "Self-hosted site (Claude Code and Codex; a team domain or this computer)". Offer only the site when the Artifact tools are missing. For a site, ask questions 2 to 4 in the same call (the people are the site's members), then continue in `references/hosted.md` "Setup".
 1. **Team size.** Options: "Just me (parallel sessions)", "2 people", "3 people". The user can type another number in Other.
 2. **How work is split.** "By feature (Recommended)": each task is a slice someone can finish alone. "By area": frontend, backend, infra and so on. "Each person decides".
 3. **Board language.** Offer the user's language first, then English.
@@ -57,6 +64,8 @@ Decide what this project needs. When unsure, keep the default.
 | Feature names, key scheme, task fields that agents use but the page does not show | Task documents and the rules file |
 | Message types wording, notice topics, when to post | The rules file |
 
+On a self-hosted board, "the page copy" is the project's page: change it with `board_page` edits (`references/hosted.md` "Adapt").
+
 | Change with care | How |
 | --- | --- |
 | Statuses (default `todo doing review blocked done`) | Edit `STATUS`, `BAR`, a `.state.<name>` CSS rule and `st_<name>` strings in the page copy, then the rules file. Keep `todo` and `done`: readiness and the graph depend on them. |
@@ -64,7 +73,7 @@ Decide what this project needs. When unsure, keep the default.
 
 | Keep | Why |
 | --- | --- |
-| `people/<id>` and the `user` capability | The page links each person to one claude.ai account. Agents never write `people/`. |
+| `people/<id>` and the `user` capability | The page links each person to one account (claude.ai, or the site's). Agents never write `people/`. |
 | Lean `tasks/<id>` plus `details/<id>` | Agents list and query small documents and open long text only for the task in hand. |
 | `waitingOn` and the ready query | One query finds pickable work. The page repairs drift itself. |
 | `cursors/<person>` | Each start reads only notices newer than the last one seen. |
