@@ -23,7 +23,7 @@ for (const backend of backends) {
     const P = `smoke-${R}`;
     const C = `scratch-${R}`;
     const K = (n) => `S${R}-${n}`;
-    let dir, store, http, BASE, tokens = {}, people = {}, board;
+    let dir, store, http, BASE, cfg, tokens = {}, people = {}, board;
 
     async function connect(token) {
       const client = new Client({ name: 'artiboard-test', version: '1.0.0' });
@@ -47,7 +47,7 @@ for (const backend of backends) {
       http = createServer();
       await new Promise((r) => http.listen(0, '127.0.0.1', r));
       BASE = `http://127.0.0.1:${http.address().port}`;
-      const cfg = loadConfig({ ...process.env, ...backend.env, ARTIBOARD_DB: join(dir, 'board.db'), BOARD_URL: BASE, ARTIBOARD_SITE: 'Test site' });
+      cfg = loadConfig({ ...process.env, ...backend.env, ARTIBOARD_DB: join(dir, 'board.db'), BOARD_URL: BASE, ARTIBOARD_SITE: 'Test site' });
       store = await openStore(cfg);
       const handle = makeApp({ store, cfg });
       http.on('request', (req, res) => handle(req, res));
@@ -201,7 +201,44 @@ for (const backend of backends) {
       }
     });
 
+    test('who is who and who wrote what are guarded on every path', async () => {
+      const member = await connect(tokens.member);
+      const me = people.member.person;
+      try {
+        const deny = async (writes, why) => assert.equal((await call(member, 'board_batch', { project: P, writes })).value.code, 'permission_denied', why);
+        await deny([{ op: 'set', path: `people/${people.admin.person}`, data: { uid: people.member.uid } }], 'no taking over a linked person');
+        await deny([{ op: 'set', path: `people/ghost${R}`, data: { uid: people.admin.uid } }], 'no linking someone else\'s account');
+        await deny([{ op: 'delete', path: `people/${me}` }], 'no unlinking');
+        assert.equal((await call(member, 'board_batch', { project: P, writes: [{ op: 'set', path: `people/ghost${R}`, data: { uid: people.member.uid } }] })).error, false,
+          'a member links their own account to an unlinked person, as the page does');
+        await deny([{ op: 'set', path: `people/ghost${R}`, data: { uid: people.member.uid } }], 'once linked, only admins change it');
+        const cfgDoc = (await call(member, 'board_get', { project: P, path: 'meta/config' })).value;
+        await deny([{ op: 'update', path: 'meta/config', data: { people: [{ id: me, uid: people.member.uid }] } }], 'no rewriting meta/config.people');
+        assert.equal((await call(member, 'board_batch', { project: P, writes: [{ op: 'update', path: 'meta/config', data: { subtitle: 'by a member' }, if_version: cfgDoc.version }] })).error, false, 'other config fields stay open');
+        const at = new Date().toISOString();
+        await deny([{ op: 'set', path: `notices/n-${R}-fake`, data: { at, author: people.admin.person, text: 'not me' } }], 'no posting as someone else');
+        assert.equal((await call(member, 'board_batch', { project: P, writes: [{ op: 'set', path: `notices/n-${R}-mine`, data: { at, author: me, text: 'me' } }] })).error, false);
+        if (store.kind === 'sqlite') {
+          const cookie = (await api('/api/login', { method: 'POST', body: { token: tokens.member } })).headers.get('set-cookie').split(';')[0];
+          const r = await api(`/api/p/${P}/batch`, { method: 'POST', cookie, body: { writes: [{ op: 'set', path: `people/${people.admin.person}`, data: { uid: people.member.uid } }] } });
+          assert.equal(r.status, 403, 'the page API enforces the same rules');
+        }
+      } finally {
+        await member.close();
+      }
+      assert.equal((await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `people/ghost${R}` }, { op: 'delete', path: `notices/n-${R}-mine` }] })).error, false, 'admins may');
+    });
+
+    test('agents change pages only where the site allows it', async () => {
+      cfg.agentPageEdits = false;
+      const off = await call(board, 'board_page', { project: P, edits: [{ old: '<title>Project Board</title>', new: '<title>x</title>' }] });
+      assert.equal(off.value.code, 'permission_denied');
+      assert.match(off.value.message, /artiboard page set/);
+      cfg.agentPageEdits = true;
+    });
+
     test('admins change a project page with exact edits; others cannot', async () => {
+      cfg.agentPageEdits = true;
       const info = (await call(board, 'board_page', { project: P })).value;
       assert.deepEqual([info.version, info.custom], [0, false]);
       assert.match((await call(board, 'board_page', { project: P, find: "var STATUS=", context: 0 })).value, /^version 0 \(bundled\)\n\d+: /);
@@ -224,7 +261,7 @@ for (const backend of backends) {
       assert.match(page.headers.get('content-security-policy'), /connect-src 'self'/);
       assert.equal((await call(board, 'board_page', { project: P, reset: true })).value.reset, true);
       assert.match(await (await api(`/p/${P}`)).text(), /<title>Project Board<\/title>/);
-      assert.equal((await api('/p/no-such-project')).status, 404);
+      assert.equal((await api('/p/no-such-project')).status, 200, 'unknown projects look like any other board until sign-in');
     });
 
     test('refuses requests without a valid token', async () => {
@@ -290,6 +327,26 @@ for (const backend of backends) {
         assert.equal((await api('/api/login', { method: 'POST', body: { code } })).status, 401, 'a link works once');
       });
 
+      test('revoking a token signs the member out; leases and logout are guarded', async () => {
+        const extra = await store.addMember({ person: `rev${R}`, role: 'member' });
+        people.revoked = extra;
+        const token = await store.issueToken(extra.uid, 'test');
+        const cookie = (await api('/api/login', { method: 'POST', body: { token } })).headers.get('set-cookie').split(';')[0];
+        const { url } = (await call(await connect(token), 'board_login_link')).value;
+        assert.equal((await api('/api/me', { cookie })).status, 200);
+        await store.revokeTokens(extra.uid);
+        assert.equal((await api('/api/me', { cookie })).status, 401, 'the browser session ends');
+        assert.equal((await api('/api/login', { method: 'POST', body: { code: /#ab-code=(.+)$/.exec(url)[1] } })).status, 401, 'unused links die too');
+
+        const viewer = (await api('/api/login', { method: 'POST', body: { token: tokens.viewer } })).headers.get('set-cookie').split(';')[0];
+        assert.equal((await api(`/api/p/${P}/acquire`, { method: 'POST', cookie: viewer, body: { path: 'people/x', holder: 'v' } })).status, 403);
+        const admin = (await api('/api/login', { method: 'POST', body: { token: tokens.admin } })).headers.get('set-cookie').split(';')[0];
+        assert.equal((await api('/api/p/no-such-project/acquire', { method: 'POST', cookie: admin, body: { path: 'people/x', holder: 'a' } })).status, 404);
+        assert.equal((await api(`/api/p/${P}/acquire`, { method: 'POST', cookie: admin, body: { path: 'x'.repeat(900), holder: 'a' } })).status, 400);
+        assert.equal((await api(`/api/p/${P}/read`, { method: 'POST', cookie: admin, body: { whole: Array.from({ length: 30 }, (_, i) => `c${i}`) } })).status, 400);
+        assert.equal((await api('/api/logout', { cookie: admin })).status, 405, 'no logging people out with a link');
+      });
+
       test('a viewer page reads but cannot write; projects are listed and created from the page', async () => {
         const cookie = (await api('/api/login', { method: 'POST', body: { token: tokens.viewer } })).headers.get('set-cookie').split(';')[0];
         assert.equal((await api(`/api/p/${P}/batch`, { method: 'POST', cookie, body: { writes: [{ op: 'set', path: `${C}/v`, data: {} }] } })).status, 403);
@@ -301,6 +358,13 @@ for (const backend of backends) {
         await store.dropProject(`${P}-2`);
       });
     } else {
+      test('revoking a token ends Supabase sessions', async () => {
+        const extra = await store.addMember({ person: `rev${R}`, role: 'member' });
+        people.revoked = extra;
+        await store.issueToken(extra.uid, 'test');
+        assert.equal(await store.revokeTokens(extra.uid), 1);
+      });
+
       test('gives a one-time Supabase sign-in link', async () => {
         assert.match((await call(board, 'board_login_link')).value.url, /\/auth\/v1\/verify\?token=/);
       });

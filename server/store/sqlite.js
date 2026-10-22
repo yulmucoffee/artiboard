@@ -7,7 +7,7 @@ import { dirname } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import {
-  BoardError, checkCollection, checkField, hashToken, isToken, MAX_DOC, MAX_PAGE, newToken, now, PERSON_ID, PROJECT_ID,
+  BoardError, checkCollection, checkField, guardWrite, hashToken, isToken, MAX_DOC, MAX_PAGE, newToken, now, PERSON_ID, PROJECT_ID,
   projectSeed, ROLES, splitPath,
 } from '../core.js';
 
@@ -95,6 +95,7 @@ export function openSqlite({ file, boardUrl }) {
     try { const out = fn(); db.exec('commit'); return out; } catch (e) { db.exec('rollback'); throw e; }
   }
 
+  const memberOf = (uid) => q('select uid, person, role from members where uid = ?').get(uid);
   const roleOf = (uid) => (uid == null ? 'admin' : q('select role from members where uid = ?').get(uid)?.role || null);
   function checkProject(project) {
     if (!q('select 1 from projects where id = ?').get(project)) throw new BoardError('not_found', `no project ${project ?? 'null'}`);
@@ -110,6 +111,9 @@ export function openSqlite({ file, boardUrl }) {
   async function query(project, collection, { where = [], order = [], limit = 20, after = null } = {}) {
     checkProject(project);
     checkCollection(collection);
+    if (!Array.isArray(where || []) || !Array.isArray(order || []) || (where || []).length > 10 || (order || []).length > 3) {
+      throw new BoardError('invalid_argument', 'where is a list of at most 10 conditions, order_by of at most 3');
+    }
     const params = [project, collection];
     const conds = ['project = ?', 'collection = ?'];
     for (const w of where || []) conds.push(condition(w, params));
@@ -125,7 +129,8 @@ export function openSqlite({ file, boardUrl }) {
 
   // Each write: {op: set|update|delete, path, data?, if_version?, if_absent?}. set replaces, update merges top-level fields.
   async function apply(actor, project, writes) {
-    const role = roleOf(actor);
+    const member = actor == null ? null : memberOf(actor);
+    const role = actor == null ? 'admin' : member?.role;
     if (!role || role === 'viewer') throw new BoardError('permission_denied', 'this account cannot write');
     checkProject(project);
     if (!Array.isArray(writes) || !writes.length || writes.length > 100) throw new BoardError('invalid_argument', 'writes must be an array of 1 to 100 entries');
@@ -138,6 +143,7 @@ export function openSqlite({ file, boardUrl }) {
         throw new BoardError('invalid_argument', 'data must be an object under 256 KiB', i);
       }
       const cur = q('select * from docs where project = ? and collection = ? and doc_id = ?').get(project, c, d);
+      if (role !== 'admin') guardWrite(member, w, c, d, cur && JSON.parse(cur.data), payload, i);
       if (w.if_version != null && (!cur || cur.version !== Number(w.if_version))) {
         throw new BoardError('version_conflict', `${w.path} is at version ${cur ? cur.version : 'none (missing)'}, not ${w.if_version}`, i);
       }
@@ -175,16 +181,22 @@ export function openSqlite({ file, boardUrl }) {
       const rows = await query(project, collection, { order, limit: limit || 200 });
       return rows.map((r) => ({ collection, doc_id: r.id, version: r.version, updated_at: r.updated_at, data: r.data }));
     }
+    // a page asks for a handful of collections at once; anything bigger is not the page
+    const many = (list) => { if (!Array.isArray(list) || list.length > 20) throw new BoardError('invalid_argument', 'at most 20 collections per read'); };
     if (collections) {
+      many(collections);
       collections.forEach(checkCollection);
       return q(`select * from docs where project = ? and updated_at > ? and collection in (select value from json_each(?))`)
         .all(project, String(since || ''), JSON.stringify(collections)).map(rowOut);
     }
+    many(whole);
+    many(Object.keys(docs || {}));
     const out = [];
     for (const c of whole) { checkCollection(c); out.push(...q('select * from docs where project = ? and collection = ?').all(project, c).map(rowOut)); }
     for (const [c, ids] of Object.entries(docs || {})) {
       if (whole.includes(c)) continue;
       checkCollection(c);
+      if (!Array.isArray(ids) || ids.length > 200) throw new BoardError('invalid_argument', 'at most 200 documents per collection');
       out.push(...q('select * from docs where project = ? and collection = ? and doc_id in (select value from json_each(?))')
         .all(project, c, JSON.stringify(ids)).map(rowOut));
     }
@@ -192,12 +204,16 @@ export function openSqlite({ file, boardUrl }) {
   }
 
   // short leases, so two viewers linking the same person at once cannot both win
-  async function acquire(actor, path, holder, ttlMs) {
-    if (!roleOf(actor)) throw new BoardError('permission_denied', 'not a member');
+  async function acquire(actor, project, path, holder, ttlMs) {
+    const role = roleOf(actor);
+    if (!role || role === 'viewer') throw new BoardError('permission_denied', 'this account cannot write');
+    checkProject(project);
+    if (typeof path !== 'string' || path.length > 800 || String(holder || '').length > 200) throw new BoardError('invalid_argument', 'lease path or holder too long');
     const t = Date.now(), ttl = Math.min(Math.max(Number(ttlMs) || 5000, 100), 60000);
+    q('delete from leases where expires_at < ?').run(t - 60000);
     const r = q(`insert into leases (path, holder, expires_at) values (?, ?, ?) on conflict (path) do update
       set holder = excluded.holder, expires_at = excluded.expires_at where leases.expires_at < ? or leases.holder = excluded.holder`)
-      .run(String(path), String(holder || ''), t + ttl, t);
+      .run(`${project}:${path}`, String(holder || ''), t + ttl, t);
     return r.changes > 0;
   }
 
@@ -244,7 +260,7 @@ export function openSqlite({ file, boardUrl }) {
     q('insert into projects (id, title, created_at, created_by) values (?, ?, ?, ?)').run(id, title, now(), actor ?? null);
     const author = actor == null ? 'admin' : q('select person from members where uid = ?').get(actor).person;
     try {
-      await apply(actor, id, projectSeed({ title, lang, members: await listMembers(), author }));
+      await apply(null, id, projectSeed({ title, lang, members: await listMembers(), author }));
     } catch (e) {
       q('delete from projects where id = ?').run(id);
       throw e;
@@ -316,7 +332,14 @@ export function openSqlite({ file, boardUrl }) {
     q('insert into tokens (id, uid, label, token_hash, created_at) values (?, ?, ?, ?, ?)').run(randomUUID(), uid, label, hashToken(token), now());
     return token;
   }
-  async function revokeTokens(uid) { return q('update tokens set revoked_at = ? where uid = ? and revoked_at is null').run(now(), uid).changes; }
+  // revoking signs the member out everywhere: browser sessions and unused sign-in links go too
+  async function revokeTokens(uid) {
+    return tx(() => {
+      q('delete from sessions where uid = ?').run(uid);
+      q('delete from codes where uid = ?').run(uid);
+      return q('update tokens set revoked_at = ? where uid = ? and revoked_at is null').run(now(), uid).changes;
+    });
+  }
 
   // A one-time link that signs the browser in; the code travels in the fragment, so it stays out of server logs.
   async function loginLink(member) {

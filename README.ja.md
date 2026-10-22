@@ -229,7 +229,7 @@ approval_mode = "approve"
 
 あとはエージェントに「このリポジトリにボードをセットアップして」と頼んでください。
 
-**カスタマイズ**は claude.ai とまったく同じです。タイトル、メンバー、言語、あらゆる画面の文言は `meta/config` にあり、すぐに反映されます。ページ自体はプロジェクトごとにあります。管理者のエージェントが `board_page` ツールで小さく正確な編集をして変えるか(ステータス、フィールド、ビュー)、管理者が `artiboard page set --project acme --file page.html` を実行します。`page reset` で同梱のページに戻せます。同梱のページはサイトと一緒に更新されます。
+**カスタマイズ**は claude.ai とまったく同じです。タイトル、言語、あらゆる画面の文言は `meta/config` にあり、すぐに反映されます。誰がボードに入るかは管理者が決めます(`member join`、`member remove`)。ページ自体はプロジェクトごとにあります。管理者が `artiboard page set --project acme --file page.html` を実行して変え(ステータス、フィールド、ビュー)、`page reset` で同梱のページに戻せます。同梱のページはサイトと一緒に更新されます。ページのコードはすべてのメンバーのもとで動くので、サイトが `ARTIBOARD_AGENT_PAGE_EDITS=1` を設定しない限り、エージェントはページを読むだけです(`board_page` の `find`)。設定すれば、管理者のエージェントが小さく正確な編集でページを変えられます。
 
 | 設定 | 既定値 | 意味 |
 | --- | --- | --- |
@@ -239,6 +239,7 @@ approval_mode = "approve"
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | データを SQLite の代わりに Supabase に置く |
 | `ARTIBOARD_SITE` | `artiboard` | 画面に出るサイト名 |
 | `ARTIBOARD_LANG` | `en` | 新しいボードとサイトの画面の言語(`en`、`ko`) |
+| `ARTIBOARD_AGENT_PAGE_EDITS` | オフ | `1` にすると、管理者のエージェントが `board_page` でボードページを変えられる |
 
 <details>
 <summary><b>管理コマンド</b></summary>
@@ -252,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイト全体に適用されます。どのメンバーもすべてのプロジェクトを見られます。メンバーにパスワードはありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。
+コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイト全体に適用されます。どのメンバーもすべてのプロジェクトを見られます。メンバーにパスワードはありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。`member revoke` はそのセッションも終わらせます。誰が誰か(`meta/config.people`、`people/`)を変えられるのは管理者だけで、メッセージとお知らせには常に書いた本人の名前が付きます。
 
 </details>
 

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isToken, PROJECT_ID, toBoardError } from './core.js';
+import { BoardError, isToken, PROJECT_ID, toBoardError } from './core.js';
 import { buildServer } from './mcp.js';
 import { defaultPage, pageHeaders, renderPage } from './page.js';
 
@@ -27,7 +27,7 @@ function send(res, status, body, headers = {}) {
 }
 function fail(res, e) {
   const err = toBoardError(e);
-  if (!STATUS[err.code]) console.error(e);
+  if (err.cause) console.error(err.cause);
   send(res, STATUS[err.code] || 503, { code: err.code, index: err.index, message: err.message });
 }
 
@@ -36,7 +36,7 @@ async function body(req) {
   let raw = '', size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > MAX_BODY) throw Object.assign(new Error('request too large'), { code: 'invalid_argument' });
+    if (size > MAX_BODY) throw new BoardError('invalid_argument', 'request too large');
     raw += chunk;
   }
   try { return raw ? JSON.parse(raw) : undefined; } catch { return undefined; }
@@ -52,6 +52,7 @@ function sameOrigin(req) {
 }
 
 export function makeApp({ store, cfg }) {
+  const streams = new Map();
   const secure = cfg.boardUrl.startsWith('https:');
   const sessionCookie = (sid, maxAge) => `ab_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 
@@ -77,10 +78,11 @@ export function makeApp({ store, cfg }) {
 
   async function page(res, project) {
     if (!PROJECT_ID.test(project || '')) return send(res, 404, 'not found', { 'Content-Type': 'text/plain' });
-    let own;
+    // an unknown project gets the bundled page too, so nobody can find project ids by trying addresses;
+    // its data stays behind sign-in either way
+    let own = null;
     try { own = await store.getPage(project); } catch (e) {
       if (toBoardError(e).code !== 'not_found') throw e;
-      return send(res, 404, `<!doctype html><meta charset="utf-8"><title>${cfg.site}</title><p>No board here. <a href="/">Projects</a></p>`, { 'Content-Type': 'text/html; charset=utf-8' });
     }
     send(res, 200, renderPage(own?.html ?? defaultPage(), cfg), pageHeaders(cfg));
   }
@@ -102,6 +104,9 @@ export function makeApp({ store, cfg }) {
   async function docs(req, res, member, project, action) {
     if (action === 'events') {
       await store.readRows(project, {});
+      if ((streams.get(member.uid) || 0) >= 20) return send(res, 429, { error: 'too_many_streams' });
+      streams.set(member.uid, (streams.get(member.uid) || 0) + 1);
+      req.on('close', () => { const n = streams.get(member.uid) - 1; if (n > 0) streams.set(member.uid, n); else streams.delete(member.uid); });
       res.writeHead(200, { ...SECURITY, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
       res.write(': live\n\n');
       const off = store.subscribe(project, (row) => res.write(`data: ${JSON.stringify(row)}\n\n`));
@@ -113,7 +118,7 @@ export function makeApp({ store, cfg }) {
     const b = (await body(req)) || {};
     if (action === 'read') return send(res, 200, await store.readRows(project, b));
     if (action === 'batch') return send(res, 200, await store.apply(member.uid, project, b.writes));
-    if (action === 'acquire') return send(res, 200, { acquired: await store.acquire(member.uid, `${project}:${b.path}`, b.holder, b.ttlMs) });
+    if (action === 'acquire') return send(res, 200, { acquired: await store.acquire(member.uid, project, b.path, b.holder, b.ttlMs) });
     send(res, 404, { error: 'not_found' });
   }
 
@@ -150,6 +155,7 @@ export function makeApp({ store, cfg }) {
         return await login(req, res);
       }
       if (name === 'logout') {
+        if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, { Allow: 'POST' });
         if (store.endSession) await store.endSession(cookie(req, 'ab_session'));
         return send(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('', 0) });
       }

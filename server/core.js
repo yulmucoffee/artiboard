@@ -10,11 +10,13 @@ export class BoardError extends Error {
   }
 }
 
-// Supabase functions raise `ab:<code>:<write index>:<detail>`
+// Supabase functions raise `ab:<code>:<write index>:<detail>`. Anything else is a fault whose details
+// stay in the server log: clients only learn that the board is unavailable.
 export function toBoardError(e) {
   if (e instanceof BoardError) return e;
   const m = /^ab:([a-z_]+):(\d+):([\s\S]*)$/.exec(e?.message || '');
-  return m ? new BoardError(m[1], m[3], Number(m[2])) : new BoardError('unavailable', e?.message || String(e));
+  if (m) return new BoardError(m[1], m[3], Number(m[2]));
+  return Object.assign(new BoardError('unavailable', 'the board is unavailable; try again'), { cause: e });
 }
 
 export const PROJECT_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
@@ -43,6 +45,24 @@ export function checkCollection(collection) {
 export function checkField(field) {
   if (typeof field !== 'string' || !FIELD.test(field)) throw new BoardError('invalid_argument', `bad field name: ${field ?? 'null'}`);
   return field.split('.');
+}
+
+// What a member who is not an admin may not write, whatever the path to the store:
+// who is who (people/, meta/config.people) beyond linking their own account once, and posts under another name.
+// The Supabase migration 20261023000000_guards.sql enforces the same in ab_apply.
+export function guardWrite(actor, w, collection, docId, cur, payload, index) {
+  const deny = (why) => { throw new BoardError('permission_denied', why, index); };
+  if (collection === 'people' && (w.op !== 'set' || payload.uid !== actor.uid || cur?.uid)) {
+    deny('only admins change people/; a member links only their own account to an unlinked person');
+  }
+  const samePeople = (v) => JSON.stringify(v) === JSON.stringify(cur?.people);
+  if (collection === 'meta' && docId === 'config' && (w.op === 'delete' || !cur
+      || (w.op === 'set' && !samePeople(payload.people)) || (w.op === 'update' && 'people' in payload && !samePeople(payload.people)))) {
+    deny('only admins change meta/config.people');
+  }
+  if ((collection === 'notices' || /^tasks\/[^/]+\/messages$/.test(collection)) && w.op !== 'delete' && 'author' in payload && payload.author !== actor.person) {
+    deny(`author must be your own person (${actor.person})`);
+  }
 }
 
 export const hashToken = (token) => createHash('sha256').update(token).digest('hex');

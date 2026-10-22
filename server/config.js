@@ -17,6 +17,8 @@ export function loadConfig(env = process.env) {
     site: env.ARTIBOARD_SITE || 'artiboard',
     // the language of new projects and of the site's own screens
     lang: env.ARTIBOARD_LANG || 'en',
+    // page HTML runs for every member; by default only admins at the command line change it, not agents
+    agentPageEdits: env.ARTIBOARD_AGENT_PAGE_EDITS === '1',
     dbFile: env.ARTIBOARD_DB || join(homedir(), '.artiboard', 'board.db'),
     supabase: { url: env.SUPABASE_URL, secretKey: env.SUPABASE_SECRET_KEY, publishableKey: env.SUPABASE_PUBLISHABLE_KEY },
   };

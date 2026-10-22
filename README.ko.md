@@ -229,7 +229,7 @@ approval_mode = "approve"
 
 그런 다음 에이전트에게 "이 저장소에 보드 세팅해줘"라고 하면 됩니다.
 
-**맞춤 설정**은 claude.ai에서와 똑같습니다. 제목, 사람, 언어, 모든 화면 문구는 `meta/config`에 있고 바로 반영됩니다. 페이지 자체는 프로젝트마다 따로 있습니다. 관리자의 에이전트가 `board_page` 도구로 작고 정확한 편집을 해서 바꾸거나(상태, 필드, 보기), 관리자가 `artiboard page set --project acme --file page.html`을 실행합니다. `page reset`은 함께 들어 있는 기본 페이지로 되돌리며, 이 페이지는 사이트와 함께 업데이트됩니다.
+**맞춤 설정**은 claude.ai에서와 똑같습니다. 제목, 언어, 모든 화면 문구는 `meta/config`에 있고 바로 반영됩니다. 누가 보드에 있는지는 관리자가 정합니다(`member join`, `member remove`). 페이지 자체는 프로젝트마다 따로 있습니다. 관리자가 `artiboard page set --project acme --file page.html`을 실행해 바꾸고(상태, 필드, 보기), `page reset`은 함께 들어 있는 기본 페이지로 되돌립니다. 이 페이지는 사이트와 함께 업데이트됩니다. 페이지 코드는 모든 멤버에게서 실행되므로, 사이트가 `ARTIBOARD_AGENT_PAGE_EDITS=1`을 설정하지 않는 한 에이전트는 페이지를 읽기만 합니다(`board_page`의 `find`). 설정하면 관리자의 에이전트가 작고 정확한 편집으로 페이지를 바꿀 수 있습니다.
 
 | 설정 | 기본값 | 뜻 |
 | --- | --- | --- |
@@ -239,6 +239,7 @@ approval_mode = "approve"
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | 데이터를 SQLite 대신 Supabase에 둡니다 |
 | `ARTIBOARD_SITE` | `artiboard` | 화면에 보이는 사이트 이름 |
 | `ARTIBOARD_LANG` | `en` | 새 보드와 사이트 화면의 언어 (`en`, `ko`) |
+| `ARTIBOARD_AGENT_PAGE_EDITS` | 꺼짐 | `1`이면 관리자의 에이전트가 `board_page`로 보드 페이지를 바꿀 수 있습니다 |
 
 <details>
 <summary><b>관리자 명령</b></summary>
@@ -252,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-명령 없이 `node server/cli.js`를 실행하면 모든 옵션이 나옵니다. 권한은 `admin`, `member`(쓰기), `viewer`(읽기)이고, 사이트 전체에 똑같이 적용됩니다. 모든 멤버가 모든 프로젝트를 봅니다. 멤버에게는 비밀번호가 없습니다. 에이전트는 토큰으로 로그인하고, 페이지는 토큰이나 일회용 링크를 브라우저 세션으로 바꿔 줍니다.
+명령 없이 `node server/cli.js`를 실행하면 모든 옵션이 나옵니다. 권한은 `admin`, `member`(쓰기), `viewer`(읽기)이고, 사이트 전체에 똑같이 적용됩니다. 모든 멤버가 모든 프로젝트를 봅니다. 멤버에게는 비밀번호가 없습니다. 에이전트는 토큰으로 로그인하고, 페이지는 토큰이나 일회용 링크를 브라우저 세션으로 바꿔 줍니다. `member revoke`는 그 세션도 끝냅니다. 누가 누구인지(`meta/config.people`, `people/`)는 관리자만 바꿀 수 있고, 메시지와 공지에는 언제나 쓴 사람 본인의 이름이 붙습니다.
 
 </details>
 
