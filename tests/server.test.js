@@ -69,12 +69,14 @@ for (const backend of backends) {
       rmSync(dir, { recursive: true, force: true });
     });
 
-    test('a new project starts with config, rules, a notice and its people', async () => {
+    test('a new project starts with config, a notice and its people; its rules are the team\'s to write', async () => {
       const cfg = (await call(board, 'board_get', { project: P, path: 'meta/config' })).value;
       assert.equal(cfg.data.title, 'Smoke');
+      assert.deepEqual(cfg.data.repos, []);
       const ids = cfg.data.people.map((p) => p.id);
       assert.ok(ids.includes(people.admin.person) && ids.includes(people.member.person) && !ids.includes(people.viewer.person));
-      assert.match((await call(board, 'board_get', { project: P, path: 'meta/protocol' })).value.data.text, /Claude Code, Codex/);
+      assert.equal((await call(board, 'board_get', { project: P, path: 'meta/rules' })).value, null);
+      assert.equal((await call(board, 'board_get', { project: P, path: 'meta/protocol' })).value, null);
       assert.equal((await call(board, 'board_get', { project: P, path: `people/${people.member.person}` })).value.data.uid, people.member.uid);
     });
 
@@ -148,12 +150,17 @@ for (const backend of backends) {
       assert.match(claimed.value, /^claimed /);
       assert.match(claimed.value, /spec: docs\/x\.md §1/);
       assert.match((await call(board, 'board_claim', { project: P, id: K(1) })).value, /^already yours/);
-      const me = people.admin.person;
+      const me = people.admin.person, them = people.member.person;
 
       const other = await connect(tokens.member);
       try {
         assert.match((await call(other, 'board_claim', { project: P, id: K(1) })).value, new RegExp(`^taken: .* held by ${me}`));
         assert.match((await call(other, 'board_post', { project: P, task: K(1), text: 'x', status: 'blocked' })).value, /^not_yours: /);
+        assert.match((await call(other, 'board_post', { project: P, task: K(1), start: '2026-10-19' })).value, /^not_yours: /, 'start is the holder\'s');
+        assert.equal((await call(other, 'board_post', { project: P, task: K(1), due: '2026-10-30' })).value, `ok ${K(1)}`, 'anyone moves a due day');
+        const moved = (await call(other, 'board_task', { project: P, id: K(1) })).value;
+        assert.match(moved, /^due 2026-10-30$/m);
+        assert.match(moved, new RegExp(`${them} update: due 2026-10-30$`, 'm'), 'the thread says who moved it');
         assert.equal((await call(other, 'board_post', { project: P, task: K(1), text: 'a question', type: 'question' })).error, false);
         const people = await call(other, 'board_batch', { project: P, writes: [{ op: 'set', path: 'people/x', data: {} }] });
         assert.equal(people.value.code, 'permission_denied', 'agents do not write people/');
@@ -162,11 +169,12 @@ for (const backend of backends) {
       }
 
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'PR open', status: 'review', pr: 'https://example.com/pr/1', summary: 'state\nleft: nothing' })).value, `ok ${K(1)} → review`);
-      assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'after the summary', due: '2026-10-23' })).value, `ok ${K(1)}`);
+      assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'after the summary', due: '2026-10-23', start: '2026-10-20' })).value, `ok ${K(1)}`);
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'x', due: 'friday' })).error, true, 'due is a day');
+      assert.match((await call(board, 'board_post', { project: P, task: K(1) })).value, /^invalid_argument: /, 'a post says or changes something');
       const shown = (await call(board, 'board_task', { project: P, id: K(1) })).value;
       assert.match(shown, new RegExp(`^${K(1)} review · ${me} \\(agent\\) · https://example.com/pr/1$`, 'm'));
-      assert.match(shown, /^due 2026-10-23$/m);
+      assert.match(shown, /^start 2026-10-20 · due 2026-10-23$/m);
       assert.match(shown, /^summary .*: state\nleft: nothing$/m);
       assert.doesNotMatch(shown, /on it|a question/, 'only messages after the summary');
 
@@ -178,6 +186,54 @@ for (const backend of backends) {
       assert.deepEqual(left.value.docs.map((d) => d.data.waitingOn), [[], ['X-9']]);
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'qa pass', status: 'qa' })).value, `ok ${K(1)} → qa`, 'a status the board adds');
       assert.equal((await call(board, 'board_get', { project: P, path: `tasks/${K(1)}` })).value.data.doneAt, undefined, 'leaving done clears doneAt');
+    });
+
+    test('a project names its repos: agents find it from a git remote, and the start brings both rules', async () => {
+      const api = `acme-${R}/API`, web = `acme-${R}/web`;
+      const cfgDoc = (await call(board, 'board_get', { project: P, path: 'meta/config' })).value;
+      const at = new Date().toISOString();
+      const task = (n, repo) => ({ op: 'set', path: `tasks/${K(`r${n}`)}`, data: { key: K(`r${n}`), title: `repo ${n}`, status: 'todo', deps: [], waitingOn: [], ...(repo && { repo }), updatedAt: at } });
+      assert.equal((await call(board, 'board_batch', { project: P, writes: [
+        { op: 'update', path: 'meta/config', data: { repos: [{ repo: api, label: 'api' }, web] }, if_version: cfgDoc.version },
+        { op: 'set', path: 'meta/rules', data: { text: '1. Roles\n- the api is ours', rev: 2, by: people.admin.person, updatedAt: at } },
+        task(1, 'api'), task(2, web), task(3),
+      ] })).error, false);
+
+      const listed = (await call(board, 'board_projects')).value.find((p) => p.id === P);
+      assert.deepEqual(listed.repos, [`${api} (api)`, web]);
+      const s = (await call(board, 'board_start', { project: undefined, repo: `git@github.com:${api.toLowerCase()}.git`, ready: 50, peek: true })).value;
+      assert.match(s, new RegExp(`^${people.admin.person} · ${P}`), 'the remote finds the project');
+      assert.match(s, new RegExp(`^repos: ${api} \\(api\\) · ${web}$`, 'm'));
+      assert.match(s, /^board rules \(every board\):$/m);
+      assert.match(s, new RegExp(`^project rules \\(rev 2 · ${people.admin.person} \\d\\d-\\d\\d\\):\n1\\. Roles\n- the api is ours$`, 'm'));
+      assert.match(s, new RegExp(`^${K('r1')} \\[?.*repo:api.* repo 1$`, 'm'));
+      assert.match(s, new RegExp(`^${K('r3')} repo 3$`, 'm'), 'tasks that name no repo are anyone\'s');
+      assert.doesNotMatch(s, new RegExp(K('r2')), 'another repo\'s tasks stay out');
+      assert.match(s, /; 1 more in other repos\):$/m);
+
+      const refuse = async (writes, why) => assert.equal((await call(board, 'board_batch', { project: P, writes })).value.code, 'invalid_argument', why);
+      await refuse([{ op: 'set', path: 'meta/protocol', data: { text: 'rules' } }], 'the old mixed rules card is retired');
+      await refuse([{ op: 'update', path: 'meta/rules', data: { text: 'Start with board_start, then board_claim.' } }], 'board rules stay out of project rules');
+      await refuse([{ op: 'set', path: 'meta/notes', data: { text: 'pass if_version on writes' } }], 'and out of notes');
+      assert.equal((await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: 'meta/protocol' }] })).error, false, 'agents may clear the old card');
+      assert.equal((await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: 'meta/notes', data: { text: 'Mon: deploy', rev: 1, updatedAt: at } }] })).error, false);
+      assert.match((await call(board, 'board_start', { project: P, ready: 0, peek: true })).value, /^project notes: meta\/notes \(rev 1 \d\d-\d\d\); board_get it/m, 'notes are pointed at, not printed');
+
+      const lean = (await call(board, 'board_start', { project: P, rules: false, ready: 0, peek: true })).value;
+      assert.doesNotMatch(lean, /board rules|project rules|project notes/, 'rules: false leaves them out');
+      assert.match((await call(board, 'board_start', { repo: `acme-${R}/nothing` })).value, /^not_found: /);
+      assert.match((await call(board, 'board_start', { repo: 'not a repo' })).value, /^invalid_argument: /);
+      assert.match((await call(board, 'board_start', {})).value, /^invalid_argument: /);
+
+      const other = `${P}-x`;
+      const made = await call(board, 'board_create_project', { id: other, title: 'Other', repos: [`https://github.com/acme-${R}/other`, { repo: `acme-${R}/docs`, label: 'docs' }] });
+      try {
+        assert.equal(made.error, false, JSON.stringify(made.value));
+        assert.deepEqual((await call(board, 'board_get', { project: other, path: 'meta/config' })).value.data.repos, [{ repo: `acme-${R}/other` }, { repo: `acme-${R}/docs`, label: 'docs' }]);
+        assert.equal((await call(board, 'board_create_project', { id: `${P}-y`, title: 'Bad', repos: ['gitlab.com/a/b'] })).value.code, 'invalid_argument');
+      } finally {
+        await store.dropProject(other);
+      }
     });
 
     test('posts a notice and shows it once at the next start', async () => {
@@ -266,7 +322,9 @@ for (const backend of backends) {
       assert.match(html, /<script src="\/shim.js"><\/script>/);
       assert.match(page.headers.get('content-security-policy'), /connect-src 'self'/);
       assert.equal((await call(board, 'board_page', { project: P, reset: true })).value.reset, true);
-      assert.match(await (await api(`/p/${P}`)).text(), /<title>Project Board<\/title>/);
+      const bundled = await (await api(`/p/${P}`)).text();
+      assert.match(bundled, /<title>Project Board<\/title>/);
+      assert.match(bundled, /^<!doctype html>[\s\S]*<meta name="viewport"[\s\S]*<script src="\/shim.js"><\/script>\n<\/head>/, 'the bundled page is wrapped in a document with a viewport, its <header> notwithstanding');
       assert.equal((await api('/p/no-such-project')).status, 200, 'unknown projects look like any other board until sign-in');
     });
 

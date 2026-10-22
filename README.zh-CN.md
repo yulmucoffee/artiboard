@@ -163,14 +163,14 @@ Codex 用于自托管看板（它没有 claude.ai artifact）。
 
 | 你说 | 会发生什么 |
 | --- | --- |
-| "为这个项目建一个任务看板" | **setup**：询问看板放在哪里、人数、分工、语言和任务来源。从文档中起草任务并请你确认。发布或创建看板、写入数据，并写好 `docs/artiboard.md` 和 `CLAUDE.md`（Codex 还有 `AGENTS.md`）里的简短指引。 |
+| "为这个项目建一个任务看板" | **setup**：询问看板放在哪里、人数、分工、语言和任务来源。从文档中起草任务和项目规则并请你确认。发布或创建看板、关联 GitHub 仓库、写入数据，并在 `CLAUDE.md`（Codex 还有 `AGENTS.md`）里写好简短指引。 |
 | "把 Cy 加到看板""把看板改成英文" | **adapt**：只更新看板配置，不重新发布。 |
 | "加一个 QA 状态""在卡片上显示估时" | **adapt**：同时修改页面和规则。在自托管看板上，通过 `board_page` 编辑完成。 |
 | "把我们的看板搬到自己的服务器上" | **move**：把 artifact 看板的文档复制到一个自托管项目。 |
 | "给我一个看板登录链接" | 为自托管看板生成一个一次性的浏览器登录链接。 |
-| "领下一个任务""继续 M1-4" | 日常工作。Agent 遵循仓库里的 `docs/artiboard.md`：认领、讨论、摘要、评审、完成。 |
+| "领下一个任务""继续 M1-4" | 日常工作。Agent 从 `board_start` 开始（artifact 看板读 `docs/artiboard.md`），一次拿到看板规则、项目规则和自己的工作：认领、讨论、摘要、评审、完成。 |
 
-安装完成后，从 artifact 的 **Share** 菜单以编辑权限分享给队友。队友的 agent 拉取仓库后就会读到规则。 页面知道是谁在看：队友第一次在“I am”中选自己的名字时，看板会把它关联到其 claude.ai 账号，之后自动选中。有人用关联到其他账号的名字发帖时会给出警告；只读用户看不到领取、发帖和编辑按钮。
+安装完成后，从 artifact 的 **Share** 菜单以编辑权限分享给队友。队友的 agent 拉取仓库后会按指引找到看板。 页面知道是谁在看：队友第一次在“I am”中选自己的名字时，看板会把它关联到其 claude.ai 账号，之后自动选中。有人用关联到其他账号的名字发帖时会给出警告；只读用户看不到领取、发帖和编辑按钮。
 
 ## 自托管
 
@@ -248,7 +248,7 @@ approval_mode = "approve"
 artiboard serve [--port N] [--host H]
 artiboard init --person ID [--name N] [--project ID --title T]
 artiboard member add|token|link|revoke|access|join|remove|list
-artiboard project add|drop|list
+artiboard project add|repos|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
@@ -262,13 +262,13 @@ artiboard import --project ID --file FILE [--map old=new]
 
 | 工具 | 作用 |
 | --- | --- |
-| `board_start` | 游标之后的新公告（并移动游标）、你未完成的任务、可领取的任务 |
+| `board_start {project 或 repo}` | 看板规则和项目规则、游标之后的新公告（并移动游标）、你未完成的任务、可领取的任务。传入 `repo`（git remote）时会找到项目并列出该仓库的工作 |
 | `board_claim {id, text}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准和摘要 |
 | `board_task {id}` | 状态、详情，以及摘要之后的消息 |
-| `board_post {task, text, status?, branch?, pr?, due?, summary?}` | 一条讨论串消息，加上对你任务的修改；`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞。不带 `task` 时：发布公告 |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | 一条讨论串消息，加上对你任务的修改；任何人都可以调整任务的 `due`。`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞。不带 `task` 时：发布公告 |
 | `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同 |
 | `board_page` | 项目的页面：大小、`find`、`read`，管理员还有 `edits`、`html`、`reset` |
-| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 站点 |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 站点；每个项目都列出其 GitHub 仓库 |
 
 日常工具用简短的几行回答，并在服务器端校验版本、记录时间，所以一次认领或更新就是一次不到一百个 token 的调用。
 
@@ -295,16 +295,18 @@ flowchart LR
 | `tasks/<id>/messages` | 讨论串：进展、问题、交接、阻塞 | Agent 读最近 8 条，人读全部 |
 | `notices` | 所有人都要知道的事 | Agent 只读游标之后的新内容 |
 | `cursors/<人>` | 此人的 agent 上次读公告的时间 | Agent |
-| `meta/config` | 标题、成员、语言、界面文案 | 页面 |
+| `meta/config` | 标题、成员、语言、GitHub 仓库、界面文案 | 页面 |
+| `meta/rules` | 项目自己的规则：谁负责什么、规格在哪里、分支、要公告什么 | 页面上的人；开始看板工作时的 agent |
+| `meta/notes` | 共享的现状：日程、各项进展、待定事项 | 页面上的人；仅在需要时由 agent 读取 |
 | `people/<person>` | 最先选择该成员的 claude.ai 账号 | 页面 |
-| `docs/artiboard.md`（仓库） | Agent 规则 | 仅在使用看板的会话中由 agent 读取 |
+| `docs/artiboard.md`（仓库，artifact 看板） | 原样复制的看板规则（自托管站点通过 `board_start` 提供） | 仅在使用看板的会话中由 agent 读取 |
 
 ## Token 设计
 
 | 规则 | 效果 |
 | --- | --- |
 | 代码绘制看板 | 视图、图表、计数、可领取状态和"新"标记不消耗任何模型 token，团队再大也一样。 |
-| 规则放在仓库里，按需加载 | 每个会话只承担三行指引。只有使用看板的会话才读规则。仓库文本经过评审、值得信任，不同于任何人都能编辑的看板文本。 |
+| 规则随看板工作而来 | 每个会话只承担三行指引。所有看板都相同的看板规则和简短的项目规则只在开始看板工作时送达，现状笔记仅在需要时读取。看板规则内置于 artiboard，任何项目都不保留或修改副本。 |
 | 用查询，不全量读取 | 找可领取的任务只需一次查询（`status == todo`、`waitingOn == []`）。公告只取游标之后的增量。 |
 | 文档保持小巧 | 任务文档只存状态。长文本只在处理某个任务时才打开。 |
 | 摘要优先于讨论串 | 交接时重写五行摘要，下一个人可以跳过旧消息。 |
@@ -325,13 +327,14 @@ flowchart LR
 | `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | 顺序决定颜色。六种颜色后循环。 可选的 `uid` 把该成员固定到一个 claude.ai 账号，优先于 `people/<id>`。 |
 | `strings` | `{"v_graph":"依赖图"}` | 用任意语言覆盖任意界面文案 |
 | `footer` | `"..."` | 替换页脚文字 |
+| `repos` | `[{"repo":"acme/api","label":"api"}]` | 项目的 GitHub 仓库。Agent 通过 git remote 找到看板，任务可以在 `repo` 中写明所属仓库。 |
 
 </details>
 
 <details>
 <summary><b>Skill 可以按项目调整什么</b></summary>
 
-可自由调整：标题、成员、角色、语言、文案、功能名、编号规则、消息措辞、公告主题。通过修改页面：状态、在界面显示的字段、新视图。任何情况下都保留：轻量 tasks 与 details 分离、`waitingOn` 与可领取查询、游标、带 `if_version` 的单次批量写入、文档 id 格式、规则放在仓库、看板文本视为数据。
+可自由调整：标题、成员、角色、语言、文案、功能名、编号规则、消息措辞、公告主题。通过修改页面：状态、在界面显示的字段、新视图。任何情况下都保留：轻量 tasks 与 details 分离、`waitingOn` 与可领取查询、游标、带 `if_version` 的单次批量写入、文档 id 格式、内置于 artiboard 的看板规则（项目只添加 `meta/rules`）、看板文本视为数据。
 
 </details>
 
@@ -341,7 +344,7 @@ flowchart LR
 ```text
 skills/artiboard/SKILL.md               skill：安装、调整、升级、token 规则
 skills/artiboard/assets/board.html      看板页面（从 artifact 数据库绘制）
-skills/artiboard/references/          规则模板（artifact 版、托管版）以及给 agent 的自托管指南
+skills/artiboard/references/          artifact 看板的看板规则、项目规则写法，以及给 agent 的自托管指南
 server/                                 自托管站点：HTTP 应用、MCP 服务器、SQLite 与 Supabase 存储、CLI、页面运行时
 api/, vercel.json                       基于 Supabase 的站点所用的 Vercel 函数
 supabase/                               Supabase schema（迁移）和本地配置

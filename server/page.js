@@ -11,7 +11,8 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 // The artifact page is a fragment (claude.ai wraps it on publish); a project's own page may be a whole document.
 export function renderPage(html, cfg) {
   const runtime = '<script src="/shim.js"></script>\n';
-  const head = /<head[^>]*>/i.exec(html);
+  // <head> itself, not the page's <header>
+  const head = /<head(?=[\s>])[^>]*>/i.exec(html);
   if (head) return html.slice(0, head.index + head[0].length) + '\n' + runtime + html.slice(head.index + head[0].length);
   return `<!doctype html>
 <html lang="${esc(cfg.lang)}">

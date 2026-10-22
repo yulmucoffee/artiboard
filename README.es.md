@@ -163,14 +163,14 @@ Pídelo con tus palabras y en cualquier idioma.
 
 | Dices | Qué pasa |
 | --- | --- |
-| "Crea un tablero de tareas para este proyecto" | **setup**: pregunta dónde vive el tablero, el tamaño del equipo, el reparto, el idioma y el origen de las tareas. Redacta tareas a partir de tu documentación y te las muestra para que digas sí. Publica o crea el tablero, lo llena y escribe `docs/artiboard.md` y una indicación corta en `CLAUDE.md` (y en `AGENTS.md` para Codex). |
+| "Crea un tablero de tareas para este proyecto" | **setup**: pregunta dónde vive el tablero, el tamaño del equipo, el reparto, el idioma y el origen de las tareas. Redacta las tareas y las reglas del proyecto a partir de tu documentación y te las muestra para que digas sí. Publica o crea el tablero, enlaza tus repositorios de GitHub, lo llena y añade una indicación corta en `CLAUDE.md` (y en `AGENTS.md` para Codex). |
 | "Añade a Cy al tablero", "Pon el tablero en inglés" | **adapt**: actualiza la configuración del tablero. Sin volver a publicar. |
 | "Añade un estado QA", "Muestra estimaciones en las tarjetas" | **adapt**: modifica la página y las reglas a la vez. En un tablero autoalojado, mediante ediciones con `board_page`. |
 | "Mueve nuestro tablero a nuestro propio servidor" | **move**: copia los documentos de un tablero en artifact a un proyecto autoalojado. |
 | "Dame un enlace para entrar al tablero" | Un enlace de un solo uso para iniciar sesión en el navegador en un tablero autoalojado. |
-| "Toma la siguiente tarea", "Continúa M1-4" | Trabajo diario. El agente sigue `docs/artiboard.md` de tu repositorio: tomar, hilo, resumen, revisión, hecho. |
+| "Toma la siguiente tarea", "Continúa M1-4" | Trabajo diario. El agente empieza con `board_start` (en un tablero artifact, `docs/artiboard.md`), que le da las reglas del tablero, las del proyecto y su trabajo: tomar, hilo, resumen, revisión, hecho. |
 
-Después, comparte el tablero con tu equipo desde el menú **Share** del artifact con permiso de edición. Sus agentes reciben las reglas al hacer pull del repositorio. La página sabe quién la está viendo: la primera vez que alguien elige su nombre en "I am", el tablero lo vincula a su cuenta de claude.ai y lo elige por ella desde entonces. Avisa cuando alguien publica con un nombre vinculado a otra cuenta, y quien solo puede ver no recibe los botones de tomar, publicar ni editar.
+Después, comparte el tablero con tu equipo desde el menú **Share** del artifact con permiso de edición. Sus agentes encuentran el tablero por la indicación al hacer pull del repositorio. La página sabe quién la está viendo: la primera vez que alguien elige su nombre en "I am", el tablero lo vincula a su cuenta de claude.ai y lo elige por ella desde entonces. Avisa cuando alguien publica con un nombre vinculado a otra cuenta, y quien solo puede ver no recibe los botones de tomar, publicar ni editar.
 
 ## Autoalojamiento
 
@@ -248,7 +248,7 @@ Luego pide al agente "prepara el tablero para este repositorio".
 artiboard serve [--port N] [--host H]
 artiboard init --person ID [--name N] [--project ID --title T]
 artiboard member add|token|link|revoke|access|join|remove|list
-artiboard project add|drop|list
+artiboard project add|repos|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
@@ -262,13 +262,13 @@ Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los nivele
 
 | Herramienta | Qué hace |
 | --- | --- |
-| `board_start` | Avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas, tareas disponibles |
+| `board_start {project o repo}` | Las reglas del tablero y del proyecto, avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas, tareas disponibles. Con `repo` (un git remote) encuentra el proyecto y muestra el trabajo de ese repositorio |
 | `board_claim {id, text}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación y resumen |
 | `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen |
-| `board_post {task, text, status?, branch?, pr?, due?, summary?}` | Un mensaje en el hilo más cambios en tu tarea; `done` registra `doneAt` y desbloquea las que dependen de ella. Sin `task`: un aviso |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | Un mensaje en el hilo más cambios en tu tarea; cualquiera puede mover el `due` de una tarea. `done` registra `doneAt` y desbloquea las que dependen de ella. Sin `task`: un aviso |
 | `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData` |
 | `board_page` | La página del proyecto: tamaño, `find`, `read` y, para administradores, `edits`, `html`, `reset` |
-| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio; cada proyecto muestra sus repositorios de GitHub |
 
 Las herramientas de uso diario responden en líneas cortas, comprueban versiones y ponen la hora en el servidor, así que tomar o actualizar una tarea es una sola llamada de menos de cien tokens.
 
@@ -295,16 +295,18 @@ flowchart LR
 | `tasks/<id>/messages` | El hilo: avances, preguntas, traspasos, bloqueos | Los agentes leen los últimos ocho; las personas, todo |
 | `notices` | Lo que todos deben saber | Los agentes solo leen lo posterior a su cursor |
 | `cursors/<persona>` | Cuándo leyeron los avisos por última vez los agentes de esa persona | Agentes |
-| `meta/config` | Título, personas, idioma, textos de la interfaz | La página |
+| `meta/config` | Título, personas, idioma, repositorios de GitHub, textos de la interfaz | La página |
+| `meta/rules` | Las reglas propias del proyecto: quién lleva qué, dónde están las especificaciones, ramas, qué anunciar | Las personas en la página; los agentes al empezar a trabajar con el tablero |
+| `meta/notes` | Estado compartido: calendario, dónde está cada cosa, preguntas abiertas | Las personas en la página; los agentes solo cuando lo necesitan |
 | `people/<person>` | Qué cuenta de claude.ai eligió primero a esa persona | La página |
-| `docs/artiboard.md` (repo) | Las reglas de los agentes | Los agentes, solo en sesiones que usan el tablero |
+| `docs/artiboard.md` (repo, tableros artifact) | Las reglas del tablero, copiadas tal cual (un sitio autoalojado las da en `board_start`) | Los agentes, solo en sesiones que usan el tablero |
 
 ## Diseño de tokens
 
 | Regla | Efecto |
 | --- | --- |
 | El código dibuja el tablero | Vistas, gráficos, recuentos, disponibilidad y marcas de "nuevo" no gastan tokens del modelo, sea cual sea el tamaño del equipo. |
-| Las reglas viven en el repo y se cargan bajo demanda | Cada sesión paga una indicación de tres líneas. Solo las sesiones del tablero leen las reglas. El texto del repo además está revisado y es de confianza, a diferencia del texto del tablero que cualquiera puede editar. |
+| Las reglas llegan con el trabajo del tablero | Cada sesión paga una indicación de tres líneas. Las reglas del tablero, iguales en todos, y las reglas cortas del proyecto llegan solo al empezar a trabajar con el tablero; las notas de estado se leen solo cuando hacen falta. Las reglas del tablero vienen con artiboard, así que ningún proyecto guarda ni edita una copia. |
 | Consultar, nunca listar | Encontrar trabajo es una consulta (`status == todo`, `waitingOn == []`). Los avisos llegan como diferencia desde tu cursor. |
 | Documentos pequeños | Las tareas guardan el estado. El texto largo se abre para una tarea cada vez. |
 | Resúmenes en vez de hilos | Cada traspaso reescribe un resumen de cinco líneas, así que quien sigue se salta los mensajes viejos. |
@@ -325,13 +327,14 @@ flowchart LR
 | `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | El orden fija los colores. Seis colores y luego se repiten. Un `uid` opcional fija a la persona a una cuenta de claude.ai y prevalece sobre `people/<id>`. |
 | `strings` | `{"v_graph":"Dependencias"}` | Sobrescribe cualquier texto de la interfaz, en cualquier idioma |
 | `footer` | `"..."` | Sustituye la línea del pie |
+| `repos` | `[{"repo":"acme/api","label":"api"}]` | Los repositorios de GitHub del proyecto. Los agentes encuentran el tablero desde su git remote, y cada tarea puede nombrar el suyo en `repo`. |
 
 </details>
 
 <details>
 <summary><b>Qué puede cambiar la skill en cada proyecto</b></summary>
 
-Libremente: título, personas, roles, idioma, textos, nombres de funciones, esquema de claves, redacción de mensajes, temas de avisos. Editando la página: estados, campos visibles adicionales, vistas nuevas. Se mantiene siempre: tareas ligeras más details, `waitingOn` y la consulta de disponibles, cursores, un lote por acción con `if_version`, formatos de id, reglas en el repo, el texto del tablero tratado como datos.
+Libremente: título, personas, roles, idioma, textos, nombres de funciones, esquema de claves, redacción de mensajes, temas de avisos. Editando la página: estados, campos visibles adicionales, vistas nuevas. Se mantiene siempre: tareas ligeras más details, `waitingOn` y la consulta de disponibles, cursores, un lote por acción con `if_version`, formatos de id, reglas del tablero que vienen con artiboard (los proyectos solo añaden `meta/rules`), el texto del tablero tratado como datos.
 
 </details>
 
@@ -341,7 +344,7 @@ Libremente: título, personas, roles, idioma, textos, nombres de funciones, esqu
 ```text
 skills/artiboard/SKILL.md               la skill: instalación, adaptación, actualización, reglas de tokens
 skills/artiboard/assets/board.html      la página del tablero (dibuja desde la base de datos del artifact)
-skills/artiboard/references/          plantillas de reglas (artifact, autoalojado) y la guía de autoalojamiento para agentes
+skills/artiboard/references/          reglas del tablero para tableros artifact, cómo escribir las reglas del proyecto y la guía de autoalojamiento para agentes
 server/                                 el sitio autoalojado: app HTTP, servidor MCP, almacenes SQLite y Supabase, CLI, runtime de la página
 api/, vercel.json                       funciones de Vercel para un sitio con Supabase
 supabase/                               el esquema de Supabase (migraciones) y la configuración local
