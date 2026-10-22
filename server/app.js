@@ -180,7 +180,9 @@ export function makeApp({ store, cfg }) {
       if (board) return await page(res, board[1]);
       const api = route ? [null, route] : /^\/api\/(.+)$/.exec(p);
       if (!api) return await serveStatic(res, p);
-      const name = api[1];
+      let name = api[1];
+      // Vercel runs one function per route, so /api/members/<person>/<action> arrives rewritten as a query
+      if (name === 'members' && url.searchParams.get('person')) name = `members/${url.searchParams.get('person')}/${url.searchParams.get('action') || ''}`;
       if (req.method !== 'GET' && !sameOrigin(req)) return send(res, 403, { error: 'cross_origin' });
 
       if (name === 'config') {

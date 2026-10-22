@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.7.1",
+      "date": "2026-10-22",
+      "prs": [
+        15
+      ],
+      "lines": {
+        "en": [
+          "On Vercel, the Members panel's actions (add, token, link, access, revoke, remove) now reach the site; they answered 404 before."
+        ],
+        "ko": [
+          "Vercel에 올린 사이트에서 멤버 패널의 동작(추가, 토큰, 링크, 권한, 회수, 삭제)이 404로 막히던 것을 고쳤어요."
+        ]
+      }
+    },
+    {
       "version": "1.7.0",
       "date": "2026-10-22",
       "prs": [
