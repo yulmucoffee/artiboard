@@ -2,9 +2,9 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
-      "version": "1.4.0",
+      "version": "1.5.0",
       "date": "2026-10-22",
-      "prs": [10],
+      "prs": [11],
       "lines": {
         "en": [
           "The project list shows what changed in each version: the newest three open, older ones behind a toggle.",
@@ -13,6 +13,21 @@
         "ko": [
           "프로젝트 목록 화면에 버전별 업데이트 내역이 보여요. 최근 세 버전은 펼쳐 두고 이전 버전은 눌러서 봐요.",
           "PR마다 한국어 · 영어 2~3줄 요약을 넣고 버전을 올려요. 테스트가 빠진 걸 잡아요."
+        ]
+      }
+    },
+    {
+      "version": "1.4.0",
+      "date": "2026-10-22",
+      "prs": [10],
+      "lines": {
+        "en": [
+          "Board rules now ship with artiboard and reach agents through board_start; each project keeps only its own agreements and shared notes, edited on the page.",
+          "Tasks get a start day next to the due day, projects list their GitHub repositories so agents find a repository's ready work, and every section of the page folds."
+        ],
+        "ko": [
+          "보드 공통 규칙은 artiboard에 들어 있고 board_start로 에이전트에게 가요. 프로젝트는 자기 약속과 공유 메모만 페이지에서 고쳐요.",
+          "태스크에 시작일이 생기고, 프로젝트에 GitHub 저장소를 이으면 에이전트가 그 저장소의 할 일을 찾아요. 페이지의 모든 구역을 접을 수 있어요."
         ]
       }
     },
