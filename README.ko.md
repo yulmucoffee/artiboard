@@ -265,7 +265,7 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_start {project 또는 repo}` | 보드 규칙과 프로젝트 규칙, 커서 이후의 새 공지(커서도 옮김), 내가 맡은 열린 태스크, 준비된 태스크. `repo`(git remote)를 주면 프로젝트를 찾고 그 저장소의 일을 보여 줍니다 |
 | `board_claim {id, text}` | 준비된 태스크를 집고, 집었다는 글을 남기고, 스펙, 인수 조건, 요약을 돌려줍니다 |
 | `board_task {id}` | 상태, 세부 내용, 요약 이후의 메시지 |
-| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. 마감일(`due`)은 누구나 옮길 수 있습니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀립니다. `task`가 없으면 공지 |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. 마감일(`due`)은 누구나 옮길 수 있습니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀리고, `todo`면 태스크를 놓아 누구나 집을 수 있게 합니다. `task`가 없으면 공지 |
 | `board_get`, `board_query`, `board_batch` | 문서를 `ArtifactData`와 같은 방식으로 읽고 씁니다 |
 | `board_page` | 프로젝트 페이지: 크기, `find`, `read`, 관리자는 `edits`, `html`, `reset`까지 |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 사이트. 프로젝트마다 GitHub 저장소가 함께 나옵니다 |
@@ -311,7 +311,7 @@ flowchart LR
 | 문서는 작게 | 태스크 문서에는 상태만 둡니다. 긴 글은 태스크 하나를 할 때만 엽니다. |
 | 스레드보다 요약 | 인계할 때 다섯 줄 요약을 고쳐 쓰니, 다음 사람은 지난 메시지를 건너뜁니다. |
 | 한 번의 일은 batch 하나로 | 집기는 호출 한 번입니다. 태스크, 메시지, 커서를 버전 확인과 함께. |
-| 스스로 고치는 데이터 | 누군가 보드를 열어 두면 페이지가 `waitingOn`을 맞춥니다. 에이전트가 장부 정리에 호출을 쓸 일이 드뭅니다. |
+| 스스로 고치는 데이터 | 누군가 보드를 열어 두면 페이지가 `waitingOn`을 맞추고, `board_start`도 선행 태스크 자체를 확인해 집을 수 있는지 판단하며 어긋난 값을 지나는 길에 고칩니다. 에이전트가 장부 정리에 호출을 쓸 일이 없습니다. |
 
 ## 참고
 

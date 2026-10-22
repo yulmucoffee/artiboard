@@ -265,7 +265,7 @@ Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los nivele
 | `board_start {project o repo}` | Las reglas del tablero y del proyecto, avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas, tareas disponibles. Con `repo` (un git remote) encuentra el proyecto y muestra el trabajo de ese repositorio |
 | `board_claim {id, text}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación y resumen |
 | `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen |
-| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | Un mensaje en el hilo más cambios en tu tarea; cualquiera puede mover el `due` de una tarea. `done` registra `doneAt` y desbloquea las que dependen de ella. Sin `task`: un aviso |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | Un mensaje en el hilo más cambios en tu tarea; cualquiera puede mover el `due` de una tarea. `done` registra `doneAt` y desbloquea las que dependen de ella; `todo` libera la tarea para cualquiera. Sin `task`: un aviso |
 | `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData` |
 | `board_page` | La página del proyecto: tamaño, `find`, `read` y, para administradores, `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio; cada proyecto muestra sus repositorios de GitHub |
@@ -311,7 +311,7 @@ flowchart LR
 | Documentos pequeños | Las tareas guardan el estado. El texto largo se abre para una tarea cada vez. |
 | Resúmenes en vez de hilos | Cada traspaso reescribe un resumen de cinco líneas, así que quien sigue se salta los mensajes viejos. |
 | Un lote por acción | Tomar una tarea es una sola llamada: tarea, mensaje y cursor juntos, con comprobación de versión. |
-| Datos que se reparan solos | Mientras alguien tiene el tablero abierto, la página corrige `waitingOn`, así que los agentes casi nunca gastan llamadas en contabilidad. |
+| Datos que se reparan solos | Mientras alguien tiene el tablero abierto, la página corrige `waitingOn`, y `board_start` comprueba la disponibilidad contra las propias tareas de las que depende y la repara de paso, así que los agentes no gastan llamadas en contabilidad. |
 
 ## Referencia
 
