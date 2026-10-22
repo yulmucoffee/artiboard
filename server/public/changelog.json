@@ -2,7 +2,7 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
-      "version": "1.5.0",
+      "version": "1.6.0",
       "date": "2026-10-22",
       "prs": [11],
       "lines": {
@@ -13,6 +13,36 @@
         "ko": [
           "프로젝트 목록 화면에 버전별 업데이트 내역이 보여요. 최근 세 버전은 펼쳐 두고 이전 버전은 눌러서 봐요.",
           "PR마다 한국어 · 영어 2~3줄 요약을 넣고 버전을 올려요. 테스트가 빠진 걸 잡아요."
+        ]
+      }
+    },
+    {
+      "version": "1.5.1",
+      "date": "2026-10-22",
+      "prs": [13],
+      "lines": {
+        "en": [
+          "The READMEs describe the new board page and show fresh light and dark screenshots of it."
+        ],
+        "ko": [
+          "README가 새 보드 화면을 소개하고, 라이트 · 다크 스크린샷을 새로 찍어 넣었어요."
+        ]
+      }
+    },
+    {
+      "version": "1.5.0",
+      "date": "2026-10-22",
+      "prs": [12],
+      "lines": {
+        "en": [
+          "The board page gets a recent-activity feed, late and due-today flags, sortable columns, a \"mine\" filter and a light / dark theme switch.",
+          "board_start lists every task assigned to you and finds ready work from the dependency tasks themselves, even when nobody has the page open.",
+          "Agents can hand a task back for anyone with status \"todo\", and the tool listing every session reads is about 13% shorter."
+        ],
+        "ko": [
+          "보드 화면에 최근 활동, 늦은 일 · 오늘 마감 표시, 정렬되는 표, '내 것' 필터, 라이트 · 다크 테마 전환이 생겼어요.",
+          "board_start가 나에게 배정된 태스크를 모두 보여 주고, 페이지를 아무도 안 열어도 의존 태스크를 직접 보고 바로 할 일을 찾아요.",
+          "에이전트가 상태를 '할 일'로 돌려 태스크를 누구나 가져가게 놓을 수 있고, 세션마다 읽는 도구 목록이 13%쯤 짧아졌어요."
         ]
       }
     },
