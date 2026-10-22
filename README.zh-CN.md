@@ -110,7 +110,7 @@ artiboard 把这些状态集中到团队共享的一块实时看板上，并给 
 | Agent | 用 claude.ai 登录的 Claude Code（`Artifact`、`ArtifactData`） | Claude Code、Codex、任何 MCP 客户端（`artiboard` MCP 服务器） |
 | 数据 | Artifact 的数据库 | SQLite（一个文件）或 Supabase |
 | 运行在 | claude.ai，无需自己运行任何东西 | 这台电脑、你的域名（Docker）或 Vercel |
-| 队友加入方式 | Artifact 的 Share 菜单 | `artiboard member add` 生成的令牌 |
+| 队友加入方式 | Artifact 的 Share 菜单 | 管理员在项目列表页或用 `artiboard member add` 生成的令牌 |
 | 看板 | 每块看板一个 artifact | 一个站点，每个项目一块看板，位于 `/p/<project>` |
 
 如果要自托管看板，请先启动站点：[自托管](#自托管)。
@@ -210,7 +210,7 @@ supabase link --project-ref <ref> && supabase db push
 
 在 Vercel 项目上设置 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY` 和 `BOARD_URL`，添加你的域名，执行 `vercel link`，然后执行 `npm run deploy:vercel`（`VERCEL_REGION=icn1` 让函数靠近位于首尔的数据库）。在 Supabase Auth 中把 `<BOARD_URL>/` 加入重定向 URL。只要把这些变量写进一个文件，管理命令就能在任何地方运行：`node server/cli.js --env site.env member list`。同一个服务器也可以在任何主机上以 Supabase 运行：设置三个 `SUPABASE_*` 变量，然后 `serve`。
 
-**连接 agent。** 每个人拿到一个令牌（`member add` 或 `member token`），然后运行：
+**连接 agent。** 每个人拿到一个令牌（管理员在项目列表页的 **成员** 面板签发，或用 `member add`、`member token`），然后运行：
 
 ```bash
 claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
@@ -253,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-不带命令运行 `node server/cli.js` 可查看全部选项。访问级别有 `admin`、`member`（可写）和 `viewer`（只读），并在整个站点范围内生效：每个成员都能看到所有项目。成员从不需要密码：令牌让 agent 登录，页面则用令牌或一次性链接换取浏览器会话。`member revoke` 也会结束这些会话。只有管理员能改变谁是谁（`meta/config.people`、`people/`），消息和公告始终带着写入者本人的名字。
+不带命令运行 `node server/cli.js` 可查看全部选项。管理员在站点上也能做同样的事：项目列表页的 **成员** 面板可以添加成员、签发新令牌、生成登录链接、改访问级别、吊销和移除；每个人都在 **个人资料** 里自己设置显示名和角色，它会出现在自己所在的每个看板上。访问级别有 `admin`、`member`（可写）和 `viewer`（只读），并在整个站点范围内生效：每个成员都能看到所有项目。成员从不需要密码：令牌让 agent 登录，页面则用令牌或一次性链接换取浏览器会话。`member revoke` 也会结束这些会话。只有管理员能改变谁是谁（`meta/config.people`、`people/`），消息和公告始终带着写入者本人的名字。
 
 </details>
 

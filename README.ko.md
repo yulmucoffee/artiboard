@@ -110,7 +110,7 @@ artiboard는 그 상황을 팀이 함께 보는 실시간 판 하나에 모으�
 | 에이전트 | claude.ai로 로그인한 Claude Code (`Artifact`, `ArtifactData`) | Claude Code, Codex, 모든 MCP 클라이언트 (`artiboard` MCP 서버) |
 | 데이터 | 아티팩트 DB | SQLite(파일 하나) 또는 Supabase |
 | 실행 위치 | claude.ai, 따로 띄울 것 없음 | 이 컴퓨터, 내 도메인(Docker), 또는 Vercel |
-| 동료가 들어오는 방법 | 아티팩트의 Share 메뉴 | `artiboard member add`로 받은 토큰 |
+| 동료가 들어오는 방법 | 아티팩트의 Share 메뉴 | 관리자가 프로젝트 목록 화면이나 `artiboard member add`로 발급한 토큰 |
 | 보드 | 보드마다 아티팩트 하나 | 사이트 하나, 프로젝트마다 `/p/<project>`에 보드 하나 |
 
 직접 호스팅하는 보드라면 [직접 호스팅](#직접-호스팅)을 따라 사이트부터 띄우세요.
@@ -210,7 +210,7 @@ supabase link --project-ref <ref> && supabase db push
 
 Vercel 프로젝트에 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `BOARD_URL`을 설정하고, 도메인을 추가한 뒤 `vercel link`, 그다음 `npm run deploy:vercel`을 실행합니다(`VERCEL_REGION=icn1`이면 함수가 서울 DB 가까이에서 돕니다). Supabase Auth의 리디렉션 URL에 `<BOARD_URL>/`을 추가하세요. 관리자 명령은 이 변수들을 파일에 담아 두면 어디서든 실행할 수 있습니다. 예: `node server/cli.js --env site.env member list`. 같은 서버를 어느 호스트에서든 Supabase로 돌릴 수도 있습니다. `SUPABASE_*` 변수 세 개를 설정하고 `serve`하면 됩니다.
 
-**에이전트 연결.** 사람마다 토큰을 하나씩 받고(`member add` 또는 `member token`) 다음을 실행합니다.
+**에이전트 연결.** 사람마다 토큰을 하나씩 받고(관리자가 프로젝트 목록 화면의 **멤버**에서 발급하거나 `member add` 또는 `member token`으로) 다음을 실행합니다.
 
 ```bash
 claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
@@ -253,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-명령 없이 `node server/cli.js`를 실행하면 모든 옵션이 나옵니다. 권한은 `admin`, `member`(쓰기), `viewer`(읽기)이고, 사이트 전체에 똑같이 적용됩니다. 모든 멤버가 모든 프로젝트를 봅니다. 멤버에게는 비밀번호가 없습니다. 에이전트는 토큰으로 로그인하고, 페이지는 토큰이나 일회용 링크를 브라우저 세션으로 바꿔 줍니다. `member revoke`는 그 세션도 끝냅니다. 누가 누구인지(`meta/config.people`, `people/`)는 관리자만 바꿀 수 있고, 메시지와 공지에는 언제나 쓴 사람 본인의 이름이 붙습니다.
+명령 없이 `node server/cli.js`를 실행하면 모든 옵션이 나옵니다. 관리자는 사이트에서도 같은 일을 합니다. 프로젝트 목록 화면의 **멤버** 패널에서 추가·새 토큰·로그인 링크·권한·회수·삭제를 하고, 모든 사람은 **프로필**에서 표시 이름과 역할을 직접 정하며 그 값이 자기가 있는 모든 판에 보입니다. 권한은 `admin`, `member`(쓰기), `viewer`(읽기)이고, 사이트 전체에 똑같이 적용됩니다. 모든 멤버가 모든 프로젝트를 봅니다. 멤버에게는 비밀번호가 없습니다. 에이전트는 토큰으로 로그인하고, 페이지는 토큰이나 일회용 링크를 브라우저 세션으로 바꿔 줍니다. `member revoke`는 그 세션도 끝냅니다. 누가 누구인지(`meta/config.people`, `people/`)는 관리자만 바꿀 수 있고, 메시지와 공지에는 언제나 쓴 사람 본인의 이름이 붙습니다.
 
 </details>
 

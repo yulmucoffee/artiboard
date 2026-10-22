@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { BoardError, cleanRepos, now, reposOf, toBoardError } from './core.js';
 import { loadConfig, openStore } from './config.js';
+import { addMember as joinSite, connectLines, entryFor, removeMember as leaveSite, setPerson as seat } from './members.js';
 import { defaultPage } from './page.js';
 
 const USAGE = `usage: artiboard <command> [options]   (--env FILE loads settings first)
@@ -62,41 +63,24 @@ async function member(person) {
 }
 
 function connectHelp(person, token) {
-  const url = `${cfg.boardUrl}/mcp`;
+  const lines = connectLines(cfg.boardUrl, token);
   console.log(`\nToken for ${person} (shown once; send it privately):\n  ${token}\n`);
   console.log('Claude Code:');
-  console.log(`  claude mcp add --scope user --transport http artiboard ${url} --header "Authorization: Bearer ${token}"`);
+  console.log(`  ${lines.claude}`);
   console.log('Codex (keep the token in the environment, e.g. in your shell profile):');
-  console.log(`  export ARTIBOARD_TOKEN=${token}`);
-  console.log(`  codex mcp add artiboard --url ${url} --bearer-token-env-var ARTIBOARD_TOKEN`);
+  lines.codex.forEach((l) => console.log(`  ${l}`));
   console.log('  (optional) let board_batch run without asking, in ~/.codex/config.toml:');
   console.log('  [mcp_servers.artiboard.tools.board_batch]\n  approval_mode = "approve"');
   console.log(`Browser: open ${cfg.boardUrl} and paste the token, or ask the agent for a sign-in link.\n`);
 }
 
-// Put a person on a project's board (meta/config.people, pinned to their account) or take them off.
-// An existing entry keeps its name and role unless new ones are given.
-async function setPerson(project, m, entry) {
-  const cfg = await store.get(project, 'meta/config');
-  const people = cfg?.data.people || [];
-  const old = people.find((p) => p.id === m.person);
-  const next = people.filter((p) => p.id !== m.person);
-  if (entry) next.push({ ...old, ...entry });
-  await store.apply(null, project, [
-    cfg ? { op: 'update', path: 'meta/config', data: { people: next }, if_version: cfg.version } : { op: 'set', path: 'meta/config', data: { people: next } },
-    entry ? { op: 'set', path: `people/${m.person}`, data: { uid: m.uid, at: now() } } : { op: 'delete', path: `people/${m.person}` },
-  ]);
-}
-const entryFor = (m) => ({ id: m.person, uid: m.uid, ...(o.name && { name: o.name }) });
 const pickProjects = async () => (o.projects ? o.projects.split(',').map((s) => s.trim()).filter(Boolean) : store.projectIds());
 
 async function addMember(access) {
   need('person');
-  const m = await store.addMember({ person: o.person, name: o.name, email: o.email, role: access });
-  const projects = access === 'viewer' ? [] : await pickProjects();
-  for (const p of projects) await setPerson(p, m, entryFor(m));
+  const { member: m, projects, token } = await joinSite(store, { person: o.person, name: o.name, email: o.email, role: access, projects: o.projects ? await pickProjects() : undefined });
   console.log(`added ${m.person} as ${access}${projects.length ? ' on ' + projects.join(', ') : ''}`);
-  connectHelp(m.person, await store.issueToken(m.uid, o.label || 'agent'));
+  connectHelp(m.person, token);
 }
 
 // Rename people in documents exported from another board: owners, claims, authors, cursors and the people list.
@@ -151,16 +135,12 @@ const commands = {
     async join() {
       need('projects');
       const m = await member(o.person);
-      for (const p of await pickProjects()) await setPerson(p, m, entryFor(m));
+      for (const p of await pickProjects()) await seat(store, p, m, entryFor(m, o.name));
       console.log(`${m.person} is on ${o.projects}`);
     },
     async remove() {
       const m = await member(o.person);
-      for (const p of await store.projectIds()) {
-        const c = await store.get(p, 'meta/config');
-        if (c?.data.people?.some((x) => x.id === m.person)) await setPerson(p, m, null);
-      }
-      await store.removeMember(m.uid);
+      await leaveSite(store, m);
       console.log(`removed ${m.person}; their tasks and messages stay`);
     },
     async list() {

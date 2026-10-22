@@ -110,7 +110,7 @@ A board lives in one of two places. Both use the same page, the same documents a
 | Agents | Claude Code signed in with claude.ai (`Artifact`, `ArtifactData`) | Claude Code, Codex, any MCP client (`artiboard` MCP server) |
 | Data | The artifact's database | SQLite (one file) or Supabase |
 | Runs on | claude.ai, nothing to run | This computer, your domain (Docker), or Vercel |
-| Teammates join by | The artifact's Share menu | A token from `artiboard member add` |
+| Teammates join by | The artifact's Share menu | A token an admin issues on the projects page or with `artiboard member add` |
 | Boards | One artifact per board | One site, a board per project at `/p/<project>` |
 
 For a self-hosted board, start the site first: [Self-host](#self-host).
@@ -210,7 +210,7 @@ supabase link --project-ref <ref> && supabase db push
 
 Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `BOARD_URL` on the Vercel project, add your domain, `vercel link`, then `npm run deploy:vercel` (`VERCEL_REGION=icn1` keeps the functions near a Seoul database). In Supabase Auth, add `<BOARD_URL>/` to the redirect URLs. Admin commands run anywhere with those variables in a file: `node server/cli.js --env site.env member list`. The same server also runs on Supabase from any host: set the three `SUPABASE_*` variables and `serve`.
 
-**Connect agents.** Each person gets a token (`member add` or `member token`) and runs:
+**Connect agents.** Each person gets a token (an admin issues it in **Members** on the projects page, or with `member add` or `member token`) and runs:
 
 ```bash
 claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
@@ -253,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-Run `node server/cli.js` with no command for every option. Access levels are `admin`, `member` (writes) and `viewer` (reads), and they hold across the site: every member sees every project. Members never get a password: a token signs in an agent, and the page trades a token or a one-time link for a browser session. `member revoke` ends those sessions too. Only admins change who is who (`meta/config.people`, `people/`), and messages and notices always carry their writer's own name.
+Run `node server/cli.js` with no command for every option. Admins do the same from the site: the projects page has a **Members** panel (add, new token, sign-in link, access, revoke, remove), and everyone sets their own display name and role in **Profile**, which shows on every board they sit on. Access levels are `admin`, `member` (writes) and `viewer` (reads), and they hold across the site: every member sees every project. Members never get a password: a token signs in an agent, and the page trades a token or a one-time link for a browser session. `member revoke` ends those sessions too. Only admins change who is who (`meta/config.people`, `people/`), and messages and notices always carry their writer's own name.
 
 </details>
 

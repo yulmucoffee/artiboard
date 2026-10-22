@@ -110,7 +110,7 @@ Un tablero vive en uno de dos sitios. Los dos usan la misma página, los mismos 
 | Agentes | Claude Code con sesión iniciada en claude.ai (`Artifact`, `ArtifactData`) | Claude Code, Codex, cualquier cliente MCP (servidor MCP `artiboard`) |
 | Datos | La base de datos del artifact | SQLite (un archivo) o Supabase |
 | Dónde corre | claude.ai, nada que ejecutar | Este ordenador, tu dominio (Docker) o Vercel |
-| Cómo entra el equipo | El menú Share del artifact | Un token de `artiboard member add` |
+| Cómo entra el equipo | El menú Share del artifact | Un token que un admin emite en la página de proyectos o con `artiboard member add` |
 | Tableros | Un artifact por tablero | Un sitio, un tablero por proyecto en `/p/<project>` |
 
 Para un tablero autoalojado, levanta primero el sitio: [Autoalojamiento](#autoalojamiento).
@@ -210,7 +210,7 @@ supabase link --project-ref <ref> && supabase db push
 
 Define `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` y `BOARD_URL` en el proyecto de Vercel, añade tu dominio, ejecuta `vercel link` y luego `npm run deploy:vercel` (`VERCEL_REGION=icn1` mantiene las funciones cerca de una base de datos en Seúl). En Supabase Auth, añade `<BOARD_URL>/` a las URL de redirección. Los comandos de administración se ejecutan desde cualquier lugar con esas variables en un archivo: `node server/cli.js --env site.env member list`. El mismo servidor también funciona con Supabase desde cualquier host: define las tres variables `SUPABASE_*` y ejecuta `serve`.
 
-**Conecta los agentes.** Cada persona recibe un token (`member add` o `member token`) y ejecuta:
+**Conecta los agentes.** Cada persona recibe un token (un admin lo emite en **Miembros** en la página de proyectos, o con `member add` o `member token`) y ejecuta:
 
 ```bash
 claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
@@ -253,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y valen para todo el sitio: cada miembro ve todos los proyectos. Los miembros nunca reciben contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador. `member revoke` también cierra esas sesiones. Solo los administradores cambian quién es quién (`meta/config.people`, `people/`), y los mensajes y avisos siempre llevan el nombre de quien los escribe.
+Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins hacen lo mismo desde el sitio: la página de proyectos tiene un panel **Miembros** (añadir, nuevo token, enlace de acceso, nivel, revocar, quitar), y cada persona fija su propio nombre y rol en **Perfil**, que se muestra en todos los tableros donde está. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y valen para todo el sitio: cada miembro ve todos los proyectos. Los miembros nunca reciben contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador. `member revoke` también cierra esas sesiones. Solo los administradores cambian quién es quién (`meta/config.people`, `people/`), y los mensajes y avisos siempre llevan el nombre de quien los escribe.
 
 </details>
 

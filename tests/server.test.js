@@ -461,6 +461,61 @@ for (const backend of backends) {
         assert.equal((await api('/api/logout', { cookie: admin })).status, 405, 'no logging people out with a link');
       });
 
+      test('admins add members from the page, the token signs them in, and members keep their own profile', async () => {
+        const admin = (await api('/api/login', { method: 'POST', body: { token: tokens.admin } })).headers.get('set-cookie').split(';')[0];
+        const member = (await api('/api/login', { method: 'POST', body: { token: tokens.member } })).headers.get('set-cookie').split(';')[0];
+        assert.equal((await api('/api/members', { cookie: member })).status, 403, 'members are the admin\'s to manage');
+        assert.equal((await api('/api/members', { method: 'POST', cookie: member, body: { person: `nope${R}` } })).status, 403);
+
+        const made = await api('/api/members', { method: 'POST', cookie: admin, body: { person: `new${R}`, name: 'Newcomer', access: 'member' } });
+        assert.equal(made.status, 200);
+        const b = await made.json();
+        people.newcomer = b.member;
+        assert.equal(b.member.role, 'member');
+        assert.ok(b.projects.includes(P), 'a new member sits on every board');
+        assert.match(b.token, /^abt_/, 'the token comes back once');
+        assert.match(b.connect.claude, new RegExp(`--header "Authorization: Bearer ${b.token}"`), 'with the connect commands');
+        const cfgDoc = (await call(board, 'board_get', { project: P, path: 'meta/config' })).value;
+        assert.deepEqual(cfgDoc.data.people.find((x) => x.id === `new${R}`), { id: `new${R}`, uid: b.member.uid, name: 'Newcomer' });
+        assert.equal((await call(board, 'board_get', { project: P, path: `people/new${R}` })).value.data.uid, b.member.uid, 'pinned to the account');
+        assert.equal((await api('/api/members', { method: 'POST', cookie: admin, body: { person: `new${R}` } })).status, 409, 'ids are unique');
+        assert.equal((await api('/api/members', { method: 'POST', cookie: admin, body: { person: 'Bad Id' } })).status, 400);
+
+        const login = await api('/api/login', { method: 'POST', body: { token: b.token } });
+        assert.equal(login.status, 200, 'the new member signs in with that token');
+        const cookie = login.headers.get('set-cookie').split(';')[0];
+        const agent = await connect(b.token);
+        try { assert.equal((await call(agent, 'board_whoami')).value.person, `new${R}`, 'and so does their agent'); } finally { await agent.close(); }
+
+        assert.equal((await api('/api/me', { method: 'POST', cookie, body: { name: '  New  Name ', title: 'backend' } })).status, 200);
+        const meDoc = await (await api('/api/me', { cookie })).json();
+        assert.equal(meDoc.name, 'New Name');
+        assert.equal(meDoc.title, 'backend');
+        const onBoard = (await call(board, 'board_get', { project: P, path: 'meta/config' })).value.data.people.find((x) => x.id === `new${R}`);
+        assert.deepEqual(onBoard, { id: `new${R}`, uid: b.member.uid, name: 'New Name', role: 'backend' }, 'the profile shows on every board');
+        assert.equal((await api('/api/me', { method: 'POST', cookie, body: { name: 5 } })).status, 400);
+        assert.equal((await api('/api/me', { method: 'POST', cookie, body: { name: '', title: '' } })).status, 200);
+        assert.equal((await call(board, 'board_get', { project: P, path: 'meta/config' })).value.data.people.find((x) => x.id === `new${R}`).role, undefined, 'an empty role is cleared');
+        const listed = (await (await api('/api/members', { cookie: admin })).json()).find((m) => m.person === `new${R}`);
+        assert.equal(listed.name, null);
+        assert.equal(listed.tokens, 1);
+
+        const again = await (await api(`/api/members/new${R}/token`, { method: 'POST', cookie: admin })).json();
+        assert.match(again.token, /^abt_/);
+        const url = (await (await api(`/api/members/new${R}/link`, { method: 'POST', cookie: admin })).json()).url;
+        assert.equal((await api('/api/login', { method: 'POST', body: { code: /#ab-code=(.+)$/.exec(url)[1] } })).status, 200, 'an admin-made link signs the member in');
+        assert.equal((await api(`/api/members/new${R}/access`, { method: 'POST', cookie: admin, body: { access: 'viewer' } })).status, 200);
+        assert.equal((await api(`/api/members/${people.admin.person}/access`, { method: 'POST', cookie: admin, body: { access: 'member' } })).status, 400, 'not your own access');
+        assert.equal((await (await api(`/api/members/new${R}/revoke`, { method: 'POST', cookie: admin })).json()).revoked, 2);
+        assert.equal((await api('/api/me', { cookie })).status, 401, 'revoking signs them out');
+        assert.equal((await api(`/api/members/no-such${R}/token`, { method: 'POST', cookie: admin })).status, 404);
+        assert.equal((await api(`/api/members/${people.admin.person}/remove`, { method: 'POST', cookie: admin })).status, 400, 'not yourself');
+        assert.equal((await api(`/api/members/new${R}/remove`, { method: 'POST', cookie: admin })).status, 200);
+        delete people.newcomer;
+        assert.ok(!(await call(board, 'board_get', { project: P, path: 'meta/config' })).value.data.people.some((x) => x.id === `new${R}`), 'removed from the boards too');
+        assert.equal((await call(board, 'board_get', { project: P, path: `people/new${R}` })).value, null);
+      });
+
       test('a viewer page reads but cannot write; projects are listed and created from the page', async () => {
         const cookie = (await api('/api/login', { method: 'POST', body: { token: tokens.viewer } })).headers.get('set-cookie').split(';')[0];
         assert.equal((await api(`/api/p/${P}/batch`, { method: 'POST', cookie, body: { writes: [{ op: 'set', path: `${C}/v`, data: {} }] } })).status, 403);

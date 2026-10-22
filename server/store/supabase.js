@@ -94,6 +94,7 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
     if (!ROLES.includes(role)) throw new BoardError('invalid_argument', 'access must be admin, member or viewer');
     check(await sb.from('ab_members').update({ role }).eq('user_id', uid));
   }
+  async function setMemberName(uid, name) { check(await sb.from('ab_members').update({ name: name || null }).eq('user_id', uid)); }
   async function removeMember(uid) { check(await sb.auth.admin.deleteUser(uid)); }
   async function issueToken(uid, label = 'agent') {
     const token = newToken();
@@ -114,6 +115,6 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
   return {
     kind: 'supabase', browser: { supabaseUrl: url, supabaseKey: publishableKey }, get, query, apply, overview, projectIds,
     createProject, dropProject, getPage, setPage, resetPage, memberForToken, memberForJwt, memberByPerson, listMembers,
-    addMember, setRole, removeMember, issueToken, revokeTokens, loginLink, close() {},
+    addMember, setRole, setMemberName, removeMember, issueToken, revokeTokens, loginLink, close() {},
   };
 }
