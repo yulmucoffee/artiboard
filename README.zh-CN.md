@@ -81,7 +81,7 @@ artiboard 把这些状态集中到团队共享的一块实时看板上，并给 
 
 ### 🗂️ 一块看板，三种视图
 
-从上往下读的文档视图、看板视图，以及突出最长剩余链路的依赖图。支持搜索、`j`/`k` 快捷键和"上次查看后的变化"标记。浅色与深色主题。
+从上往下读的文档视图、看板视图，以及突出最长剩余链路的依赖图。最近动态列出每个有动静的任务的最后一条消息，"当前"会突出被阻塞、已逾期或今天到期的任务。支持搜索、按列排序、"我的"筛选、`j`/`k` 快捷键和"上次查看后的变化"标记。浅色、深色或自动主题。
 
 </td>
 <td width="33%" valign="top">
@@ -265,7 +265,7 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_start {project 或 repo}` | 看板规则和项目规则、游标之后的新公告（并移动游标）、你未完成的任务、可领取的任务。传入 `repo`（git remote）时会找到项目并列出该仓库的工作 |
 | `board_claim {id, text}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准和摘要 |
 | `board_task {id}` | 状态、详情，以及摘要之后的消息 |
-| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | 一条讨论串消息，加上对你任务的修改；任何人都可以调整任务的 `due`。`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞。不带 `task` 时：发布公告 |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | 一条讨论串消息，加上对你任务的修改；任何人都可以调整任务的 `due`。`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞；`todo` 会释放任务，任何人都可以再领取。不带 `task` 时：发布公告 |
 | `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同 |
 | `board_page` | 项目的页面：大小、`find`、`read`，管理员还有 `edits`、`html`、`reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 站点；每个项目都列出其 GitHub 仓库 |
@@ -311,7 +311,7 @@ flowchart LR
 | 文档保持小巧 | 任务文档只存状态。长文本只在处理某个任务时才打开。 |
 | 摘要优先于讨论串 | 交接时重写五行摘要，下一个人可以跳过旧消息。 |
 | 每个动作一次批量写入 | 认领就是一次调用：任务、消息、游标一起写，并校验版本。 |
-| 自我修复的数据 | 只要有人打开看板，页面就会纠正 `waitingOn`，agent 很少需要为记账花调用。 |
+| 自我修复的数据 | 只要有人打开看板，页面就会纠正 `waitingOn`；`board_start` 也会按依赖任务本身核对可领取状态并顺手修正，agent 不必为记账花调用。 |
 
 ## 参考
 

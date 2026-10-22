@@ -85,6 +85,8 @@ for (const backend of backends) {
       assert.deepEqual(tools.map((t) => t.name).sort(), ['board_batch', 'board_claim', 'board_create_project', 'board_get', 'board_login_link',
         'board_page', 'board_post', 'board_projects', 'board_query', 'board_start', 'board_task', 'board_whoami']);
       assert.ok(!JSON.stringify(tools).includes('$schema'), 'listed schemas carry no boilerplate');
+      assert.ok(!JSON.stringify(tools).includes('"pattern"'), 'nor patterns zod enforces on the call');
+      assert.ok(JSON.stringify(tools).length < 7200, `every session reads the listing, so it stays small (${JSON.stringify(tools).length} chars)`);
       const me = (await call(board, 'board_whoami')).value;
       assert.equal(me.person, people.admin.person);
       assert.equal(me.backend, backend.name);
@@ -191,6 +193,39 @@ for (const backend of backends) {
       assert.deepEqual(left.value.docs.map((d) => d.data.waitingOn), [[], ['X-9']]);
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'qa pass', status: 'qa' })).value, `ok ${K(1)} → qa`, 'a status the board adds');
       assert.equal((await call(board, 'board_get', { project: P, path: `tasks/${K(1)}` })).value.data.doneAt, undefined, 'leaving done clears doneAt');
+    });
+
+    test('the start lists what was assigned to you and repairs readiness from the deps themselves', async () => {
+      const at = new Date().toISOString(), me = people.admin.person;
+      const task = (n, data) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `drift ${n}`, status: 'todo', deps: [], updatedAt: at, ...data } });
+      assert.equal((await call(board, 'board_batch', { project: P, writes: [
+        task('d1', { status: 'done' }),
+        task('d2', { deps: [K('d1')] }), // written without waitingOn
+        task('d3', { deps: [K('d1')], waitingOn: [K('d1')] }), // stale: d1 finished while no page was open
+        task('d4', { deps: [K('d2')], waitingOn: [] }), // wrong the other way
+        task('d5', { owner: me }), // assigned to me on the page, not started
+      ] })).error, false);
+      const s = (await call(board, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
+      assert.match(s, new RegExp(`^${K('d2')} drift d2$`, 'm'), 'ready without a waitingOn field');
+      assert.match(s, new RegExp(`^${K('d3')} drift d3$`, 'm'), 'ready although waitingOn still names a done dep');
+      assert.doesNotMatch(s, new RegExp(`^${K('d4')} `, 'm'), 'not ready although waitingOn is empty');
+      assert.match(s, new RegExp(`^${K('d5')} todo drift d5$`, 'm'), 'an assigned task is listed as yours, with its status');
+      assert.doesNotMatch(s, new RegExp(`^${K('d5')} drift d5$`, 'm'), 'and not as anyone\'s ready work');
+      const fixed = (await call(board, 'board_query', { project: P, collection: 'tasks', where: [{ field: 'key', op: 'in', value: [K('d2'), K('d3'), K('d4')] }], fields: ['waitingOn'] })).value.docs;
+      assert.deepEqual(fixed.map((d) => d.data.waitingOn), [[], [], [K('d2')]], 'the start wrote the repairs');
+
+      assert.match((await call(board, 'board_claim', { project: P, id: K('d5') })).value, /^claimed /);
+      assert.equal((await call(board, 'board_post', { project: P, task: K('d5'), type: 'handoff', summary: 'half done', status: 'todo' })).value, `ok ${K('d5')} → todo`);
+      const released = (await call(board, 'board_get', { project: P, path: `tasks/${K('d5')}` })).value.data;
+      assert.equal(released.owner, undefined, 'a released task has no owner');
+      assert.equal(released.claimedBy, undefined, 'and no holder');
+      const other = await connect(tokens.member);
+      try {
+        assert.match((await call(other, 'board_claim', { project: P, id: K('d5') })).value, /^claimed [\s\S]*summary .*: half done$/, 'anyone picks it up with the summary');
+      } finally {
+        await other.close();
+      }
+      await call(board, 'board_batch', { project: P, writes: ['d1', 'd2', 'd3', 'd4', 'd5'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })) });
     });
 
     test('a project names its repos: agents find it from a git remote, and the start brings both rules', async () => {

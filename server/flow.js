@@ -14,7 +14,6 @@ function keyOrder(a, b) {
   return x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] - y[1] || x[2] - y[2];
 }
 const holderOf = (d) => d.claimedBy?.who || d.owner || null;
-const OPEN = ['doing', 'review', 'blocked'];
 const CLAIMED = { ko: '집었어요.', en: 'Claimed.' };
 
 // a pinned write lost a race (someone wrote in between): read again and redo it once
@@ -78,20 +77,46 @@ export function makeFlow(store) {
     return hits[0];
   }
 
-  // Session start: the rules, notices after this person's cursor (and move the cursor), their open tasks, and ready work.
+  // Ready work: todo tasks nobody holds whose deps are all done. waitingOn is the stored answer the page and the
+  // ready query rely on; here it is checked against the dep tasks themselves and repaired in passing, so a task
+  // written without it, or a dep finished while no page was open, still shows up (and a stale one stays out).
+  async function readyWork(member, project, todo) {
+    const free = todo.filter((t) => !t.data.claimedBy);
+    const depsOf = (t) => (Array.isArray(t.data.deps) ? t.data.deps.filter((k) => typeof k === 'string') : []);
+    const keys = [...new Set(free.flatMap(depsOf))];
+    const done = new Set();
+    for (let i = 0; i < keys.length; i += 100) {
+      for (const d of await query(project, 'tasks', { where: [{ field: 'key', op: 'in', value: keys.slice(i, i + 100) }, { field: 'status', op: '==', value: 'done' }], limit: 200 })) done.add(d.data.key);
+    }
+    const repairs = [], ready = [];
+    for (const t of free) {
+      const want = depsOf(t).filter((k) => !done.has(k)), cur = t.data.waitingOn;
+      if (!Array.isArray(cur) || cur.length !== want.length || cur.some((k, i) => k !== want[i])) {
+        repairs.push({ op: 'update', path: `tasks/${t.id}`, if_version: t.version, data: { waitingOn: want } });
+      }
+      if (!want.length) ready.push(t);
+    }
+    // best effort: a conflict means someone else just wrote the task, a viewer may not write at all
+    for (let i = 0; i < repairs.length; i += 100) await apply(member, project, repairs.slice(i, i + 100)).catch(() => {});
+    return ready;
+  }
+
+  // Session start: the rules, notices after this person's cursor (and move the cursor), their tasks, and ready work.
   // With a repo, ready work is the tasks of that repository and the tasks that name none.
   async function start(member, { project, repo, ready = 8, peek = false, rules = true } = {}) {
     if (!project && !repo) throw new BoardError('invalid_argument', 'pass project, or repo (owner/name from git remote) to find it');
     if (!project) project = await projectFor(repo);
     const me = member.person;
-    const [config, cursor, mine, todo, own, notes] = await Promise.all([
+    const [config, cursor, owned, todo, own, notes] = await Promise.all([
       get(project, 'meta/config'),
       get(project, `cursors/${me}`),
-      query(project, 'tasks', { where: [{ field: 'owner', op: '==', value: me }, { field: 'status', op: 'in', value: OPEN }], limit: 50 }),
-      ready ? query(project, 'tasks', { where: [{ field: 'status', op: '==', value: 'todo' }, { field: 'waitingOn', op: '==', value: [] }], limit: 200 }) : [],
+      query(project, 'tasks', { where: [{ field: 'owner', op: '==', value: me }], limit: 50 }),
+      ready ? query(project, 'tasks', { where: [{ field: 'status', op: '==', value: 'todo' }], limit: 200 }) : [],
       rules ? get(project, 'meta/rules') : null,
       rules ? get(project, 'meta/notes') : null,
     ]);
+    // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
+    const mine = owned.filter((t) => (t.data.status || 'todo') !== 'done');
     const since = cursor?.data?.noticesAt || null;
     const notices = since
       ? await query(project, 'notices', { where: [{ field: 'at', op: '>', value: since }], order: [{ field: 'at' }], limit: 20 })
@@ -106,7 +131,7 @@ export function makeFlow(store) {
       stray = `repo ${want || '(not a GitHub repository)'} is not linked to ${project}; showing all ready work (link it in meta/config.repos)`;
       want = null;
     }
-    let free = todo.filter((t) => !t.data.claimedBy).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
+    let free = (ready ? await readyWork(member, project, todo) : []).filter((t) => t.data.owner !== me).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
     const elsewhere = want ? free.filter((t) => { const r = taskRepo(t.data, repos); return r && r !== want; }).length : 0;
     if (want) free = free.filter((t) => { const r = taskRepo(t.data, repos); return !r || r === want; });
 
@@ -197,7 +222,8 @@ export function makeFlow(store) {
 
   // A thread message, optionally with a status, branch, PR, start or due day, repo or summary change; without a task, a notice.
   // Only the task's holder changes it, except its due day, which anyone may move (the thread records who and from what).
-  // status done stamps doneAt (leaving done clears it) and takes the key out of every dependent's waitingOn.
+  // status todo releases the task (no holder, no owner). status done stamps doneAt (leaving done clears it) and takes
+  // the key out of every dependent's waitingOn.
   async function post(member, project, { task: id, text, type, status, branch, pr, start, due, repo, summary }) {
     const me = member.person;
     if (!id) {
@@ -222,7 +248,7 @@ export function makeFlow(store) {
       const at = now();
       const patch = { updatedAt: at, lastMessageAt: at };
       if (status !== undefined) patch.status = status;
-      if (status === 'todo') patch.claimedBy = null;
+      if (status === 'todo') { patch.claimedBy = null; patch.owner = null; }
       if (status === 'done' && d.status !== 'done') patch.doneAt = at;
       if (status !== undefined && status !== 'done' && d.doneAt) patch.doneAt = null;
       if (branch !== undefined) patch.branch = branch || null;

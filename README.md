@@ -81,7 +81,7 @@ artiboard gives the team one shared, live place for that state, and gives agents
 
 ### 🗂️ One board, three views
 
-A document view you read top to bottom, a kanban, and a dependency graph that highlights the longest remaining chain. Search, `j`/`k` keys and "new since you last looked" markers. Light and dark.
+A document view you read top to bottom, a kanban, and a dependency graph that highlights the longest remaining chain. A recent-activity feed shows the last message on every task that moved, and "Now" flags what is blocked, late or due today. Search, sortable columns, a "mine" filter, `j`/`k` keys and "new since you last looked" markers. Light, dark or auto.
 
 </td>
 <td width="33%" valign="top">
@@ -265,7 +265,7 @@ Run `node server/cli.js` with no command for every option. Access levels are `ad
 | `board_start {project or repo}` | The board rules and the project's rules, new notices since your cursor (and moves it), your open tasks, ready tasks. With `repo` (a git remote) it finds the project and lists that repository's work |
 | `board_claim {id, text}` | Claims a ready task, posts the claim, returns spec, acceptance, summary |
 | `board_task {id}` | Status, details, and the messages after the summary |
-| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | A thread message plus changes to your task; anyone may move a task's `due`. `done` stamps `doneAt` and unblocks dependents. Without `task`: a notice |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | A thread message plus changes to your task; anyone may move a task's `due`. `done` stamps `doneAt` and unblocks dependents; `todo` releases the task for anyone. Without `task`: a notice |
 | `board_get`, `board_query`, `board_batch` | Documents, as `ArtifactData` reads and writes them |
 | `board_page` | The project's page: size, `find`, `read`, and for admins `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | The site; each project lists its GitHub repositories |
@@ -311,7 +311,7 @@ flowchart LR
 | Small documents | Task documents hold status. Long text is opened for one task at a time. |
 | Summaries over threads | Handoffs rewrite a five-line summary, so the next reader skips old messages. |
 | One batch per action | A claim is one call: task, message and cursor together, version-checked. |
-| Self-repairing data | The page keeps `waitingOn` right while anyone has it open, so agents rarely spend calls on bookkeeping. |
+| Self-repairing data | The page keeps `waitingOn` right while anyone has it open, and `board_start` checks readiness against the dependency tasks themselves and repairs it in passing, so agents never spend calls on bookkeeping. |
 
 ## Reference
 

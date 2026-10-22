@@ -11,7 +11,8 @@ const seed=()=>({
   'tasks/M1-2':{key:'M1-2',title:'API',feature:'Data',status:'todo',owner:null,deps:['M1-1'],waitingOn:['M1-1'],claimedBy:null,updatedAt:T0},
   'tasks/M1-3':{key:'M1-3',title:'Screen',feature:'UI',status:'todo',owner:null,deps:['M1-2'],claimedBy:null,updatedAt:T0},
   'tasks/M1-4':{key:'M1-4',title:'Docs',feature:'UI',status:'done',owner:'cy',deps:[],waitingOn:[],claimedBy:null,updatedAt:T0},
-  'details/M1-1':{spec:'docs/db.md',acceptance:'Migrations run',summary:''}
+  'details/M1-1':{spec:'docs/db.md',acceptance:'Migrations run',summary:''},
+  'tasks/M1-4/messages/2026-01-05T09-00-00.000Z-cy':{at:T0,author:'cy',kind:'agent',type:'update',text:'Docs done\nsee the PR'}
 });
 // user: the namespace claude.use('user') resolves (null = no identity, today's picker); deny: every write rejects like a view-only viewer's
 function boot({user=null,docs={},me=null,deny=false,storage={}}={}){
@@ -62,10 +63,26 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   unfold(d,'people');await tick();
   ok(JSON.stringify(store['tasks/M1-3'].waitingOn)==='["M1-2"]','page repairs a missing waitingOn');
   ok(!note(d)&&!!writeNotice(d),'picker works as before, with no identity note');
+  ok(d.querySelectorAll('#activity li').length===4&&d.querySelector('#activity li .key').textContent==='M1-1','recent activity lists the tasks touched last');
+  ok(/Docs done · see the PR/.test([...d.querySelectorAll('#activity li')].find(li=>li.querySelector('.key').textContent==='M1-4').querySelector('.line .text').textContent),'with each task\'s latest message on one line');
+  ok(d.querySelectorAll('#activity .line.quiet').length===3,'and says when a task has no message yet');
+  d.querySelectorAll('#themeSel button')[2].click();await tick();
+  ok(d.documentElement.getAttribute('data-theme')==='dark'&&w.localStorage.getItem('ab-theme')==='dark','the theme switch sets dark and remembers it site-wide');
+  d.querySelectorAll('#themeSel button')[0].click();await tick();
+  ok(!d.documentElement.hasAttribute('data-theme')&&!w.localStorage.getItem('ab-theme'),'auto follows the system again');
+  d.querySelector('thead th[aria-sort] ~ th button').click();await tick();
+  ok(d.querySelector('thead th[aria-sort="ascending"] button').textContent==='Owner'&&w.localStorage.getItem('ab-sort')==='{"by":"owner","dir":"asc"}','a column header sorts the table and the choice is remembered');
+  d.querySelector('thead th[aria-sort] button').click();await tick();
+  ok(d.querySelector('thead th[aria-sort="descending"]')&&[...d.querySelectorAll('tr.item .key')].map(x=>x.textContent).join()==='M1-2,M1-1,M1-3,M1-4','clicking again reverses it, within each feature group');
+  d.querySelector('thead th button').click();await tick();
   writeNotice(d).click();await tick();
   ok(!!d.getElementById('noticeText'),'the notice form opens on demand');
   d.querySelector('.pick .btn').click();await tick();await tick();
   ok(store['tasks/M1-1'].owner==='ana'&&store['tasks/M1-1'].status==='doing','claim button claims for the selected person');
+  key('m');await tick();
+  ok(d.getElementById('mineBtn').getAttribute('aria-pressed')==='true'&&[...d.querySelectorAll('tr.item .key')].map(x=>x.textContent).join()==='M1-1','the mine filter keeps only my tasks');
+  key('m');await tick();
+  ok(d.querySelectorAll('tr.item').length===4,'and lets go');
   key('3');await tick();
   ok(d.querySelectorAll('.node').length===4&&d.querySelectorAll('path.e').length===2,'graph draws every task and dependency');
   ok(/3 steps/.test(d.getElementById('crit').textContent),'longest remaining chain is found');
@@ -154,6 +171,7 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   const day=(n)=>{const d=new Date(Date.now()+n*864e5);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
   b=boot({docs:{'tasks/M1-1':{...seed()['tasks/M1-1'],owner:'ana',status:'doing',due:day(-1)},'tasks/M1-4':{...seed()['tasks/M1-4'],doneAt:'2026-01-04T10:00:00.000Z'}}});all.push(b);await tick();await heal();
   ok(!!b.d.querySelector('.lane .date.late'),'a due day in the past shows as late');
+  ok(!!b.d.querySelector('.pick.alert')&&/Past its due day/.test(b.d.querySelector('.pick.alert .note').textContent)&&/late 1/.test(b.d.getElementById('nowSub').textContent),'and needs attention');
   ok(/done/.test(b.d.querySelector('.lane .done-list summary').textContent)||!!b.d.querySelector('.lane .done-list'),'done work folds under its lane');
   b.d.querySelector('tr.item').click();await tick();
   const fs_=b.d.getElementById('fStatus');fs_.value='done';fs_.dispatchEvent(new b.w.Event('change'));await tick();
@@ -163,6 +181,12 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   const du=b.d.getElementById('fDue');du.value=day(3);du.dispatchEvent(new b.w.Event('change'));await tick();
   ok(b.store['tasks/M1-1'].due===day(3),'the due field saves a day');
   b.key('Escape');
+
+  console.log('# agents at work');
+  b=boot({docs:{'tasks/M1-2':{...seed()['tasks/M1-2'],status:'doing',owner:'ben',claimedBy:{who:'ben',agent:true,at:new Date().toISOString()},updatedAt:new Date().toISOString()}}});all.push(b);await tick();await heal();
+  ok(!!b.d.querySelector('.lane .agent-mark.live'),'an agent that just posted shows as live');
+  b.d.querySelector('section[data-fold="activity"] .fold').click();await tick();
+  ok(isFolded(b.d,'activity')&&!b.d.querySelectorAll('#activity li').length,'the activity section folds');
 
   console.log('# view-only viewer');
   b=boot({user:fakeUser('u_ana',false)});all.push(b);await tick();await heal();
