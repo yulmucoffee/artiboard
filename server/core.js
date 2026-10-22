@@ -47,6 +47,24 @@ export function checkField(field) {
   return field.split('.');
 }
 
+// What a member who is not an admin may not write, whatever the path to the store:
+// who is who (people/, meta/config.people) beyond linking their own account once, and posts under another name.
+// The Supabase migration 20261023000000_guards.sql enforces the same in ab_apply.
+export function guardWrite(actor, w, collection, docId, cur, payload, index) {
+  const deny = (why) => { throw new BoardError('permission_denied', why, index); };
+  if (collection === 'people' && (w.op !== 'set' || payload.uid !== actor.uid || cur?.uid)) {
+    deny('only admins change people/; a member links only their own account to an unlinked person');
+  }
+  const samePeople = (v) => JSON.stringify(v) === JSON.stringify(cur?.people);
+  if (collection === 'meta' && docId === 'config' && (w.op === 'delete' || !cur
+      || (w.op === 'set' && !samePeople(payload.people)) || (w.op === 'update' && 'people' in payload && !samePeople(payload.people)))) {
+    deny('only admins change meta/config.people');
+  }
+  if ((collection === 'notices' || /^tasks\/[^/]+\/messages$/.test(collection)) && w.op !== 'delete' && 'author' in payload && payload.author !== actor.person) {
+    deny(`author must be your own person (${actor.person})`);
+  }
+}
+
 export const hashToken = (token) => createHash('sha256').update(token).digest('hex');
 export const newToken = () => 'abt_' + randomBytes(24).toString('base64url');
 export const isToken = (token) => typeof token === 'string' && /^abt_[A-Za-z0-9_-]{20,}$/.test(token);

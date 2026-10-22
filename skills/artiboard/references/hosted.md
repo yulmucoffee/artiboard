@@ -31,7 +31,7 @@ node "$HOME/.artiboard/src/server/cli.js" init --person <id> --name <name>
 
 ## Setup: put this repository on a board
 
-1. `board_projects`. If the repo's project is missing, ask for a title and a short lowercase id, then `board_create_project` (with `lang` if the team's language is not the site default). Every member starts on it; trim `meta/config.people` if asked.
+1. `board_projects`. If the repo's project is missing, ask for a title and a short lowercase id, then `board_create_project` (with `lang` if the team's language is not the site default). Every member starts on it; a site admin trims `meta/config.people` if asked (`artiboard member remove`, or an admin's agent).
 2. Draft tasks as in SKILL.md "Read the project, then draft" (key, title, feature, deps, spec, acceptance), show the table and wait for a yes. Find keys already used with `board_query tasks` where `milestone == "<M>"`, `fields: ["key"]`, limit 200. Then `board_batch`, at most 100 writes per call, `if_absent: true` on each, no null fields:
 
    ```json
@@ -56,9 +56,10 @@ node "$HOME/.artiboard/src/server/cli.js" init --person <id> --name <name>
 
 Same rules as the artifact board (SKILL.md "Adapt to the project"):
 
-- **Title, subtitle, milestone label, language, people, any UI string:** `board_get meta/config`, then `board_batch` `update` with `if_version`. Strings go in `meta/config.strings` (keys of the page's `I18N.en`). The page updates live.
+- **Title, subtitle, milestone label, language, any UI string:** `board_get meta/config`, then `board_batch` `update` with `if_version`. Strings go in `meta/config.strings` (keys of the page's `I18N.en`). The page updates live.
+- **People:** only site admins change who is on a board (`meta/config.people`, `people/`), with `artiboard member join` or `member remove`, or an admin's agent with `board_batch`. A member's agent gets `permission_denied`: ask an admin. Messages and notices must carry your own person as `author`.
 - **Rules:** edit `docs/artiboard.md`, update `meta/protocol` (`text`, `rev` + 1) and post one notice, together.
-- **The page itself** (a status, a field on screen, a view), admins only: `board_page {project}` gives the version; `board_page {project, find: "<text>"}` shows numbered lines around a match, so read only what you change; then `board_page {project, edits: [{old, new}], if_version}` with exact, unique `old` text. Change `STATUS`, `BAR`, the `.state.<name>` CSS rule and the `st_<name>` strings together, exactly as for the artifact page, then the rules file. The new page is served at once; `board_page {project, reset: true}` goes back to the bundled page. A member who is not an admin gets `permission_denied`: ask a site admin, or have them run `artiboard page set --project <id> --file <page.html>`.
+- **The page itself** (a status, a field on screen, a view), admins only, and only where the site sets `ARTIBOARD_AGENT_PAGE_EDITS=1` (page code runs for every member, so by default agents only read pages). Elsewhere, write the changed page to a file in the scratchpad and ask a site admin to run `artiboard page set --project <id> --file <file>`. Where it is on: `board_page {project}` gives the version; `board_page {project, find: "<text>"}` shows numbered lines around a match, so read only what you change; then `board_page {project, edits: [{old, new}], if_version}` with exact, unique `old` text. Change `STATUS`, `BAR`, the `.state.<name>` CSS rule and the `st_<name>` strings together, exactly as for the artifact page, then the rules file. The new page is served at once; `board_page {project, reset: true}` goes back to the bundled page. A member who is not an admin gets `permission_denied`: ask a site admin.
 
 ## Upgrade
 
@@ -77,4 +78,4 @@ The bundled page and the server update together when the site's code is updated 
 
 ## Site admin (outside the agent's tools)
 
-Admins manage the site with `artiboard` commands (`node server/cli.js …` in the source checkout, `docker compose exec board node server/cli.js …` in a container, or with `--env <file>` holding the Supabase keys): `member add|token|link|revoke|access|join|remove|list`, `project add|drop|list`, `page show|set|reset`, `import`. Agents cannot write `people/`; access levels are `admin`, `member` (writes) and `viewer` (reads).
+Admins manage the site with `artiboard` commands (`node server/cli.js …` in the source checkout, `docker compose exec board node server/cli.js …` in a container, or with `--env <file>` holding the Supabase keys): `member add|token|link|revoke|access|join|remove|list`, `project add|drop|list`, `page show|set|reset`, `import`. Only admins change `people/` and `meta/config.people`; access levels are `admin`, `member` (writes) and `viewer` (reads). `member revoke` also signs that member out of every browser.

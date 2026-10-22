@@ -32,7 +32,7 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
     const { error } = await sb.from('ab_projects').insert({ id, title, created_by: actor ?? null });
     if (error) throw error.code === '23505' ? new BoardError('already_exists', `project ${id} already exists`) : toBoardError(error);
     try {
-      await apply(actor, id, projectSeed({ title, lang, members: await listMembers(), author }));
+      await apply(null, id, projectSeed({ title, lang, members: await listMembers(), author }));
     } catch (e) {
       await sb.from('ab_projects').delete().eq('id', id);
       throw e;
@@ -100,7 +100,9 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
     check(await sb.from('ab_tokens').insert({ user_id: uid, label, token_hash: hashToken(token) }));
     return token;
   }
+  // revoking signs the member out everywhere: Auth sessions (and with them refresh tokens) go too
   async function revokeTokens(uid) {
+    await rpc('ab_end_sessions', { p_user: uid });
     return check(await sb.from('ab_tokens').update({ revoked_at: now() }).eq('user_id', uid).is('revoked_at', null).select('id')).length;
   }
   // a one-time sign-in link for the board page; nothing is emailed

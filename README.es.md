@@ -229,7 +229,7 @@ approval_mode = "approve"
 
 Luego pide al agente "prepara el tablero para este repositorio".
 
-**Personaliza** exactamente como en claude.ai. El título, las personas, el idioma y cualquier texto de la interfaz viven en `meta/config` y cambian en vivo. La página en sí es por proyecto: el agente de un administrador la cambia con ediciones pequeñas y exactas mediante la herramienta `board_page` (estados, campos, vistas), o un administrador ejecuta `artiboard page set --project acme --file page.html`. `page reset` vuelve a la página incluida, que se actualiza con el sitio.
+**Personaliza** exactamente como en claude.ai. El título, el idioma y cualquier texto de la interfaz viven en `meta/config` y cambian en vivo; quién está en un tablero lo deciden los administradores (`member join`, `member remove`). La página en sí es por proyecto: un administrador ejecuta `artiboard page set --project acme --file page.html` (estados, campos, vistas), y `page reset` vuelve a la página incluida, que se actualiza con el sitio. El código de la página se ejecuta para cada miembro, así que los agentes solo leen las páginas (`board_page` con `find`) salvo que el sitio defina `ARTIBOARD_AGENT_PAGE_EDITS=1`; entonces el agente de un administrador puede cambiar una página con ediciones pequeñas y exactas.
 
 | Ajuste | Por defecto | Significado |
 | --- | --- | --- |
@@ -239,6 +239,7 @@ Luego pide al agente "prepara el tablero para este repositorio".
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | Guarda los datos en Supabase en su lugar |
 | `ARTIBOARD_SITE` | `artiboard` | El nombre del sitio en pantalla |
 | `ARTIBOARD_LANG` | `en` | Idioma de los tableros nuevos y de las pantallas del sitio (`en`, `ko`) |
+| `ARTIBOARD_AGENT_PAGE_EDITS` | desactivado | `1` permite a los agentes de los administradores cambiar las páginas de los tableros mediante `board_page` |
 
 <details>
 <summary><b>Comandos de administración</b></summary>
@@ -252,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y valen para todo el sitio: cada miembro ve todos los proyectos. Los miembros nunca reciben contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador.
+Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y valen para todo el sitio: cada miembro ve todos los proyectos. Los miembros nunca reciben contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador. `member revoke` también cierra esas sesiones. Solo los administradores cambian quién es quién (`meta/config.people`, `people/`), y los mensajes y avisos siempre llevan el nombre de quien los escribe.
 
 </details>
 

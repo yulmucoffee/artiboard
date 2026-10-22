@@ -52,6 +52,7 @@ function sameOrigin(req) {
 }
 
 export function makeApp({ store, cfg }) {
+  const streams = new Map();
   const secure = cfg.boardUrl.startsWith('https:');
   const sessionCookie = (sid, maxAge) => `ab_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 
@@ -103,6 +104,9 @@ export function makeApp({ store, cfg }) {
   async function docs(req, res, member, project, action) {
     if (action === 'events') {
       await store.readRows(project, {});
+      if ((streams.get(member.uid) || 0) >= 20) return send(res, 429, { error: 'too_many_streams' });
+      streams.set(member.uid, (streams.get(member.uid) || 0) + 1);
+      req.on('close', () => { const n = streams.get(member.uid) - 1; if (n > 0) streams.set(member.uid, n); else streams.delete(member.uid); });
       res.writeHead(200, { ...SECURITY, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
       res.write(': live\n\n');
       const off = store.subscribe(project, (row) => res.write(`data: ${JSON.stringify(row)}\n\n`));
@@ -114,7 +118,7 @@ export function makeApp({ store, cfg }) {
     const b = (await body(req)) || {};
     if (action === 'read') return send(res, 200, await store.readRows(project, b));
     if (action === 'batch') return send(res, 200, await store.apply(member.uid, project, b.writes));
-    if (action === 'acquire') return send(res, 200, { acquired: await store.acquire(member.uid, `${project}:${b.path}`, b.holder, b.ttlMs) });
+    if (action === 'acquire') return send(res, 200, { acquired: await store.acquire(member.uid, project, b.path, b.holder, b.ttlMs) });
     send(res, 404, { error: 'not_found' });
   }
 
@@ -151,6 +155,7 @@ export function makeApp({ store, cfg }) {
         return await login(req, res);
       }
       if (name === 'logout') {
+        if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, { Allow: 'POST' });
         if (store.endSession) await store.endSession(cookie(req, 'ab_session'));
         return send(res, 200, { ok: true }, { 'Set-Cookie': sessionCookie('', 0) });
       }

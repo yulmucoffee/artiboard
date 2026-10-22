@@ -229,7 +229,7 @@ approval_mode = "approve"
 
 Then ask the agent to "set up the board for this repo".
 
-**Customize** exactly as on claude.ai. Title, people, language and any UI string live in `meta/config` and change live. The page itself is per project: an admin's agent changes it with small exact edits through the `board_page` tool (statuses, fields, views), or an admin runs `artiboard page set --project acme --file page.html`. `page reset` goes back to the bundled page, which updates with the site.
+**Customize** exactly as on claude.ai. Title, language and any UI string live in `meta/config` and change live; who is on a board is the admins' (`member join`, `member remove`). The page itself is per project: an admin runs `artiboard page set --project acme --file page.html` (statuses, fields, views), and `page reset` goes back to the bundled page, which updates with the site. Page code runs for every member, so agents only read pages (`board_page` with `find`) unless the site sets `ARTIBOARD_AGENT_PAGE_EDITS=1`; then an admin's agent can change a page with small exact edits.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -239,6 +239,7 @@ Then ask the agent to "set up the board for this repo".
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | Keep the data in Supabase instead |
 | `ARTIBOARD_SITE` | `artiboard` | The site's name on screens |
 | `ARTIBOARD_LANG` | `en` | Language of new boards and the site's screens (`en`, `ko`) |
+| `ARTIBOARD_AGENT_PAGE_EDITS` | off | `1` lets admins' agents change board pages through `board_page` |
 
 <details>
 <summary><b>Admin commands</b></summary>
@@ -252,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-Run `node server/cli.js` with no command for every option. Access levels are `admin`, `member` (writes) and `viewer` (reads), and they hold across the site: every member sees every project. Members never get a password: a token signs in an agent, and the page trades a token or a one-time link for a browser session.
+Run `node server/cli.js` with no command for every option. Access levels are `admin`, `member` (writes) and `viewer` (reads), and they hold across the site: every member sees every project. Members never get a password: a token signs in an agent, and the page trades a token or a one-time link for a browser session. `member revoke` ends those sessions too. Only admins change who is who (`meta/config.people`, `people/`), and messages and notices always carry their writer's own name.
 
 </details>
 

@@ -229,7 +229,7 @@ approval_mode = "approve"
 
 然后让 agent "为这个仓库设置看板"。
 
-**自定义**方式与 claude.ai 上完全相同。标题、成员、语言和任意界面文案都在 `meta/config` 里，修改即时生效。页面本身按项目区分：管理员的 agent 通过 `board_page` 工具做小而精确的编辑来修改它（状态、字段、视图），或者由管理员运行 `artiboard page set --project acme --file page.html`。`page reset` 会恢复为内置页面，内置页面随站点一起更新。
+**自定义**方式与 claude.ai 上完全相同。标题、语言和任意界面文案都在 `meta/config` 里，修改即时生效；谁在看板上由管理员决定（`member join`、`member remove`）。页面本身按项目区分：由管理员运行 `artiboard page set --project acme --file page.html` 修改（状态、字段、视图），`page reset` 会恢复为内置页面，内置页面随站点一起更新。页面代码会为每个成员运行，所以除非站点设置了 `ARTIBOARD_AGENT_PAGE_EDITS=1`，agent 只读取页面（`board_page` 的 `find`）；设置后，管理员的 agent 可以通过小而精确的编辑修改页面。
 
 | 设置 | 默认值 | 含义 |
 | --- | --- | --- |
@@ -239,6 +239,7 @@ approval_mode = "approve"
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | 改为把数据存放在 Supabase |
 | `ARTIBOARD_SITE` | `artiboard` | 界面上显示的站点名称 |
 | `ARTIBOARD_LANG` | `en` | 新看板和站点界面的语言（`en`、`ko`） |
+| `ARTIBOARD_AGENT_PAGE_EDITS` | 关闭 | 设为 `1` 时，管理员的 agent 可以通过 `board_page` 修改看板页面 |
 
 <details>
 <summary><b>管理命令</b></summary>
@@ -252,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-不带命令运行 `node server/cli.js` 可查看全部选项。访问级别有 `admin`、`member`（可写）和 `viewer`（只读），并在整个站点范围内生效：每个成员都能看到所有项目。成员从不需要密码：令牌让 agent 登录，页面则用令牌或一次性链接换取浏览器会话。
+不带命令运行 `node server/cli.js` 可查看全部选项。访问级别有 `admin`、`member`（可写）和 `viewer`（只读），并在整个站点范围内生效：每个成员都能看到所有项目。成员从不需要密码：令牌让 agent 登录，页面则用令牌或一次性链接换取浏览器会话。`member revoke` 也会结束这些会话。只有管理员能改变谁是谁（`meta/config.people`、`people/`），消息和公告始终带着写入者本人的名字。
 
 </details>
 
