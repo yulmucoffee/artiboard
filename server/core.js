@@ -68,7 +68,13 @@ export function guardWrite(actor, w, collection, docId, cur, payload, index) {
 export const hashToken = (token) => createHash('sha256').update(token).digest('hex');
 export const newToken = () => 'abt_' + randomBytes(24).toString('base64url');
 export const isToken = (token) => typeof token === 'string' && /^abt_[A-Za-z0-9_-]{20,}$/.test(token);
-export const now = () => new Date().toISOString();
+// strictly increasing within a process, so two messages written back to back never share an id
+let lastNow = '';
+export const now = () => {
+  let at = new Date().toISOString();
+  if (at <= lastNow) at = new Date(Date.parse(lastNow) + 1).toISOString();
+  return (lastNow = at);
+};
 export const stampId = (at, person) => `${at.replace(/:/g, '-')}-${person}`;
 
 // How every board works, for agents. board_start prints it, so no repository keeps a copy, and it changes
@@ -93,13 +99,17 @@ export function checkAgentWrite(w, index) {
   if (w.path === 'meta/protocol') {
     throw new BoardError('invalid_argument', 'meta/protocol is retired: project rules go to meta/rules, shared status to meta/notes', index);
   }
+  if ((w.path === 'meta/rules' || w.path === 'meta/notes') && w.data && 'text' in w.data && typeof w.data.text !== 'string') {
+    throw new BoardError('invalid_argument', `${w.path}.text must be a string`, index);
+  }
   if ((w.path === 'meta/rules' || w.path === 'meta/notes') && BOARD_TALK.test(String(w.data?.text ?? ''))) {
     throw new BoardError('invalid_argument', `${w.path} holds only this project's own agreements and status; the board rules come with artiboard (board_start prints them), so leave out how to use the board tools`, index);
   }
 }
 
 // owner/name of a GitHub repository, from "owner/name", its URL or a git remote; null for anything else
-const REPO = /^(?:(?:https?:\/\/|ssh:\/\/)?(?:[\w.-]+@)?(?:www\.)?github\.com[:/])?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/;
+// (credentials and a port in the remote are allowed and dropped; the page reads them the same way)
+const REPO = /^(?:(?:(?:https?|ssh|git):\/\/)?(?:[^@/\s]+@)?(?:www\.)?github\.com(?::\d+)?[:/])?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i;
 const repoOf = (s) => { const m = REPO.exec(String(s ?? '').trim()); return m ? `${m[1]}/${m[2]}` : null; };
 // the form two names are compared in: GitHub matches names without case
 export const repoName = (s) => repoOf(s)?.toLowerCase() ?? null;
@@ -117,7 +127,7 @@ export function cleanRepos(list) {
   return list.map((r) => {
     const [repo, ...label] = typeof r === 'string' ? r.trim().split(/\s+/) : [r?.repo, r?.label ?? ''];
     const name = repoOf(repo);
-    if (!name) throw new BoardError('invalid_argument', `not a GitHub repository: ${repo ?? 'null'} (owner/name or its URL)`);
+    if (!name) throw new BoardError('invalid_argument', 'a repo is not a GitHub repository (owner/name or its URL)');
     const l = String(Array.isArray(label) ? label.join(' ') : label).trim().slice(0, 40);
     return { repo: name, ...(l && { label: l }) };
   });

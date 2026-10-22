@@ -574,6 +574,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var BAR={done:'var(--ink)',review:'var(--muted)',doing:'var(--warn)',blocked:'var(--danger)',todo:'var(--line)'};
   var TYPES=['note','update','question','answer','handoff','blocker'];
   var VIEWS=['doc','kanban','graph'];
+  // a hosted site keeps several boards on one origin, so its browser storage is namespaced by project
+  // (set before anything below reads it)
+  var ns=window.AB_PROJECT?window.AB_PROJECT+':':'';
   var config={},people=[],db=null,tasks=[],notices=[],sel=null,msgs=[],msgErr=false,unsub=null,loaded=false,failed='',noticesLoaded=false;
   var feat=read('ab-feature')||'all',view=read('ab-view')||'doc';if(VIEWS.indexOf(view)<0)view='doc';
   var me=read('ab-me')||'';
@@ -587,8 +590,6 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var fold=readJSON('ab-fold')||{},groupFold=readJSON('ab-groups')||{},showDone=read('ab-show-done')==='1';
   var FOLD_DEFAULT={rules:true,guide:true},LANE_MAX=5,NOW_MAX=6;
 
-  // a hosted site keeps several boards on one origin, so its browser storage is namespaced by project
-  var ns=window.AB_PROJECT?window.AB_PROJECT+':':'';
   function read(k){try{return localStorage.getItem(ns+k)}catch(e){return null}}
   function write(k,v){try{localStorage.setItem(ns+k,v)}catch(e){}}
   function readJSON(k){try{return JSON.parse(read(k)||'null')}catch(e){return null}}
@@ -642,7 +643,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // ---------- repositories (meta/config.repos) and PR links ----------
   var REPO=/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-  function repoList(){return (Array.isArray(config.repos)?config.repos:[]).map(function(r){return typeof r==='string'?{repo:r}:r}).filter(function(r){return r&&REPO.test(r.repo||'')})}
+  // owner/name from "owner/name", a GitHub URL or a git remote, as the server reads them; null for anything else
+  function repoOf(s){var m=/^(?:(?:(?:https?|ssh|git):\/\/)?(?:[^@\/\s]+@)?(?:www\.)?github\.com(?::\d+)?[:\/])?([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i.exec(String(s==null?'':s).trim());return m?m[1]+'/'+m[2]:null}
+  function repoList(){
+    return (Array.isArray(config.repos)?config.repos:[]).map(function(r){
+      var o=typeof r==='string'?{repo:r}:r||{},name=repoOf(o.repo);
+      return name?(typeof o.label==='string'&&o.label.trim()?{repo:name,label:o.label.trim()}:{repo:name}):null;
+    }).filter(Boolean);
+  }
   // a label from the list, or an owner/name
   function repoRef(ref){
     if(!ref)return null;var rs=repoList(),low=String(ref).toLowerCase();
@@ -1170,8 +1178,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // ---------- views and keyboard cursor ----------
   function renderView(){
     $('viewDoc').hidden=view!=='doc';$('viewKanban').hidden=view!=='kanban';$('viewGraph').hidden=view!=='graph';
+    applyFolds();
     if(view==='doc'){
-      applyFolds();
       if(!folded('now'))renderNow();if(!folded('people'))renderLanes();if(!folded('items'))renderTable();else order=[];
       if(!folded('notices'))renderFeed();renderNotes();renderRules();renderGuide();
     }
@@ -1250,15 +1258,15 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       var repos=[],bad=null;
       re.value.split('\n').forEach(function(line){
         var parts=line.trim().split(/\s+/);if(!parts[0])return;
-        var name=parts[0].replace(/^https?:\/\/(www\.)?github\.com\//,'').replace(/^git@github\.com:/,'').replace(/\.git$/,'').replace(/\/$/,'');
-        if(!REPO.test(name)){bad=bad||parts[0];return}
+        var name=repoOf(parts[0]);
+        if(!name){bad=bad||parts[0];return}
         var lb=parts.slice(1).join(' ').slice(0,40);repos.push(lb?{repo:name,label:lb}:{repo:name});
       });
       if(bad){err.textContent=T('s_bad',{r:bad});err.hidden=false;return}
       if(!ti.value.trim()){ti.focus();return}
       ok.disabled=true;
       db.doc('meta/config').update({title:ti.value.trim(),subtitle:su.value.trim(),milestone:mi.value.trim(),repos:repos})
-        .then(function(){toast(T('s_saved'));closeSettings()})
+        .then(function(){toast(T('s_saved'));if(settingsOpen)closeSettings()})
         .catch(function(e){ok.disabled=false;err.textContent=T('saveFail',{e:errText(e)});err.hidden=false;refused(e)});
     });
     var sheet=el('div',{class:'sheet',role:'dialog','aria-modal':'true','aria-labelledby':'setTitle'},[

@@ -172,6 +172,11 @@ for (const backend of backends) {
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'after the summary', due: '2026-10-23', start: '2026-10-20' })).value, `ok ${K(1)}`);
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'x', due: 'friday' })).error, true, 'due is a day');
       assert.match((await call(board, 'board_post', { project: P, task: K(1) })).value, /^invalid_argument: /, 'a post says or changes something');
+      await call(board, 'board_post', { project: P, task: K(1), branch: 'feat/x' });
+      await call(board, 'board_post', { project: P, task: K(1), pr: '' });
+      const said = (await call(board, 'board_query', { project: P, collection: `tasks/${K(1)}/messages`, order_by: [{ field: 'at', dir: 'desc' }], limit: 2, fields: ['text'] })).value.docs.map((d) => d.data.text);
+      assert.deepEqual(said, ['pr none', 'branch feat/x'], 'a post without text still says what changed');
+      await call(board, 'board_post', { project: P, task: K(1), pr: 'https://example.com/pr/1', branch: '' });
       const shown = (await call(board, 'board_task', { project: P, id: K(1) })).value;
       assert.match(shown, new RegExp(`^${K(1)} review · ${me} \\(agent\\) · https://example.com/pr/1$`, 'm'));
       assert.match(shown, /^start 2026-10-20 · due 2026-10-23$/m);
@@ -215,9 +220,19 @@ for (const backend of backends) {
       await refuse([{ op: 'set', path: 'meta/protocol', data: { text: 'rules' } }], 'the old mixed rules card is retired');
       await refuse([{ op: 'update', path: 'meta/rules', data: { text: 'Start with board_start, then board_claim.' } }], 'board rules stay out of project rules');
       await refuse([{ op: 'set', path: 'meta/notes', data: { text: 'pass if_version on writes' } }], 'and out of notes');
+      await refuse([{ op: 'set', path: 'meta/rules', data: { text: 5 } }], 'rules are text');
       assert.equal((await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: 'meta/protocol' }] })).error, false, 'agents may clear the old card');
       assert.equal((await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: 'meta/notes', data: { text: 'Mon: deploy', rev: 1, updatedAt: at } }] })).error, false);
       assert.match((await call(board, 'board_start', { project: P, ready: 0, peek: true })).value, /^project notes: meta\/notes \(rev 1 \d\d-\d\d\); board_get it/m, 'notes are pointed at, not printed');
+
+      const byLabel = (await call(board, 'board_start', { project: P, repo: 'api', ready: 50, rules: false, peek: true })).value;
+      assert.match(byLabel, /; 1 more in other repos\):$/m, 'with a project, repo may be one of its labels');
+      const stray = (await call(board, 'board_start', { project: P, repo: `acme-${R}/elsewhere`, ready: 50, rules: false, peek: true })).value;
+      assert.match(stray, new RegExp(`^repo acme-${R}/elsewhere is not linked to ${P}; showing all ready work`, 'm'));
+      assert.match(stray, new RegExp(`^${K('r2')} `, 'm'), 'an unlinked repo filters nothing');
+      const token = await call(board, 'board_start', { repo: `https://x-access-token:SECRET@github.com/${api}.git`, ready: 0, rules: false, peek: true });
+      assert.match(token.value, new RegExp(`^${people.admin.person} · ${P}`), 'a remote with credentials still finds the project');
+      assert.doesNotMatch((await call(board, 'board_start', { repo: 'https://x:SECRET@gitlab.com/a/b' })).value, /SECRET/, 'errors never echo a remote');
 
       const lean = (await call(board, 'board_start', { project: P, rules: false, ready: 0, peek: true })).value;
       assert.doesNotMatch(lean, /board rules|project rules|project notes/, 'rules: false leaves them out');

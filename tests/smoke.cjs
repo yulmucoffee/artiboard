@@ -14,7 +14,7 @@ const seed=()=>({
   'details/M1-1':{spec:'docs/db.md',acceptance:'Migrations run',summary:''}
 });
 // user: the namespace claude.use('user') resolves (null = no identity, today's picker); deny: every write rejects like a view-only viewer's
-function boot({user=null,docs={},me=null,deny=false}={}){
+function boot({user=null,docs={},me=null,deny=false,storage={}}={}){
   const store={...seed(),...docs},subs=[],writes=[],errors=[];
   const notify=()=>subs.slice().forEach(s=>s());
   const put=(p,f)=>{if(deny)return Promise.reject({code:'invalid_argument'});writes.push(p);store[p]=f(store[p]);setTimeout(notify,0);return Promise.resolve()};
@@ -24,7 +24,7 @@ function boot({user=null,docs={},me=null,deny=false}={}){
   function doc(p){return {get:async()=>({exists:!!store[p],data:()=>store[p]}),onSnapshot(cb){const run=()=>cb({exists:!!store[p],data:()=>store[p]});subs.push(run);run();return()=>subs.splice(subs.indexOf(run),1)},
     acquire:async()=>({acquired:true}),update:o=>put(p,c=>({...c,...o})),set:o=>put(p,()=>o)}}
   const dom=new JSDOM('<!doctype html><body>'+html+'</body>',{runScripts:'dangerously',url:'https://board.test/',pretendToBeVisual:true,
-    beforeParse(w){w.Math.random=()=>0;if(me)w.localStorage.setItem('ab-me',me);
+    beforeParse(w){w.Math.random=()=>0;if(me)w.localStorage.setItem('ab-me',me);for(const k in storage)w.localStorage.setItem(k,storage[k]);
       w.claude={use:n=>Promise.resolve(n==='db'?{collection:coll,doc}:n==='user'?user:null)};w.HTMLElement.prototype.scrollIntoView=()=>{}}});
   const w=dom.window;w.addEventListener('error',e=>errors.push(e.message));
   return {w,d:w.document,store,writes,errors,notify,key:k=>w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:k,bubbles:true})),pick:id=>{const x=w.document.querySelector('#meSel [data-me="'+id+'"]');if(x)x.click();return !!x}};
@@ -83,13 +83,21 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   ok(!d.querySelector('#hint img')&&d.querySelectorAll('#hint kbd').length===1&&!w.pwned,'config strings cannot inject markup');
   const all=[b];
 
+  console.log('# what this browser remembers is read back');
+  b=boot({storage:{'ab-fold':'{"people":true,"rules":false}','ab-show-done':'1','ab-view':'kanban','ab-seen-init':'1','ab-seen':JSON.stringify({'M1-1':T0,'M1-2':T0,'M1-3':T0,'M1-4':T0})}});all.push(b);await tick();await heal();
+  ok(isFolded(b.d,'people')&&!isFolded(b.d,'rules'),'folded sections stay folded after a reload');
+  ok(!b.d.getElementById('viewKanban').hidden,'the chosen view comes back');
+  ok(!/New/.test(b.d.getElementById('newBtn').textContent),'tasks seen before are not new again');
+  b.key('1');await tick();
+  ok(b.d.querySelectorAll('tr.item').length===4,'showing done work is remembered');
+
   console.log('# repos, settings, rules editing, long lanes');
   const many={};for(let i=1;i<=7;i++)many['tasks/L-'+i]={key:'L-'+i,title:'Lane '+i,feature:'Ops',status:'doing',owner:'ben',deps:[],waitingOn:[],updatedAt:T0};
   b=boot({user:fakeUser('u_ana',true),docs:{...many,'people/ana':{uid:'u_ana',at:T0},
-    'meta/config':{...seed()['meta/config'],repos:[{repo:'acme/api',label:'backend'},'acme/web','not a repo']},
+    'meta/config':{...seed()['meta/config'],repos:[{repo:'https://github.com/acme/api.git',label:'backend'},'git@github.com:acme/web.git','not a repo']},
     'tasks/M1-2':{...seed()['tasks/M1-2'],status:'review',owner:'ana',repo:'backend',pr:'backend#12 https://github.com/acme/web/pull/3'}}});all.push(b);await tick();await tick();
   const links=[...b.d.querySelectorAll('#repos .repo')];
-  ok(links.length===2&&links[0].href==='https://github.com/acme/api'&&/backend/.test(links[0].textContent),'the header links each repo, labels first, and skips what is not one');
+  ok(links.length===2&&links[0].href==='https://github.com/acme/api'&&links[1].href==='https://github.com/acme/web'&&/backend/.test(links[0].textContent),'the header links each repo in any form agents write, and skips what is not one');
   const pick=b.d.querySelector('.pick.review');
   ok(!!pick.querySelector('.repotag')&&[...pick.querySelectorAll('a')].map(a=>a.href).join()==='https://github.com/acme/api/pull/12,https://github.com/acme/web/pull/3','PR references resolve through the repo labels');
   const ben=[...b.d.querySelectorAll('.lane')][1];

@@ -71,7 +71,7 @@ export function makeFlow(store) {
   // The project a repository belongs to: the one whose meta/config.repos lists it.
   async function projectFor(repo) {
     const want = repoName(repo);
-    if (!want) throw new BoardError('invalid_argument', `not a GitHub repository: ${repo} (owner/name or its URL)`);
+    if (!want) throw new BoardError('invalid_argument', 'repo is not a GitHub repository: pass owner/name or the git remote URL');
     const hits = (await store.overview()).filter((p) => reposOf(p).some((r) => repoName(r.repo) === want)).map((p) => p.id);
     if (!hits.length) throw new BoardError('not_found', `no project lists ${want}; board_projects shows each project's repos`);
     if (hits.length > 1) throw new BoardError('invalid_argument', `${want} is on ${hits.join(', ')}; pass project`);
@@ -99,21 +99,28 @@ export function makeFlow(store) {
     const newest = notices.map((n) => n.data.at).filter((a) => typeof a === 'string').sort().pop();
     if (!peek && newest && (!since || newest > since)) await moveCursor(member, project, cursor, newest).catch(() => {});
 
-    const c = config?.data || {}, repos = reposOf(c), want = repo ? repoName(repo) : null;
+    // repo, given with a project, may also be one of its labels; one the project does not list turns the filter off
+    const c = config?.data || {}, repos = reposOf(c);
+    let want = repo ? repoName(repos.find((r) => r.label === repo)?.repo ?? repo) : null, stray = '';
+    if (repo && (!want || !repos.some((r) => repoName(r.repo) === want))) {
+      stray = `repo ${want || '(not a GitHub repository)'} is not linked to ${project}; showing all ready work (link it in meta/config.repos)`;
+      want = null;
+    }
     let free = todo.filter((t) => !t.data.claimedBy).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
     const elsewhere = want ? free.filter((t) => { const r = taskRepo(t.data, repos); return r && r !== want; }).length : 0;
     if (want) free = free.filter((t) => { const r = taskRepo(t.data, repos); return !r || r === want; });
 
     const out = [`${me} · ${project}${c.milestone ? ` · ${c.milestone}` : ''}`];
     if (repos.length) out.push(`repos: ${repoList(repos)}`);
+    if (stray) out.push(stray);
     if (rules) {
       out.push(BOARD_RULES);
       const r = own?.data;
-      if (r?.text?.trim()) out.push(`project rules (rev ${r.rev || 1}${r.by ? ` · ${r.by}` : ''}${r.updatedAt ? ` ${short(r.updatedAt).slice(0, 5)}` : ''}):`, r.text.trim());
+      if (typeof r?.text === 'string' && r.text.trim()) out.push(`project rules (rev ${r.rev || 1}${r.by ? ` · ${r.by}` : ''}${r.updatedAt ? ` ${short(r.updatedAt).slice(0, 5)}` : ''}):`, r.text.trim());
       else out.push('project rules: none yet');
       // the shared status (schedule, where things stand) is long and changes daily: pointed at, not printed
       const n = notes?.data;
-      if (n?.text?.trim()) out.push(`project notes: meta/notes (rev ${n.rev || 1}${n.updatedAt ? ` ${short(n.updatedAt).slice(0, 5)}` : ''}); board_get it when you need the schedule or status`);
+      if (typeof n?.text === 'string' && n.text.trim()) out.push(`project notes: meta/notes (rev ${n.rev || 1}${n.updatedAt ? ` ${short(n.updatedAt).slice(0, 5)}` : ''}); board_get it when you need the schedule or status`);
     }
     out.push(notices.length ? `notices${since ? ' (new)' : ' (latest)'}:` : 'notices: none new');
     notices.forEach((n) => out.push(msgLine(n.data)));
@@ -180,7 +187,7 @@ export function makeFlow(store) {
       await apply(member, project, [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: {
           status: 'doing', owner: me, claimedBy: { who: me, agent: true, ...(session && { session }), at }, updatedAt: at, lastMessageAt: at } },
-        { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, data: {
+        { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
           at, author: me, kind: 'agent', type: 'update', text: text || CLAIMED[config?.data?.lang] || CLAIMED.en } },
       ]);
       return 'claimed';
@@ -225,14 +232,14 @@ export function makeFlow(store) {
       if (repo !== undefined) patch.repo = repo || null;
       // with no text, the thread still says what changed
       const said = text?.trim() || [
-        status && `status ${status}`, pr && `pr ${pr}`,
+        status && `status ${status}`, branch !== undefined && `branch ${branch || 'none'}`, pr !== undefined && `pr ${pr || 'none'}`,
         start !== undefined && `start ${start || 'none'}${day(d.start) ? ` (was ${d.start})` : ''}`,
         due !== undefined && `due ${due || 'none'}${day(d.due) ? ` (was ${d.due})` : ''}`,
         repo !== undefined && `repo ${repo || 'none'}`, summary !== undefined && 'summary updated',
-      ].filter(Boolean).join(' · ');
+      ].filter(Boolean).join(' · ') || 'updated';
       const writes = [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: patch },
-        { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, data: {
+        { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
           at, author: me, kind: 'agent', type: type || (status === 'blocked' ? 'blocker' : 'update'), text: said } },
       ];
       if (summary !== undefined) {
