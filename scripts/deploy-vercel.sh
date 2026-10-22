@@ -10,7 +10,5 @@ out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 git -C "$root" archive HEAD | tar -x -C "$out"
 cp -R "$root/.vercel" "$out/.vercel"
-if [ -n "$VERCEL_REGION" ]; then
-  node -e 'const f=process.argv[1];const j=JSON.parse(require("fs").readFileSync(f,"utf8"));j.regions=[process.argv[2]];require("fs").writeFileSync(f,JSON.stringify(j,null,2))' "$out/vercel.json" "$VERCEL_REGION"
-fi
-vercel deploy --prod --yes --cwd "$out"
+# a regions entry in vercel.json loses to a project's default function region, so the flag carries it
+vercel deploy --prod --yes --cwd "$out" ${VERCEL_REGION:+--regions "$VERCEL_REGION"}
