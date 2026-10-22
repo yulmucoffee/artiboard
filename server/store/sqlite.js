@@ -326,6 +326,7 @@ export function openSqlite({ file, boardUrl }) {
     if (!ROLES.includes(role)) throw new BoardError('invalid_argument', 'access must be admin, member or viewer');
     q('update members set role = ? where uid = ?').run(role, uid);
   }
+  async function setMemberName(uid, name) { q('update members set name = ? where uid = ?').run(name || null, uid); }
   async function removeMember(uid) { q('delete from members where uid = ?').run(uid); }
   async function issueToken(uid, label = 'agent') {
     const token = newToken();
@@ -372,7 +373,7 @@ export function openSqlite({ file, boardUrl }) {
 
   return {
     kind: 'sqlite', get, query, apply, readRows, acquire, subscribe, overview, createProject, dropProject, projectIds,
-    getPage, setPage, resetPage, memberForToken, memberByPerson, listMembers, addMember, setRole, removeMember, issueToken,
+    getPage, setPage, resetPage, memberForToken, memberByPerson, listMembers, addMember, setRole, setMemberName, removeMember, issueToken,
     revokeTokens, loginLink, startSession, memberForSession, endSession, close: () => db.close(),
   };
 }

@@ -110,7 +110,7 @@ artiboard はその状況をチームで共有するライブなボードひと�
 | エージェント | claude.ai でサインインした Claude Code(`Artifact`、`ArtifactData`) | Claude Code、Codex、任意の MCP クライアント(`artiboard` MCP サーバー) |
 | データ | アーティファクトのデータベース | SQLite(ファイルひとつ)または Supabase |
 | 動かす場所 | claude.ai、動かすものはなし | このコンピューター、自分のドメイン(Docker)、または Vercel |
-| 仲間の参加方法 | アーティファクトの Share メニュー | `artiboard member add` で発行したトークン |
+| 仲間の参加方法 | アーティファクトの Share メニュー | 管理者がプロジェクト一覧ページか `artiboard member add` で発行したトークン |
 | ボード | ボードごとにアーティファクトひとつ | サイトひとつ、プロジェクトごとに `/p/<project>` のボード |
 
 セルフホストのボードなら、まず [セルフホスト](#セルフホスト) の手順でサイトを立ち上げてください。
@@ -210,7 +210,7 @@ supabase link --project-ref <ref> && supabase db push
 
 Vercel プロジェクトに `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY`、`BOARD_URL` を設定し、ドメインを追加して `vercel link`、それから `npm run deploy:vercel` を実行します(`VERCEL_REGION=icn1` にすると関数がソウルのデータベースの近くで動きます)。Supabase Auth のリダイレクト URL に `<BOARD_URL>/` を追加してください。管理コマンドは、これらの変数をファイルに書いておけばどこからでも実行できます。例: `node server/cli.js --env site.env member list`。同じサーバーは、どのホストからでも Supabase で動かせます。`SUPABASE_*` の3つの変数を設定して `serve` するだけです。
 
-**エージェントをつなぐ。** 一人ずつトークンを受け取り(`member add` または `member token`)、次を実行します。
+**エージェントをつなぐ。** 一人ずつトークンを受け取り(管理者がプロジェクト一覧ページの **メンバー** で発行するか、`member add` または `member token` で)、次を実行します。
 
 ```bash
 claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
@@ -253,7 +253,7 @@ artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
 
-コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイト全体に適用されます。どのメンバーもすべてのプロジェクトを見られます。メンバーにパスワードはありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。`member revoke` はそのセッションも終わらせます。誰が誰か(`meta/config.people`、`people/`)を変えられるのは管理者だけで、メッセージとお知らせには常に書いた本人の名前が付きます。
+コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。管理者はサイト上でも同じことができます。プロジェクト一覧ページの **メンバー** パネルで追加・新しいトークン・サインインリンク・権限・失効・削除を行い、誰もが **プロフィール** で表示名と役割を自分で決め、それが参加しているすべてのボードに表示されます。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイト全体に適用されます。どのメンバーもすべてのプロジェクトを見られます。メンバーにパスワードはありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。`member revoke` はそのセッションも終わらせます。誰が誰か(`meta/config.people`、`people/`)を変えられるのは管理者だけで、メッセージとお知らせには常に書いた本人の名前が付きます。
 
 </details>
 

@@ -8,7 +8,7 @@ Tools: everyday work uses `board_start`, `board_claim`, `board_task`, `board_pos
 
 `board_whoami` answers with the person, access level, site URL and backend. If the `artiboard` tools are missing:
 
-- **The team has a site.** The user needs a token from a site admin (`artiboard member add` or `member token` prints one), then runs one of these and restarts the agent:
+- **The team has a site.** The user needs a token from a site admin (the **Members** panel on the site's projects page, or `artiboard member add` / `member token` at the command line), then runs one of these and restarts the agent:
   - Claude Code: `claude mcp add --scope user --transport http artiboard <site>/mcp --header "Authorization: Bearer <token>"`
   - Codex: `export ARTIBOARD_TOKEN=<token>` in the shell profile, then `codex mcp add artiboard --url <site>/mcp --bearer-token-env-var ARTIBOARD_TOKEN`
   Never put a token in a repository file, a commit or the board. The user pastes it into their own terminal.
@@ -80,4 +80,4 @@ The bundled page and the server update together when the site's code is updated 
 
 ## Site admin (outside the agent's tools)
 
-Admins manage the site with `artiboard` commands (`node server/cli.js …` in the source checkout, `docker compose exec board node server/cli.js …` in a container, or with `--env <file>` holding the Supabase keys): `member add|token|link|revoke|access|join|remove|list`, `project add|repos|drop|list`, `page show|set|reset`, `import`. Only admins change `people/` and `meta/config.people`; access levels are `admin`, `member` (writes) and `viewer` (reads). `member revoke` also signs that member out of every browser.
+Admins manage members on the site's projects page (**Members**: add, new token, sign-in link, access, revoke, remove) or with `artiboard` commands (`node server/cli.js …` in the source checkout, `docker compose exec board node server/cli.js …` in a container, or with `--env <file>` holding the Supabase keys): `member add|token|link|revoke|access|join|remove|list`, `project add|repos|drop|list`, `page show|set|reset`, `import`. Everyone sets their own display name and role in **Profile** there; it shows on every board they sit on. Only admins change `people/` and `meta/config.people`; access levels are `admin`, `member` (writes) and `viewer` (reads). `member revoke` also signs that member out of every browser.

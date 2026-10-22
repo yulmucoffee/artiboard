@@ -4,8 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { BoardError, isToken, PROJECT_ID, toBoardError } from './core.js';
+import { BoardError, isToken, PERSON_ID, PROJECT_ID, toBoardError } from './core.js';
 import { buildServer } from './mcp.js';
+import { addMember, connectLines, removeMember, setProfile, titleOf } from './members.js';
 import { defaultPage, pageHeaders, renderPage } from './page.js';
 
 const PUBLIC = fileURLToPath(new URL('./public/', import.meta.url));
@@ -122,6 +123,41 @@ export function makeApp({ store, cfg }) {
     send(res, 404, { error: 'not_found' });
   }
 
+  // Admins manage who is on the site from the projects page: the same steps as `artiboard member …`.
+  // A token or a sign-in link is in the response once and nowhere else.
+  async function members(req, res, me, rest) {
+    if (me.role !== 'admin') return send(res, 403, { error: 'admins_only' });
+    if (!rest) {
+      if (req.method !== 'POST') {
+        const list = await store.listMembers();
+        for (const m of list) m.title = await titleOf(store, m);
+        return send(res, 200, list);
+      }
+      const b = (await body(req)) || {};
+      const { member, projects, token } = await addMember(store, { person: b.person, name: b.name, email: b.email, role: b.access || 'member' });
+      return send(res, 200, { member, projects, token, connect: connectLines(cfg.boardUrl, token) });
+    }
+    if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, { Allow: 'POST' });
+    const m = /^([^/]+)\/(token|link|revoke|access|remove)$/.exec(rest);
+    if (!m || !PERSON_ID.test(m[1])) return send(res, 404, { error: 'not_found' });
+    const target = await store.memberByPerson(m[1]);
+    if (!target) return send(res, 404, { error: 'no_member' });
+    const b = (await body(req)) || {};
+    switch (m[2]) {
+      case 'token': { const token = await store.issueToken(target.uid, 'agent'); return send(res, 200, { token, connect: connectLines(cfg.boardUrl, token) }); }
+      case 'link': return send(res, 200, { url: await store.loginLink(target) });
+      case 'revoke': return send(res, 200, { revoked: await store.revokeTokens(target.uid) });
+      case 'access':
+        if (target.uid === me.uid) throw new BoardError('invalid_argument', 'ask another admin to change your own access');
+        await store.setRole(target.uid, b.access);
+        return send(res, 200, { ok: true });
+      case 'remove':
+        if (target.uid === me.uid) throw new BoardError('invalid_argument', 'ask another admin to remove you');
+        await removeMember(store, target);
+        return send(res, 200, { ok: true });
+    }
+  }
+
   async function serveStatic(res, path) {
     const file = normalize(join(PUBLIC, path === '/' ? 'index.html' : path));
     if (!file.startsWith(PUBLIC)) return send(res, 403, 'forbidden', { 'Content-Type': 'text/plain' });
@@ -162,7 +198,14 @@ export function makeApp({ store, cfg }) {
 
       const member = await memberFor(req);
       if (!member) return send(res, 401, { error: 'signed_out' });
-      if (name === 'me') return send(res, 200, member);
+      if (name === 'me') {
+        if (req.method === 'POST') {
+          const b = (await body(req)) || {};
+          return send(res, 200, { ...member, ...(await setProfile(store, member, { name: b.name, title: b.title })) });
+        }
+        return send(res, 200, { ...member, title: await titleOf(store, member) });
+      }
+      if (name === 'members' || name.startsWith('members/')) return await members(req, res, member, name.slice('members/'.length));
       if (name === 'projects') {
         if (req.method === 'POST') {
           const b = (await body(req)) || {};

@@ -2,9 +2,28 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.7.0",
+      "date": "2026-10-22",
+      "prs": [
+        14
+      ],
+      "lines": {
+        "en": [
+          "Admins add members, issue tokens and sign-in links, change access, revoke and remove from a Members panel on the project list.",
+          "Everyone sets their own display name and role in Profile; it shows on every board they sit on."
+        ],
+        "ko": [
+          "관리자가 프로젝트 목록 화면의 멤버 패널에서 멤버 추가, 토큰 발급, 로그인 링크, 권한 변경, 회수, 삭제를 해요.",
+          "누구나 프로필에서 표시 이름과 역할을 직접 정하고, 자기가 있는 모든 판에 그대로 보여요."
+        ]
+      }
+    },
+    {
       "version": "1.6.0",
       "date": "2026-10-22",
-      "prs": [11],
+      "prs": [
+        11
+      ],
       "lines": {
         "en": [
           "The project list shows what changed in each version: the newest three open, older ones behind a toggle.",
@@ -19,7 +38,9 @@
     {
       "version": "1.5.1",
       "date": "2026-10-22",
-      "prs": [13],
+      "prs": [
+        13
+      ],
       "lines": {
         "en": [
           "The READMEs describe the new board page and show fresh light and dark screenshots of it."
@@ -32,7 +53,9 @@
     {
       "version": "1.5.0",
       "date": "2026-10-22",
-      "prs": [12],
+      "prs": [
+        12
+      ],
       "lines": {
         "en": [
           "The board page gets a recent-activity feed, late and due-today flags, sortable columns, a \"mine\" filter and a light / dark theme switch.",
@@ -49,7 +72,9 @@
     {
       "version": "1.4.0",
       "date": "2026-10-22",
-      "prs": [10],
+      "prs": [
+        10
+      ],
       "lines": {
         "en": [
           "Board rules now ship with artiboard and reach agents through board_start; each project keeps only its own agreements and shared notes, edited on the page.",
@@ -64,7 +89,9 @@
     {
       "version": "1.3.1",
       "date": "2026-10-22",
-      "prs": [9],
+      "prs": [
+        9
+      ],
       "lines": {
         "en": [
           "Vercel deploys run in the region set with VERCEL_REGION; before, they fell back to the project's default region."
@@ -77,7 +104,9 @@
     {
       "version": "1.3.0",
       "date": "2026-10-22",
-      "prs": [8],
+      "prs": [
+        8
+      ],
       "lines": {
         "en": [
           "Who you are on the board follows your signed-in account; the \"I am\" picker stays only where the platform cannot tell.",
@@ -92,7 +121,9 @@
     {
       "version": "1.2.1",
       "date": "2026-10-22",
-      "prs": [7],
+      "prs": [
+        7
+      ],
       "lines": {
         "en": [
           "Errors no longer pass database details to browsers or agents, and unknown project addresses look like known ones.",
@@ -107,7 +138,9 @@
     {
       "version": "1.2.0",
       "date": "2026-10-22",
-      "prs": [6],
+      "prs": [
+        6
+      ],
       "lines": {
         "en": [
           "A board can live on a self-hosted site (SQLite or Supabase) as well as in a claude.ai artifact.",
@@ -122,7 +155,10 @@
     {
       "version": "1.1.2",
       "date": "2026-10-19",
-      "prs": [4, 5],
+      "prs": [
+        4,
+        5
+      ],
       "lines": {
         "en": [
           "Installing or upgrading the skill copies files over the old ones instead of deleting the folder with rm -rf.",
@@ -137,7 +173,9 @@
     {
       "version": "1.1.1",
       "date": "2026-10-19",
-      "prs": [3],
+      "prs": [
+        3
+      ],
       "lines": {
         "en": [
           "The public demo has an English / 한국어 switch that follows the browser language on a first visit."
@@ -150,7 +188,9 @@
     {
       "version": "1.1.0",
       "date": "2026-10-19",
-      "prs": [2],
+      "prs": [
+        2
+      ],
       "lines": {
         "en": [
           "The board links each person to a claude.ai account and picks \"I am\" for you.",
@@ -165,7 +205,9 @@
     {
       "version": "1.0.1",
       "date": "2026-10-19",
-      "prs": [1],
+      "prs": [
+        1
+      ],
       "lines": {
         "en": [
           "Text from board settings can no longer run script, and open boards stop rewriting the same documents at once.",
