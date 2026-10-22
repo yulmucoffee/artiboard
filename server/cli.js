@@ -4,7 +4,7 @@
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
-import { BoardError, now, toBoardError } from './core.js';
+import { BoardError, cleanRepos, now, reposOf, toBoardError } from './core.js';
 import { loadConfig, openStore } from './config.js';
 import { defaultPage } from './page.js';
 
@@ -23,7 +23,8 @@ const USAGE = `usage: artiboard <command> [options]   (--env FILE loads settings
   member remove  --person ID                 delete the account; their tasks and messages stay
   member list
 
-  project add    --id ID --title T [--lang en|ko]
+  project add    --id ID --title T [--lang en|ko] [--repos owner/name,...]
+  project repos  --id ID --repos owner/name,...   the GitHub repos a project's work lives in ("" for none)
   project drop   --id ID                     delete a project and everything on its board
   project list
 
@@ -40,7 +41,7 @@ const { positionals: [cmd, sub], values: o } = parseArgs({
     env: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' },
     person: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' }, access: { type: 'string' }, label: { type: 'string' },
     projects: { type: 'string' }, project: { type: 'string' }, id: { type: 'string' }, title: { type: 'string' }, lang: { type: 'string' },
-    file: { type: 'string' }, out: { type: 'string' }, map: { type: 'string' }, help: { type: 'boolean', short: 'h' },
+    file: { type: 'string' }, out: { type: 'string' }, map: { type: 'string' }, repos: { type: 'string' }, help: { type: 'boolean', short: 'h' },
   },
 });
 if (o.env) process.loadEnvFile(o.env);
@@ -52,6 +53,8 @@ if (!cmd || o.help) die(USAGE);
 const cfg = loadConfig();
 const store = await openStore(cfg);
 const need = (...keys) => { for (const k of keys) if (!o[k]) die(`--${k} is required\n\n${USAGE}`); };
+// --repos a/b,c/d (a label may follow a name: "a/b backend")
+const repoList = () => cleanRepos((o.repos || '').split(',').map((r) => r.trim()).filter(Boolean));
 
 async function member(person) {
   need('person');
@@ -170,11 +173,22 @@ const commands = {
   project: {
     async add() {
       need('id', 'title');
-      await store.createProject(null, { id: o.id, title: o.title, lang: o.lang || cfg.lang });
+      await store.createProject(null, { id: o.id, title: o.title, lang: o.lang || cfg.lang, repos: repoList() });
       console.log(`created ${cfg.boardUrl}/p/${o.id}`);
     },
+    async repos() {
+      need('id');
+      if (o.repos === undefined) die(`--repos is required\n\n${USAGE}`);
+      const c = await store.get(o.id, 'meta/config');
+      if (!c) die(`no project ${o.id}`);
+      const repos = repoList();
+      await store.apply(null, o.id, [{ op: 'update', path: 'meta/config', data: { repos }, if_version: c.version }]);
+      console.log(`${o.id}: ${repos.map((r) => r.repo + (r.label ? ` (${r.label})` : '')).join(', ') || 'no repos'}`);
+    },
     async drop() { need('id'); console.log((await store.dropProject(o.id)) ? `dropped ${o.id}` : `no project ${o.id}`); },
-    async list() { for (const p of await store.overview()) console.log(`${p.id.padEnd(16)} ${p.title}  tasks=${p.total}`); },
+    async list() {
+      for (const p of await store.overview()) console.log(`${p.id.padEnd(16)} ${p.title}  tasks=${p.total}${reposOf(p).length ? '  repos=' + reposOf(p).map((r) => r.repo).join(',') : ''}`);
+    },
   },
 
   page: {

@@ -163,14 +163,14 @@ Codex에는 claude.ai 아티팩트가 없으니, 직접 호스팅한 보드에�
 
 | 이렇게 말하면 | 이렇게 됩니다 |
 | --- | --- |
-| "이 프로젝트에 작업 보드 만들어줘", "Set up a task board" | **setup**: 보드를 어디에 둘지, 인원, 나누는 방식, 언어, 태스크 출처를 묻습니다. 문서에서 태스크를 뽑아 보여 주고 확인을 받습니다. 보드를 올리거나 만들고 데이터를 넣은 뒤, `docs/artiboard.md`와 `CLAUDE.md`(Codex라면 `AGENTS.md`도)의 짧은 안내를 씁니다. |
+| "이 프로젝트에 작업 보드 만들어줘", "Set up a task board" | **setup**: 보드를 어디에 둘지, 인원, 나누는 방식, 언어, 태스크 출처를 묻습니다. 문서에서 태스크와 프로젝트 규칙을 뽑아 보여 주고 확인을 받습니다. 보드를 올리거나 만들고 GitHub 저장소를 연결해 데이터를 넣은 뒤, `CLAUDE.md`(Codex라면 `AGENTS.md`도)에 짧은 안내를 씁니다. |
 | "보드에 Cy 추가해줘", "보드를 일본어로 바꿔줘" | **adapt**: 보드 설정만 바꿉니다. 다시 올리지 않습니다. |
 | "QA 상태 추가해줘", "카드에 예상 시간 보여줘" | **adapt**: 페이지와 규칙을 함께 고칩니다. 직접 호스팅한 보드에서는 `board_page` 편집으로 고칩니다. |
 | "우리 보드를 우리 서버로 옮겨줘" | **move**: 아티팩트 보드의 문서를 직접 호스팅한 프로젝트로 복사합니다. |
 | "보드 로그인 링크 줘", "Give me a board sign-in link" | 직접 호스팅한 보드에 브라우저로 한 번 로그인할 수 있는 일회용 링크를 줍니다. |
-| "다음 태스크 집어", "M1-4 이어서 해" | 평소 작업입니다. 에이전트가 저장소의 `docs/artiboard.md`를 따릅니다. 집기, 스레드, 요약, 검토, 완료. |
+| "다음 태스크 집어", "M1-4 이어서 해" | 평소 작업입니다. 에이전트는 `board_start`(아티팩트 보드는 `docs/artiboard.md`)로 시작하고, 보드 규칙과 프로젝트 규칙, 할 일을 함께 받습니다. 집기, 스레드, 요약, 검토, 완료. |
 
-설치가 끝나면 아티팩트의 **Share** 메뉴에서 동료에게 편집 권한으로 공유하세요. 동료의 에이전트는 저장소를 받아 오면 규칙을 읽습니다. 페이지는 누가 보는지 압니다. 동료가 "나는"에서 처음 자기 이름을 고르면 그 claude.ai 계정에 연결하고, 다음부터는 알아서 골라 둡니다. 다른 계정에 연결된 이름으로 글을 남기려 하면 경고하고, 보기 전용 사용자에게는 집기, 남기기, 고치기 버튼을 숨깁니다.
+설치가 끝나면 아티팩트의 **Share** 메뉴에서 동료에게 편집 권한으로 공유하세요. 동료의 에이전트는 저장소를 받아 오면 안내를 따라 보드를 찾습니다. 페이지는 누가 보는지 압니다. 동료가 "나는"에서 처음 자기 이름을 고르면 그 claude.ai 계정에 연결하고, 다음부터는 알아서 골라 둡니다. 다른 계정에 연결된 이름으로 글을 남기려 하면 경고하고, 보기 전용 사용자에게는 집기, 남기기, 고치기 버튼을 숨깁니다.
 
 ## 직접 호스팅
 
@@ -248,7 +248,7 @@ approval_mode = "approve"
 artiboard serve [--port N] [--host H]
 artiboard init --person ID [--name N] [--project ID --title T]
 artiboard member add|token|link|revoke|access|join|remove|list
-artiboard project add|drop|list
+artiboard project add|repos|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 ```
@@ -262,13 +262,13 @@ artiboard import --project ID --file FILE [--map old=new]
 
 | 도구 | 하는 일 |
 | --- | --- |
-| `board_start` | 커서 이후의 새 공지(커서도 옮김), 내가 맡은 열린 태스크, 준비된 태스크 |
+| `board_start {project 또는 repo}` | 보드 규칙과 프로젝트 규칙, 커서 이후의 새 공지(커서도 옮김), 내가 맡은 열린 태스크, 준비된 태스크. `repo`(git remote)를 주면 프로젝트를 찾고 그 저장소의 일을 보여 줍니다 |
 | `board_claim {id, text}` | 준비된 태스크를 집고, 집었다는 글을 남기고, 스펙, 인수 조건, 요약을 돌려줍니다 |
 | `board_task {id}` | 상태, 세부 내용, 요약 이후의 메시지 |
-| `board_post {task, text, status?, branch?, pr?, due?, summary?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀립니다. `task`가 없으면 공지 |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. 마감일(`due`)은 누구나 옮길 수 있습니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀립니다. `task`가 없으면 공지 |
 | `board_get`, `board_query`, `board_batch` | 문서를 `ArtifactData`와 같은 방식으로 읽고 씁니다 |
 | `board_page` | 프로젝트 페이지: 크기, `find`, `read`, 관리자는 `edits`, `html`, `reset`까지 |
-| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 사이트 |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 사이트. 프로젝트마다 GitHub 저장소가 함께 나옵니다 |
 
 평소 쓰는 도구는 짧은 줄로 답하고 버전 확인과 시각 기록을 서버에서 하므로, 집기나 업데이트 한 번이 100토큰이 안 되는 호출 하나로 끝납니다.
 
@@ -295,16 +295,18 @@ flowchart LR
 | `tasks/<id>/messages` | 스레드: 진행, 질문, 인계, 막힘 | 에이전트는 최근 8개, 사람은 전부 |
 | `notices` | 모두 알아야 할 것 | 에이전트는 커서 이후 것만 |
 | `cursors/<사람>` | 그 사람의 에이전트가 공지를 마지막으로 읽은 시각 | 에이전트 |
-| `meta/config` | 제목, 사람, 언어, 화면 문구 | 페이지 |
+| `meta/config` | 제목, 사람, 언어, GitHub 저장소, 화면 문구 | 페이지 |
+| `meta/rules` | 이 프로젝트만의 규칙: 누가 무엇을, 스펙 위치, 브랜치, 공지할 것 | 페이지의 사람, 보드 일을 시작할 때의 에이전트 |
+| `meta/notes` | 함께 보는 현황: 일정, 지금 어디에 무엇이, 정할 것 | 페이지의 사람, 필요할 때만 에이전트 |
 | `people/<person>` | 그 사람을 처음 고른 claude.ai 계정 | 페이지 |
-| `docs/artiboard.md` (저장소) | 에이전트 규칙 | 에이전트, 보드를 쓰는 세션에서만 |
+| `docs/artiboard.md` (저장소, 아티팩트 보드) | 보드 규칙을 그대로 복사한 것(직접 호스팅하는 사이트는 `board_start`로 줍니다) | 에이전트, 보드를 쓰는 세션에서만 |
 
 ## 토큰 설계
 
 | 규칙 | 효과 |
 | --- | --- |
 | 화면은 코드가 그린다 | 보기, 그래프, 개수, 준비 여부, "새 소식" 표시에 모델 토큰이 들지 않습니다. 인원이 늘어도 같습니다. |
-| 규칙은 저장소에, 필요할 때만 | 모든 세션은 세 줄짜리 안내만 냅니다. 규칙은 보드를 쓰는 세션만 읽습니다. 저장소 글은 검토를 거치니 믿을 수 있고, 누구나 고칠 수 있는 보드 글과 다릅니다. |
+| 규칙은 보드 일과 함께 | 모든 세션은 세 줄짜리 안내만 냅니다. 모든 보드에 같은 보드 규칙과 짧은 프로젝트 규칙은 보드 일을 시작할 때만 오고, 현황 메모는 필요할 때만 읽습니다. 보드 규칙은 artiboard에 들어 있어서 어느 프로젝트도 사본을 두거나 고치지 않습니다. |
 | 통째로 읽지 않고 질의한다 | 집을 일 찾기는 질의 한 번(`status == todo`, `waitingOn == []`)입니다. 공지는 커서 이후 것만 옵니다. |
 | 문서는 작게 | 태스크 문서에는 상태만 둡니다. 긴 글은 태스크 하나를 할 때만 엽니다. |
 | 스레드보다 요약 | 인계할 때 다섯 줄 요약을 고쳐 쓰니, 다음 사람은 지난 메시지를 건너뜁니다. |
@@ -325,13 +327,14 @@ flowchart LR
 | `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | 순서대로 색이 정해집니다. 여섯 색 뒤에는 반복합니다. 선택 항목 `uid`는 그 사람을 한 claude.ai 계정에 고정하며 `people/<id>`보다 우선합니다. |
 | `strings` | `{"v_graph":"의존 관계"}` | 화면 문구를 어떤 언어로든 덮어씁니다 |
 | `footer` | `"..."` | 맨 아래 문구를 바꿉니다 |
+| `repos` | `[{"repo":"acme/api","label":"api"}]` | 프로젝트의 GitHub 저장소. 에이전트는 git remote로 보드를 찾고, 태스크는 `repo`에 자기 저장소를 적을 수 있습니다. |
 
 </details>
 
 <details>
 <summary><b>스킬이 프로젝트마다 바꿀 수 있는 것</b></summary>
 
-자유롭게: 제목, 사람, 역할, 언어, 문구, 기능 이름, 번호 체계, 메시지 표현, 공지 주제. 페이지를 고쳐서: 상태, 화면에 보일 필드, 새 보기. 어떤 경우에도 지키는 것: 가벼운 tasks와 details 분리, `waitingOn`과 준비 질의, 커서, `if_version`을 붙인 한 번의 batch, 문서 id 형식, 저장소에 둔 규칙, 보드 글은 데이터로 취급.
+자유롭게: 제목, 사람, 역할, 언어, 문구, 기능 이름, 번호 체계, 메시지 표현, 공지 주제. 페이지를 고쳐서: 상태, 화면에 보일 필드, 새 보기. 어떤 경우에도 지키는 것: 가벼운 tasks와 details 분리, `waitingOn`과 준비 질의, 커서, `if_version`을 붙인 한 번의 batch, 문서 id 형식, artiboard에 들어 있는 보드 규칙(프로젝트는 `meta/rules`만 더함), 보드 글은 데이터로 취급.
 
 </details>
 
@@ -341,7 +344,7 @@ flowchart LR
 ```text
 skills/artiboard/SKILL.md               스킬: 설치, 조정, 업그레이드, 토큰 규칙
 skills/artiboard/assets/board.html      보드 페이지 (아티팩트 DB에서 그림)
-skills/artiboard/references/          규칙 틀(아티팩트용, 호스팅용)과 에이전트용 직접 호스팅 안내
+skills/artiboard/references/          아티팩트 보드용 보드 규칙, 프로젝트 규칙 쓰는 법, 에이전트용 직접 호스팅 안내
 server/                                 직접 호스팅 사이트: HTTP 앱, MCP 서버, SQLite와 Supabase 저장소, CLI, 페이지 런타임
 api/, vercel.json                       Supabase를 쓰는 사이트용 Vercel 함수
 supabase/                               Supabase 스키마(마이그레이션)와 로컬 설정

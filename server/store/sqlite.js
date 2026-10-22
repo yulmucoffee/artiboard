@@ -246,11 +246,11 @@ export function openSqlite({ file, boardUrl }) {
       // the latest time written on a task or notice, so imported history keeps its own dates
       const last = q(`select max(max(coalesce(json_extract(data, '$.updatedAt'), ''), coalesce(json_extract(data, '$.lastMessageAt'), ''),
           coalesce(json_extract(data, '$.at'), ''))) t from docs where project = ? and collection in ('tasks', 'notices')`).get(p.id).t;
-      return { id: p.id, title: cfg.title || p.title, subtitle: cfg.subtitle || null, created_at: p.created_at, tasks, total, last: /^\d{4}-/.test(last || '') ? last : null };
+      return { id: p.id, title: cfg.title || p.title, subtitle: cfg.subtitle || null, repos: Array.isArray(cfg.repos) ? cfg.repos : [], created_at: p.created_at, tasks, total, last: /^\d{4}-/.test(last || '') ? last : null };
     }).sort((a, b) => (b.last || '').localeCompare(a.last || '') || a.created_at.localeCompare(b.created_at));
   }
 
-  async function createProject(actor, { id, title, lang = 'en' }) {
+  async function createProject(actor, { id, title, lang = 'en', repos = [] }) {
     const role = roleOf(actor);
     if (!role || role === 'viewer') throw new BoardError('permission_denied', 'this account cannot create projects');
     if (typeof id !== 'string' || !PROJECT_ID.test(id)) throw new BoardError('invalid_argument', 'project id must be 1 to 40 lowercase letters, digits or hyphens');
@@ -260,7 +260,7 @@ export function openSqlite({ file, boardUrl }) {
     q('insert into projects (id, title, created_at, created_by) values (?, ?, ?, ?)').run(id, title, now(), actor ?? null);
     const author = actor == null ? 'admin' : q('select person from members where uid = ?').get(actor).person;
     try {
-      await apply(null, id, projectSeed({ title, lang, members: await listMembers(), author }));
+      await apply(null, id, projectSeed({ title, lang, members: await listMembers(), author, repos }));
     } catch (e) {
       q('delete from projects where id = ?').run(id);
       throw e;
