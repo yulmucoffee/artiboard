@@ -56,6 +56,16 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
 .btn{min-height:36px;padding:0 16px;border-radius:6px;border:0;background:var(--accent);color:var(--on-accent);font-weight:600;cursor:pointer}
 .btn:disabled{opacity:.5;cursor:default}
 form .hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:0}
+.ver{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:1px 9px}
+.ver:hover{border-color:var(--edge);color:var(--ink)}
+.log{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.log>li{padding:14px 20px;border-top:1px solid var(--line-soft);display:grid;gap:4px;min-width:0}
+.log>li:first-child{border-top:0}
+.log .h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.log .v{font-family:var(--f-mono);font-weight:600;font-size:13.5px}
+.log .when{font-size:12.5px;color:var(--muted)}
+.log .when a{color:inherit}
+.log ul{margin:0;padding-left:1.15em;color:var(--text2);font-size:13.5px;display:grid;gap:2px;overflow-wrap:anywhere}
 @media (max-width:640px){form{grid-template-columns:1fr}h1{font-size:24px}}
 </style>
 </head>
@@ -63,6 +73,7 @@ form .hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:0}
 <div class="page">
   <header>
     <h1 id="hSite"></h1>
+    <a class="ver" id="ver" href="#changes" hidden></a>
     <span class="me"><span id="who"></span><button type="button" class="linkbtn" id="signOut" hidden></button></span>
   </header>
   <section style="display:flex;flex-direction:column;gap:14px">
@@ -79,6 +90,10 @@ form .hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:0}
       <p class="err" id="nErr" hidden></p>
     </form>
   </section>
+  <section style="display:flex;flex-direction:column;gap:14px" id="changes" hidden>
+    <h2 id="hChanges"></h2>
+    <ol class="log" id="log"></ol>
+  </section>
 </div>
 <script src="/shim.js"></script>
 <script>
@@ -88,11 +103,13 @@ form .hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:0}
       new:'New project',title:'Name',titlePh:'e.g. Checkout redesign',id:'Address (lowercase letters, digits, -)',idPh:'e.g. checkout',create:'Create',
       hint:'Creates a board at {u} with every member on it. Agents can also create one with the MCP tool board_create_project.',
       tasks:'{n} tasks',done:'done {n}',last:'last change {t}',now:'just now',m:'{n}m ago',h:'{n}h ago',d:'{n}d ago',
+      changes:'Updates',older:'Show {n} earlier versions',fewer:'Show fewer',
       st:{todo:'to do',doing:'doing',review:'review',blocked:'blocked',done:'done'}},
     ko:{boards:'작업판',loading:'불러오는 중이에요.',loadFail:'불러오지 못했어요 ({e})',none:'아직 프로젝트가 없어요. 아래에서 만드세요.',signOut:'로그아웃',
       new:'새 프로젝트',title:'이름',titlePh:'예: 결제 화면 개편',id:'주소 (영문 소문자 · 숫자 · -)',idPh:'예: checkout',create:'만들기',
       hint:'만들면 {u} 에 판이 생기고, 멤버 모두가 사람 목록에 들어가요. 에이전트는 MCP 도구 board_create_project로도 만들 수 있어요.',
       tasks:'태스크 {n}',done:'완료 {n}',last:'마지막 변화 {t}',now:'방금',m:'{n}분 전',h:'{n}시간 전',d:'{n}일 전',
+      changes:'업데이트 내역',older:'이전 버전 {n}개 보기',fewer:'접기',
       st:{todo:'할 일',doing:'진행 중',review:'검토',blocked:'막힘',done:'완료'}}
   };
   var L=I18N.en;
@@ -134,6 +151,34 @@ form .hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:0}
     }
     load();
     document.addEventListener('visibilitychange',function(){if(!document.hidden)load()});
+
+    // what changed, version by version, from the changelog.json shipped with this site
+    fetch('/changelog.json',{cache:'no-cache'}).then(function(r){return r.ok?r.json():null}).then(function(c){
+      var vs=(c&&Array.isArray(c.versions)?c.versions:[]).filter(function(v){return v&&v.version});
+      if(!vs.length)return;
+      var ver=$('ver');ver.textContent='v'+vs[0].version;ver.hidden=false;
+      $('hChanges').textContent=T('changes');$('changes').hidden=false;
+      var repo=typeof c.repo==='string'&&/^https:\/\//.test(c.repo)?c.repo.replace(/\/$/,''):'',all=false,SHOW=3;
+      function when(v){
+        var prs=(Array.isArray(v.prs)?v.prs:[]).filter(function(n){return typeof n==='number'});
+        return el('span',{class:'when'},[v.date||''].concat(prs.length?[' · ']:[]).concat(prs.map(function(n,i){
+          var t=(i?' ':'')+'#'+n;return repo?el('a',{href:repo+'/pull/'+n,target:'_blank',rel:'noopener',text:t}):t})));
+      }
+      function draw(){
+        var ol=$('log');ol.textContent='';
+        (all?vs:vs.slice(0,SHOW)).forEach(function(v){
+          var lines=v.lines&&(v.lines[s.config.lang]||v.lines.en)||[];
+          ol.appendChild(el('li',{},[el('div',{class:'h'},[el('span',{class:'v',text:'v'+v.version}),when(v)]),
+            el('ul',{},lines.map(function(t){return el('li',{text:t})}))]));
+        });
+        if(vs.length>SHOW){
+          var b=el('button',{type:'button',class:'linkbtn',text:all?T('fewer'):T('older',{n:vs.length-SHOW})});
+          b.addEventListener('click',function(){all=!all;draw()});
+          ol.appendChild(el('li',{},[b]));
+        }
+      }
+      draw();
+    }).catch(function(){});
 
     var title=$('nTitle'),id=$('nId'),touched=false;
     title.addEventListener('input',function(){if(touched)return;var g=title.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);id.value=g;hint(g)});

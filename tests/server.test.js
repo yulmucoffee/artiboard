@@ -5,7 +5,7 @@
 // Run: npm test
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
@@ -286,6 +286,12 @@ for (const backend of backends) {
       assert.equal(cfg.site, 'Test site');
       assert.equal(!!cfg.supabaseKey, backend.name === 'supabase');
       assert.ok(!JSON.stringify(cfg).includes(process.env.SUPABASE_SECRET_KEY || 'no secret'), 'the secret key never leaves the server');
+    });
+
+    test('the project list can read the changelog without signing in', async () => {
+      const r = await api('/changelog.json');
+      assert.equal(r.status, 200);
+      assert.equal((await r.json()).versions[0].version, JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
     });
 
     if (backend.name === 'sqlite') {

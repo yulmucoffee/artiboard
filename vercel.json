@@ -20,6 +20,7 @@
       ]
     },
     { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
-    { "source": "/shim.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    { "source": "/shim.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/changelog.json", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
   ]
 }
