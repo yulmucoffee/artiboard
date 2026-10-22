@@ -10,11 +10,13 @@ export class BoardError extends Error {
   }
 }
 
-// Supabase functions raise `ab:<code>:<write index>:<detail>`
+// Supabase functions raise `ab:<code>:<write index>:<detail>`. Anything else is a fault whose details
+// stay in the server log: clients only learn that the board is unavailable.
 export function toBoardError(e) {
   if (e instanceof BoardError) return e;
   const m = /^ab:([a-z_]+):(\d+):([\s\S]*)$/.exec(e?.message || '');
-  return m ? new BoardError(m[1], m[3], Number(m[2])) : new BoardError('unavailable', e?.message || String(e));
+  if (m) return new BoardError(m[1], m[3], Number(m[2]));
+  return Object.assign(new BoardError('unavailable', 'the board is unavailable; try again'), { cause: e });
 }
 
 export const PROJECT_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isToken, PROJECT_ID, toBoardError } from './core.js';
+import { BoardError, isToken, PROJECT_ID, toBoardError } from './core.js';
 import { buildServer } from './mcp.js';
 import { defaultPage, pageHeaders, renderPage } from './page.js';
 
@@ -27,7 +27,7 @@ function send(res, status, body, headers = {}) {
 }
 function fail(res, e) {
   const err = toBoardError(e);
-  if (!STATUS[err.code]) console.error(e);
+  if (err.cause) console.error(err.cause);
   send(res, STATUS[err.code] || 503, { code: err.code, index: err.index, message: err.message });
 }
 
@@ -36,7 +36,7 @@ async function body(req) {
   let raw = '', size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > MAX_BODY) throw Object.assign(new Error('request too large'), { code: 'invalid_argument' });
+    if (size > MAX_BODY) throw new BoardError('invalid_argument', 'request too large');
     raw += chunk;
   }
   try { return raw ? JSON.parse(raw) : undefined; } catch { return undefined; }
@@ -77,10 +77,11 @@ export function makeApp({ store, cfg }) {
 
   async function page(res, project) {
     if (!PROJECT_ID.test(project || '')) return send(res, 404, 'not found', { 'Content-Type': 'text/plain' });
-    let own;
+    // an unknown project gets the bundled page too, so nobody can find project ids by trying addresses;
+    // its data stays behind sign-in either way
+    let own = null;
     try { own = await store.getPage(project); } catch (e) {
       if (toBoardError(e).code !== 'not_found') throw e;
-      return send(res, 404, `<!doctype html><meta charset="utf-8"><title>${cfg.site}</title><p>No board here. <a href="/">Projects</a></p>`, { 'Content-Type': 'text/html; charset=utf-8' });
     }
     send(res, 200, renderPage(own?.html ?? defaultPage(), cfg), pageHeaders(cfg));
   }

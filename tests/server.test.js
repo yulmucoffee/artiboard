@@ -224,7 +224,7 @@ for (const backend of backends) {
       assert.match(page.headers.get('content-security-policy'), /connect-src 'self'/);
       assert.equal((await call(board, 'board_page', { project: P, reset: true })).value.reset, true);
       assert.match(await (await api(`/p/${P}`)).text(), /<title>Project Board<\/title>/);
-      assert.equal((await api('/p/no-such-project')).status, 404);
+      assert.equal((await api('/p/no-such-project')).status, 200, 'unknown projects look like any other board until sign-in');
     });
 
     test('refuses requests without a valid token', async () => {

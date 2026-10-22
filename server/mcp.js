@@ -16,6 +16,7 @@ const ok = (value) => ({ content: [{ type: 'text', text: typeof value === 'strin
 // the everyday tools answer failures in one line; the document tools as {code, index, message}
 const fail = (error, line) => {
   const e = toBoardError(error);
+  if (e.cause) console.error(e.cause);
   return { isError: true, content: [{ type: 'text', text: line ? `${e.code}: ${e.message}` : JSON.stringify({ code: e.code, index: e.index, message: e.message }) }] };
 };
 const run = (fn, line) => async (args) => { try { return ok(await fn(args)); } catch (e) { return fail(e, line); } };
