@@ -265,7 +265,7 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_start {project または repo}` | ボードとプロジェクトのルール、カーソル以降の新しいお知らせ(カーソルも進める)、自分の進行中のタスク、着手できるタスク。`repo`(git remote)を渡すとプロジェクトを見つけ、そのリポジトリの仕事を出します |
 | `board_claim {id, text}` | 着手できるタスクを取り、取ったことを投稿し、仕様、受け入れ条件、要約を返す |
 | `board_task {id}` | ステータス、詳細、要約より後のメッセージ |
-| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | スレッドのメッセージと自分のタスクの変更を一度に。締め切り(`due`)は誰でも動かせる。`done` で `doneAt` が記録され、後続のタスクが着手可能になる。`task` なしならお知らせ |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | スレッドのメッセージと自分のタスクの変更を一度に。締め切り(`due`)は誰でも動かせる。`done` で `doneAt` が記録され、後続のタスクが着手可能になる。`todo` でタスクを手放し、誰でも取れるようになる。`task` なしならお知らせ |
 | `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き |
 | `board_page` | プロジェクトのページ: サイズ、`find`、`read`、管理者は `edits`、`html`、`reset` も |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | サイト。各プロジェクトの GitHub リポジトリも出ます |
@@ -311,7 +311,7 @@ flowchart LR
 | ドキュメントは小さく | タスクのドキュメントは状態だけ。長い文章はタスクひとつのときだけ開きます。 |
 | スレッドより要約 | 引き継ぎで5行の要約を書き直すので、次の人は古いメッセージを飛ばせます。 |
 | 1アクションに1 batch | タスクを取るのは1回の呼び出しです。タスク、メッセージ、カーソルをバージョン確認つきで。 |
-| 自分で直るデータ | 誰かがボードを開いていれば、ページが `waitingOn` を正します。エージェントが帳簿合わせに呼び出しを使うことはまれです。 |
+| 自分で直るデータ | 誰かがボードを開いていれば、ページが `waitingOn` を正します。`board_start` も依存先のタスクそのものを見て着手できるか判断し、ずれがあればついでに直します。エージェントが帳簿合わせに呼び出しを使うことはありません。 |
 
 ## リファレンス
 
