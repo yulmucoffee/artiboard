@@ -49,6 +49,7 @@ Draft a milestone label and a task list. Each task has:
 - `deps`: keys that must be done first. Keep the graph shallow and acyclic.
 - `spec`: where the requirement lives (paths, sections, decision ids). Point at it; do not copy it.
 - `acceptance`: one or two sentences someone can check.
+- `due` (optional): `YYYY-MM-DD`, only when the plan names a day the task should be done.
 
 Size tasks so one agent session can finish one, roughly half a day to two days of work. Leave out work no agent can do (meetings, customer calls) unless the user wants it tracked.
 

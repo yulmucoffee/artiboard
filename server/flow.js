@@ -29,6 +29,7 @@ function taskLine(d, id, withStatus) {
   if (d.feature) bits.push(`[${d.feature}]`);
   if (d.branch && withStatus) bits.push(d.branch);
   if (d.pr && withStatus) bits.push(d.pr);
+  if (d.due && d.status !== 'done') bits.push(`due ${d.due}`);
   return `${bits.join(' ')} ${d.title || ''}`.trim();
 }
 const msgLine = (m) => `${short(m.at)} ${m.author || '?'}${m.type && m.type !== 'note' ? ` ${m.type}` : ''}: ${oneLine(m.text)}`;
@@ -105,6 +106,8 @@ export function makeFlow(store) {
     const who = d.claimedBy?.who ? `${d.claimedBy.who}${d.claimedBy.agent ? ' (agent)' : ''}` : d.owner || 'unassigned';
     const out = [`${d.key || id} ${d.status || 'todo'} · ${who}${d.branch ? ` · ${d.branch}` : ''}${d.pr ? ` · ${d.pr}` : ''}`, d.title || ''];
     if (d.deps?.length) out.push(`deps ${d.deps.join(', ')}${d.waitingOn?.length ? ` · waiting on ${d.waitingOn.join(', ')}` : ''}`);
+    const dates = [d.due && `due ${d.due}`, d.doneAt && `done ${short(d.doneAt)}`].filter(Boolean);
+    if (dates.length) out.push(dates.join(' · '));
     out.push(...detailLines(det));
     if (thread) {
       out.push(msgs.length ? `messages${since ? ' after summary' : ''}:` : `messages${since ? ' after summary' : ''}: none`);
@@ -136,18 +139,18 @@ export function makeFlow(store) {
     return [`${result} ${id}`, ...detailLines(det)].join('\n');
   }
 
-  // A thread message, optionally with a status, branch, PR or summary change; without a task, a notice.
-  // status done also takes the key out of every dependent's waitingOn.
-  async function post(member, project, { task: id, text, type, status, branch, pr, summary }) {
+  // A thread message, optionally with a status, branch, PR, due day or summary change; without a task, a notice.
+  // status done stamps doneAt (leaving done clears it) and takes the key out of every dependent's waitingOn.
+  async function post(member, project, { task: id, text, type, status, branch, pr, due, summary }) {
     const me = member.person;
     if (!id) {
-      if (status || branch !== undefined || pr !== undefined || summary !== undefined) throw new BoardError('invalid_argument', 'status, branch, pr and summary need a task');
+      if (status || branch !== undefined || pr !== undefined || due !== undefined || summary !== undefined) throw new BoardError('invalid_argument', 'status, branch, pr, due and summary need a task');
       const at = now();
       await apply(member, project, [{ op: 'set', path: `notices/n-${stampId(at, me)}`, if_absent: true,
         data: { at, author: me, kind: 'agent', type: type || 'note', text } }]);
       return 'posted notice';
     }
-    const changes = status !== undefined || branch !== undefined || pr !== undefined;
+    const changes = status !== undefined || branch !== undefined || pr !== undefined || due !== undefined;
     return retrying(async () => {
       const [t, det] = await Promise.all([get(project, `tasks/${id}`), summary !== undefined ? get(project, `details/${id}`) : null]);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
@@ -159,8 +162,11 @@ export function makeFlow(store) {
       const patch = { updatedAt: at, lastMessageAt: at };
       if (status !== undefined) patch.status = status;
       if (status === 'todo') patch.claimedBy = null;
+      if (status === 'done' && d.status !== 'done') patch.doneAt = at;
+      if (status !== undefined && status !== 'done' && d.doneAt) patch.doneAt = null;
       if (branch !== undefined) patch.branch = branch || null;
       if (pr !== undefined) patch.pr = pr || null;
+      if (due !== undefined) patch.due = due || null;
       const writes = [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: patch },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, data: {

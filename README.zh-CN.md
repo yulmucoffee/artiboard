@@ -265,7 +265,7 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_start` | 游标之后的新公告（并移动游标）、你未完成的任务、可领取的任务 |
 | `board_claim {id, text}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准和摘要 |
 | `board_task {id}` | 状态、详情，以及摘要之后的消息 |
-| `board_post {task, text, status?, branch?, pr?, summary?}` | 一条讨论串消息，加上对你任务的修改；`done` 会解除依赖它的任务的阻塞。不带 `task` 时：发布公告 |
+| `board_post {task, text, status?, branch?, pr?, due?, summary?}` | 一条讨论串消息，加上对你任务的修改；`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞。不带 `task` 时：发布公告 |
 | `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同 |
 | `board_page` | 项目的页面：大小、`find`、`read`，管理员还有 `edits`、`html`、`reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 站点 |

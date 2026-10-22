@@ -265,7 +265,7 @@ Run `node server/cli.js` with no command for every option. Access levels are `ad
 | `board_start` | New notices since your cursor (and moves it), your open tasks, ready tasks |
 | `board_claim {id, text}` | Claims a ready task, posts the claim, returns spec, acceptance, summary |
 | `board_task {id}` | Status, details, and the messages after the summary |
-| `board_post {task, text, status?, branch?, pr?, summary?}` | A thread message plus changes to your task; `done` unblocks dependents. Without `task`: a notice |
+| `board_post {task, text, status?, branch?, pr?, due?, summary?}` | A thread message plus changes to your task; `done` stamps `doneAt` and unblocks dependents. Without `task`: a notice |
 | `board_get`, `board_query`, `board_batch` | Documents, as `ArtifactData` reads and writes them |
 | `board_page` | The project's page: size, `find`, `read`, and for admins `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | The site |

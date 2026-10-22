@@ -162,16 +162,22 @@ for (const backend of backends) {
       }
 
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'PR open', status: 'review', pr: 'https://example.com/pr/1', summary: 'state\nleft: nothing' })).value, `ok ${K(1)} → review`);
-      await call(board, 'board_post', { project: P, task: K(1), text: 'after the summary' });
+      assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'after the summary', due: '2026-10-23' })).value, `ok ${K(1)}`);
+      assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'x', due: 'friday' })).error, true, 'due is a day');
       const shown = (await call(board, 'board_task', { project: P, id: K(1) })).value;
       assert.match(shown, new RegExp(`^${K(1)} review · ${me} \\(agent\\) · https://example.com/pr/1$`, 'm'));
+      assert.match(shown, /^due 2026-10-23$/m);
       assert.match(shown, /^summary .*: state\nleft: nothing$/m);
       assert.doesNotMatch(shown, /on it|a question/, 'only messages after the summary');
 
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'merged', status: 'done' })).value, `ok ${K(1)} → done · unblocked ${K(2)}`);
+      const finished = (await call(board, 'board_get', { project: P, path: `tasks/${K(1)}`, fields: ['due', 'doneAt'] })).value.data;
+      assert.equal(finished.due, '2026-10-23');
+      assert.match(finished.doneAt, /^\d{4}-\d\d-\d\dT/, 'done stamps doneAt');
       const left = await call(board, 'board_query', { project: P, collection: 'tasks', where: [{ field: 'key', op: 'in', value: [K(2), K(3)] }], fields: ['waitingOn'] });
       assert.deepEqual(left.value.docs.map((d) => d.data.waitingOn), [[], ['X-9']]);
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'qa pass', status: 'qa' })).value, `ok ${K(1)} → qa`, 'a status the board adds');
+      assert.equal((await call(board, 'board_get', { project: P, path: `tasks/${K(1)}` })).value.data.doneAt, undefined, 'leaving done clears doneAt');
     });
 
     test('posts a notice and shows it once at the next start', async () => {

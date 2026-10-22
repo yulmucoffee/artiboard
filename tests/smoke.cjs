@@ -27,7 +27,7 @@ function boot({user=null,docs={},me=null,deny=false}={}){
     beforeParse(w){w.Math.random=()=>0;if(me)w.localStorage.setItem('ab-me',me);
       w.claude={use:n=>Promise.resolve(n==='db'?{collection:coll,doc}:n==='user'?user:null)};w.HTMLElement.prototype.scrollIntoView=()=>{}}});
   const w=dom.window;w.addEventListener('error',e=>errors.push(e.message));
-  return {w,d:w.document,store,writes,errors,notify,key:k=>w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:k,bubbles:true})),pick:id=>w.document.querySelector('#meSel [data-me="'+id+'"]').click()};
+  return {w,d:w.document,store,writes,errors,notify,key:k=>w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:k,bubbles:true})),pick:id=>{const x=w.document.querySelector('#meSel [data-me="'+id+'"]');if(x)x.click();return !!x}};
 }
 const fakeUser=(id,write)=>({id:async()=>id,can:async n=>n==='data.write'?write:false,isOwner:async()=>false,canEdit:async()=>false});
 const tick=()=>new Promise(r=>setTimeout(r,25));const heal=()=>new Promise(r=>setTimeout(r,600));
@@ -71,15 +71,12 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
 
   console.log('# linked viewer');
   b=boot({user:fakeUser('u_ben',true),docs:{'people/ben':{uid:'u_ben',at:T0}},me:'ana'});all.push(b);await tick();await tick();
-  ok(meLane(b.d)==='Ben'&&!note(b.d),'a linked account defaults to its person over the remembered pick');
+  ok(meLane(b.d)==='Ben'&&!note(b.d),'a linked account is its person, whatever this browser remembered');
   ok(/Claim as Ben/.test(b.d.querySelector('.pick .btn').title),'claims go to the linked person');
-  b.pick('ana');await tick();
-  ok(/linked to Ben/.test(note(b.d))&&b.d.getElementById('meNote').className==='err','posting as another person shows a warning');
-  ok(!b.store['people/ana'],'an already linked account does not link a second person');
-  b.d.querySelector('tr.item').click();await tick();
-  ok(!!b.d.querySelector('.composer .err'),'the thread composer repeats the warning');
-  b.key('Escape');b.store['meta/config']={...b.store['meta/config'],people:[{id:'ana',uid:'u_ana'},{id:'ben',name:'Ben'},{id:'cy'}]};b.notify();await tick();writeNotice(b.d).click();await tick();
-  ok(/ana is linked to another account/.test(note(b.d))&&!!b.d.querySelector('#feed .form .err'),'meta/config uid marks a person as someone else');
+  ok(!b.d.querySelector('#meSel button')&&b.d.querySelector('#meSel .me-fixed').textContent==='Ben','a linked account sees its own name and nothing to pick');
+  ok(!b.pick('ana')&&!b.store['people/ana']&&meLane(b.d)==='Ben','there is no way to act as someone else');
+  b.store['meta/config']={...b.store['meta/config'],people:[{id:'ana',uid:'u_ana'},{id:'ben',name:'Ben'},{id:'cy'}]};b.notify();await tick();
+  ok(meLane(b.d)==='Ben'&&!note(b.d),'other people pinned in meta/config change nothing for this viewer');
 
   console.log('# first pick links the account');
   b=boot({user:fakeUser('u_cy',true)});all.push(b);await tick();await tick();
@@ -87,8 +84,27 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   b.pick('cy');await tick();await tick();
   ok(b.store['people/cy']&&b.store['people/cy'].uid==='u_cy','picking a person links it to the account');
   ok(!note(b.d)&&meLane(b.d)==='cy','the note clears once linked');
-  b.pick('ben');await tick();
-  ok(!b.store['people/ben']&&/linked to cy/.test(note(b.d)),'switching away after linking warns and links nothing');
+  ok(!b.pick('ben')&&!b.store['people/ben']&&b.d.querySelector('#meSel .me-fixed').textContent==='cy','once linked, the choice is fixed');
+  b=boot({user:fakeUser('u_cy',true),docs:{'people/ben':{uid:'u_ben',at:T0}},me:'ben'});all.push(b);await tick();await tick();
+  ok([...b.d.querySelectorAll('#meSel button')].map(x=>x.dataset.me).join()==='ana,cy','an unlinked account chooses only among people no account holds');
+  ok(!b.d.querySelector('.pick .btn')&&/Pick yourself/.test(note(b.d)),'it acts as nobody until it chooses, even if this browser remembered someone else');
+
+  b=boot({user:fakeUser('u_ana',true),docs:{'meta/config':{...seed()['meta/config'],people:[{id:'ana'}]}}});all.push(b);await tick();await tick();await tick();
+  ok(b.store['people/ana']&&b.store['people/ana'].uid==='u_ana'&&!note(b.d),'a board of one links its only person at once');
+
+  console.log('# dates');
+  const day=(n)=>{const d=new Date(Date.now()+n*864e5);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+  b=boot({docs:{'tasks/M1-1':{...seed()['tasks/M1-1'],owner:'ana',status:'doing',due:day(-1)},'tasks/M1-4':{...seed()['tasks/M1-4'],doneAt:'2026-01-04T10:00:00.000Z'}}});all.push(b);await tick();await heal();
+  ok(!!b.d.querySelector('.lane .date.late'),'a due day in the past shows as late');
+  ok(/done/.test(b.d.querySelector('.lane .done-list summary').textContent)||!!b.d.querySelector('.lane .done-list'),'done work folds under its lane');
+  b.d.querySelector('tr.item').click();await tick();
+  const fs_=b.d.getElementById('fStatus');fs_.value='done';fs_.dispatchEvent(new b.w.Event('change'));await tick();
+  ok(/^\d{4}-\d\d-\d\dT/.test(b.store['tasks/M1-1'].doneAt||''),'marking done stamps doneAt');
+  const fs2=b.d.getElementById('fStatus');fs2.value='doing';fs2.dispatchEvent(new b.w.Event('change'));await tick();
+  ok(b.store['tasks/M1-1'].doneAt===null,'leaving done clears doneAt');
+  const du=b.d.getElementById('fDue');du.value=day(3);du.dispatchEvent(new b.w.Event('change'));await tick();
+  ok(b.store['tasks/M1-1'].due===day(3),'the due field saves a day');
+  b.key('Escape');
 
   console.log('# view-only viewer');
   b=boot({user:fakeUser('u_ana',false)});all.push(b);await tick();await heal();
