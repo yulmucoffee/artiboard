@@ -12,7 +12,7 @@
   },
   "scripts": {
     "start": "node server/cli.js serve",
-    "test": "node --test tests/",
+    "test": "node --test \"tests/*.test.js\"",
     "deploy:vercel": "sh scripts/deploy-vercel.sh"
   },
   "dependencies": {

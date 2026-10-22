@@ -2,7 +2,7 @@
 // SQLite runs in-process against a throwaway file. Supabase runs too when AB_SUPABASE=1 and SUPABASE_URL,
 // SUPABASE_SECRET_KEY and SUPABASE_PUBLISHABLE_KEY point at a project with supabase/migrations applied
 // (`supabase start` gives a local one); it adds a smoke-<random> project and members, and removes them afterwards.
-// Run: node --test tests/
+// Run: npm test
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
