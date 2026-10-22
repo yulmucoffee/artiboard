@@ -515,6 +515,7 @@ for (const backend of backends) {
         assert.equal((await (await api(`/api/members/new${R}/revoke`, { method: 'POST', cookie: admin })).json()).revoked, 2);
         assert.equal((await api('/api/me', { cookie })).status, 401, 'revoking signs them out');
         assert.equal((await api(`/api/members/no-such${R}/token`, { method: 'POST', cookie: admin })).status, 404);
+        assert.equal((await api(`/api/members?person=new${R}&action=link`, { method: 'POST', cookie: admin })).status, 200, 'the form Vercel rewrites sub-paths to works too');
         assert.equal((await api(`/api/members/${people.admin.person}/remove`, { method: 'POST', cookie: admin })).status, 400, 'not yourself');
         assert.equal((await api(`/api/members/new${R}/remove`, { method: 'POST', cookie: admin })).status, 200);
         delete people.newcomer;

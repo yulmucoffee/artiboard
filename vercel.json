@@ -3,24 +3,73 @@
   "framework": null,
   "outputDirectory": "server/public",
   "rewrites": [
-    { "source": "/mcp", "destination": "/api/mcp" },
-    { "source": "/p/:project", "destination": "/api/page?project=:project" }
+    {
+      "source": "/mcp",
+      "destination": "/api/mcp"
+    },
+    {
+      "source": "/p/:project",
+      "destination": "/api/page?project=:project"
+    },
+    {
+      "source": "/api/members/:person/:action",
+      "destination": "/api/members?person=:person&action=:action"
+    }
   ],
   "functions": {
-    "api/*.js": { "maxDuration": 30, "includeFiles": "skills/artiboard/assets/board.html" }
+    "api/*.js": {
+      "maxDuration": 30,
+      "includeFiles": "skills/artiboard/assets/board.html"
+    }
   },
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
       ]
     },
-    { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
-    { "source": "/shim.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
-    { "source": "/changelog.json", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/shim.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/changelog.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    }
   ]
 }
