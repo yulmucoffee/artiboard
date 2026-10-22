@@ -33,6 +33,8 @@ const fakeUser=(id,write)=>({id:async()=>id,can:async n=>n==='data.write'?write:
 const tick=()=>new Promise(r=>setTimeout(r,25));const heal=()=>new Promise(r=>setTimeout(r,600));
 let failed=0;const ok=(c,m)=>{console.log((c?'ok   ':'FAIL ')+m);if(!c)failed++};
 const note=d=>{const n=d.getElementById('meNote');return n.hidden?'':n.textContent};
+const writeNotice=d=>d.querySelector('#feed li.more .btn');
+const openRules=(d,w)=>{const r=d.getElementById('rulesBox');r.open=true;r.dispatchEvent(new w.Event('toggle'))};
 const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNode.querySelector('strong').textContent};
 (async()=>{
   console.log('# no viewer identity (user capability absent)');
@@ -41,10 +43,14 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   ok(d.getElementById('hTitle').textContent==='Test Board','title comes from meta/config');
   ok(d.querySelectorAll('.lane').length===3,'one lane per person');
   ok(d.querySelectorAll('tr.item').length===4,'item table lists every task');
+  ok(!d.querySelectorAll('.rule').length,'rules stay folded until opened');
+  openRules(d,w);await tick();
   ok(d.querySelectorAll('.rule').length===3,'rules render as cards');
   ok(JSON.stringify(store['tasks/M1-3'].waitingOn)==='["M1-2"]','page repairs a missing waitingOn');
-  ok(!note(d)&&!!d.getElementById('noticeText'),'picker works as before, with no identity note');
-  d.querySelector('.pick .btn.primary').click();await tick();await tick();
+  ok(!note(d)&&!!writeNotice(d),'picker works as before, with no identity note');
+  writeNotice(d).click();await tick();
+  ok(!!d.getElementById('noticeText'),'the notice form opens on demand');
+  d.querySelector('.pick .btn').click();await tick();await tick();
   ok(store['tasks/M1-1'].owner==='ana'&&store['tasks/M1-1'].status==='doing','claim button claims for the selected person');
   key('3');await tick();
   ok(d.querySelectorAll('.node').length===4&&d.querySelectorAll('path.e').length===2,'graph draws every task and dependency');
@@ -66,13 +72,13 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   console.log('# linked viewer');
   b=boot({user:fakeUser('u_ben',true),docs:{'people/ben':{uid:'u_ben',at:T0}},me:'ana'});all.push(b);await tick();await tick();
   ok(meLane(b.d)==='Ben'&&!note(b.d),'a linked account defaults to its person over the remembered pick');
-  ok(/Claim as Ben/.test(b.d.querySelector('.pick .btn.primary').textContent),'claims go to the linked person');
+  ok(/Claim as Ben/.test(b.d.querySelector('.pick .btn').title),'claims go to the linked person');
   b.pick('ana');await tick();
   ok(/linked to Ben/.test(note(b.d))&&b.d.getElementById('meNote').className==='err','posting as another person shows a warning');
   ok(!b.store['people/ana'],'an already linked account does not link a second person');
   b.d.querySelector('tr.item').click();await tick();
   ok(!!b.d.querySelector('.composer .err'),'the thread composer repeats the warning');
-  b.key('Escape');b.store['meta/config']={...b.store['meta/config'],people:[{id:'ana',uid:'u_ana'},{id:'ben',name:'Ben'},{id:'cy'}]};b.notify();await tick();
+  b.key('Escape');b.store['meta/config']={...b.store['meta/config'],people:[{id:'ana',uid:'u_ana'},{id:'ben',name:'Ben'},{id:'cy'}]};b.notify();await tick();writeNotice(b.d).click();await tick();
   ok(/ana is linked to another account/.test(note(b.d))&&!!b.d.querySelector('#feed .form .err'),'meta/config uid marks a person as someone else');
 
   console.log('# first pick links the account');
@@ -87,7 +93,7 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   console.log('# view-only viewer');
   b=boot({user:fakeUser('u_ana',false)});all.push(b);await tick();await heal();
   ok(/View only/.test(note(b.d)),'header says the board is view only');
-  ok(!b.d.querySelector('.pick .btn.primary')&&!b.d.getElementById('noticeText'),'no claim buttons and no notice form');
+  ok(!b.d.querySelector('.pick .btn')&&!writeNotice(b.d)&&!b.d.getElementById('noticeText'),'no claim buttons and no notice form');
   b.pick('ben');b.d.querySelector('tr.item').click();await tick();
   ok(!b.d.querySelector('.composer')&&b.d.getElementById('fStatus').disabled&&b.d.getElementById('fOwner').disabled,'detail sheet has no composer and locked fields');
   ok(![...b.d.querySelectorAll('.sheet .linkbtn')].some(x=>/Write|Edit/.test(x.textContent)),'summary cannot be edited');
@@ -95,9 +101,9 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
 
   console.log('# viewer the platform said nothing about');
   b=boot({user:fakeUser(null,null),deny:true});all.push(b);await tick();await heal();
-  ok(!note(b.d)&&!!b.d.querySelector('.pick .btn.primary'),'controls stay while write access is unknown');
-  b.d.querySelector('.pick .btn.primary').click();await tick();await tick();
-  ok(!b.d.querySelector('.pick .btn.primary')&&/View only/.test(note(b.d)),'a refused write turns the page read-only');
+  ok(!note(b.d)&&!!b.d.querySelector('.pick .btn'),'controls stay while write access is unknown');
+  b.d.querySelector('.pick .btn').click();await tick();await tick();
+  ok(!b.d.querySelector('.pick .btn')&&/View only/.test(note(b.d)),'a refused write turns the page read-only');
 
   const errs=all.flatMap(x=>x.errors);
   ok(errs.length===0,'no script errors '+(errs.join('; ')||''));

@@ -12,10 +12,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - name: Manifests are valid JSON
         run: |
-          node -e "for (const f of ['.claude-plugin/plugin.json','.claude-plugin/marketplace.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
+          node -e "for (const f of ['.claude-plugin/plugin.json','.claude-plugin/marketplace.json','package.json','vercel.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
       - name: Skill frontmatter has name and description
         run: |
           head -5 skills/artiboard/SKILL.md | grep -q '^name: artiboard$'
@@ -24,10 +24,14 @@ jobs:
         run: |
           node -e "const s=require('fs').readFileSync('skills/artiboard/assets/board.html','utf8');require('fs').writeFileSync('/tmp/board.js',s.match(/<script>([\s\S]*)<\/script>/)[1])"
           node --check /tmp/board.js
+      - name: Install
+        run: npm ci --no-audit --no-fund
       - name: Board smoke test
         run: |
           npm install --no-save --no-audit --no-fund jsdom@24.1.1
           node tests/smoke.cjs
+      - name: Hosted site tests (SQLite)
+        run: npm test
       - name: Demo is built from the current page
         run: |
           node examples/build-demo.cjs

@@ -198,6 +198,16 @@ td.when{white-space:nowrap;font-size:13px;color:var(--muted)}
 .feed .at{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .feed .text{white-space:pre-wrap;overflow-wrap:anywhere}
 .feed li.form{display:flex;flex-direction:column;gap:8px;background:var(--bg);border-radius:0 0 10px 10px}
+.feed li.more{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding-block:10px}
+.live{display:inline-flex;align-items:center;gap:6px}
+.live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--p1-bar)}
+.live.off{color:var(--warn)}
+.live.off::before{background:transparent;box-shadow:inset 0 0 0 1.5px currentColor}
+#rulesBox>summary{cursor:pointer;list-style:none}
+#rulesBox>summary::-webkit-details-marker{display:none}
+#rulesBox>summary h2::after{content:" ▸";color:var(--muted);font-weight:400}
+#rulesBox[open]>summary h2::after{content:" ▾"}
+#rulesBox[open]>summary{margin-bottom:14px}
 textarea,select,input[type=text],input[type=url]{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-height:32px;min-width:0}
 textarea{width:100%;min-height:64px;resize:vertical;line-height:1.5}
 .form-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
@@ -211,6 +221,8 @@ textarea{width:100%;min-height:64px;resize:vertical;line-height:1.5}
 .rule p{font-size:13.5px;color:var(--text2)}
 .rule li,.rule p{overflow-wrap:anywhere}
 footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:16px}
+.back{font-size:13px;color:var(--muted);text-decoration:none;align-self:flex-start}
+.back:hover{color:var(--ink)}
 
 /* kanban */
 .kanban{overflow-x:auto;padding-bottom:4px}
@@ -302,6 +314,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   body{font-size:14px;padding-block:20px 56px}
   h1{font-size:24px}
   .box,.lane{padding:16px}
+  .toolbar{position:static}
   .feed li{grid-template-columns:1fr}
   .feed .at{flex-direction:row;flex-wrap:wrap;align-items:center}
 }
@@ -310,12 +323,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
 <div class="page">
   <header class="top">
+    <a class="back" id="backLink" href="/" hidden></a>
     <h1 id="hTitle">Project Board</h1>
     <p class="lede" id="hLede"></p>
     <div class="meta">
       <span id="mMilestone"></span>
       <span id="mCount"></span>
       <span id="mUpdated"></span>
+      <span id="mLive" class="live" hidden></span>
       <span id="meWrap" style="display:inline-flex;align-items:center;gap:8px"><b id="meLabel"></b>
         <span class="seg" role="group" id="meSel"></span>
       </span>
@@ -347,6 +362,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       <div class="sec-head"><h2 id="h-now"></h2><p id="nowSub"></p></div>
       <div class="box" id="now"></div>
     </section>
+    <section aria-labelledby="h-notices">
+      <div class="sec-head"><h2 id="h-notices"></h2><p id="noticesSub"></p><button type="button" class="linkbtn" id="noticeRead" hidden></button></div>
+      <ul class="feed" id="feed"></ul>
+    </section>
     <section aria-labelledby="h-people">
       <div class="sec-head"><h2 id="h-people"></h2><p id="peopleSub"></p></div>
       <div class="lanes" id="lanes"></div>
@@ -361,13 +380,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         </table>
       </div>
     </section>
-    <section aria-labelledby="h-notices">
-      <div class="sec-head"><h2 id="h-notices"></h2><p id="noticesSub"></p><button type="button" class="linkbtn" id="noticeRead" hidden></button></div>
-      <ul class="feed" id="feed"></ul>
-    </section>
     <section aria-labelledby="h-rules">
-      <div class="sec-head"><h2 id="h-rules"></h2><p id="rulesSub"></p></div>
-      <div class="rules" id="rules"></div>
+      <details id="rulesBox"><summary class="sec-head"><h2 id="h-rules"></h2><p id="rulesSub"></p></summary>
+        <div class="rules" id="rules"></div></details>
     </section>
   </div>
 
@@ -1045,7 +1060,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // ---------- strings: meta/config.lang picks a table; meta/config.strings overrides any key ----------
   var I18N={
     en:{
-      loading:'Loading…',noDb:'Board data is not available in this view. Open it on claude.ai.',loadFail:'Could not load tasks ({e})',
+      loading:'Loading…',noDb:'Board data is not available. Reload the page, or open the board where it is hosted.',back:'← Projects',loadFail:'Could not load tasks ({e})',
       milestone:'Milestone',tasksCount:'{n} tasks · {d} done',lastChange:'Last change {t}',iAm:'I am',
       st_todo:'To do',st_doing:'In progress',st_review:'Review',st_blocked:'Blocked',st_done:'Done',
       ty_note:'Note',ty_update:'Update',ty_question:'Question',ty_answer:'Answer',ty_handoff:'Handoff',ty_blocker:'Blocker',
@@ -1053,13 +1068,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       results:'{n}',newN:'New {n}',newViewing:' · showing',noNew:'Nothing new',newTitle:'Show only changed tasks',newNoticeOnly:'New notices are in the Notices section',readAll:'Mark all read',
       hint:'<kbd>/</kbd> find · <kbd>j</kbd><kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> views · <kbd>Esc</kbd> close',
       h_now:'Now',h_people:'Who is on what',peopleSub:'Only unfinished work. Done shows as a count.',h_items:'Items',itemsSub:'Grouped by feature. Click a row for details and the thread.',
-      h_notices:'Notices',noticesSub:'Only what everyone needs: spec or decision changes, merges to main, shared interface changes.',noticeRead:'Mark notices read',
-      h_rules:'Working rules',rulesSub:'A human-readable copy of the rules the agents follow.',h_kanban:'Kanban',kanbanSub:'Grouped by status. The left color is the owner.',
+      h_notices:'Notices',noticesSub:'Only what everyone needs: spec or decision changes, merges to main, shared interface changes.',noticeRead:'Mark notices read',showAll:'Show all {n}',showLess:'Show fewer',writeNotice:'Write a notice',live:'Live',offline:'Reconnecting…',
+      h_rules:'Working rules',rulesSub:'A human-readable copy of the rules the agents follow. Click to open.',h_kanban:'Kanban',kanbanSub:'Grouped by status. The left color is the owner.',
       h_graph:'Dependency graph',graphSub:'A column unlocks when the columns to its left are done. Hover a task to keep only what it depends on and unlocks.',
       nowSub:'In progress {a} · review {b} · blocked {c}',noneYet:'Nothing claimed yet',meTag:'me',total:'{n} tasks',
       tallyParts:{doing:'in progress',review:'review',blocked:'blocked',done:'done'},unassigned:'Unassigned',unassignedN:'Unassigned · {n}',readyN:'Ready to pick {n}',
       needsHands:'Needs attention',blockedNote:'Blocked. See the thread for why.',reviewNote:'Waiting for PR review and merge.',noPr:' (no PR link)',openPr:'Open PR',
-      ready:'Ready to pick',readyNone:'No unassigned task has all its dependencies done.',unlocks:'Unlocks {k} when done.',claim:'Claim as {p}',
+      ready:'Ready to pick',readyNone:'No unassigned task has all its dependencies done.',unlocks:'Unlocks {k} when done.',claim:'Claim',claimTitle:'Claim as {p}',
       alreadyClaimed:'Someone just claimed it.',claimed:'{p} claimed {k}.',claimFail:'Could not claim ({e})',saveFail:'Could not save ({e})',postFail:'Could not post ({e})',
       laneOpen:'{n} open',laneEmpty:'Nothing assigned. Pick from “Ready to pick” above.',laneNoMatch:'Nothing matches the filter.',laneDone:'Done {n}',waitingDeps:'waiting on {k}',
       all:'All',filterGroup:'Filter by feature',th:['Key','Item','Depends on','Owner','Status','Updated'],doneOf:'{d}/{n} done',none:'none',noMatch:'No task matches the filter.',
@@ -1079,7 +1094,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       notYou:'{p} is linked to another account. What you post here will still show {p}.',linkedElse:'Your account is linked to {q}. What you post here will show {p}.'
     },
     ko:{
-      loading:'불러오는 중이에요.',noDb:'이 화면에서는 판 데이터를 쓸 수 없어요. claude.ai에서 열어 주세요.',loadFail:'태스크를 불러오지 못했어요 ({e})',
+      loading:'불러오는 중이에요.',noDb:'판 데이터를 불러오지 못했어요. 새로고침하거나 판이 있는 곳에서 열어 주세요.',back:'← 프로젝트',loadFail:'태스크를 불러오지 못했어요 ({e})',
       milestone:'마일스톤',tasksCount:'태스크 {n}개 · 완료 {d}',lastChange:'마지막 변화 {t}',iAm:'나는',
       st_todo:'할 일',st_doing:'진행 중',st_review:'검토',st_blocked:'막힘',st_done:'완료',
       ty_note:'메모',ty_update:'진행',ty_question:'질문',ty_answer:'답',ty_handoff:'인계',ty_blocker:'막힘',
@@ -1087,13 +1102,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       results:'{n}개',newN:'새 소식 {n}',newViewing:' · 보는 중',noNew:'새 소식 없음',newTitle:'바뀐 태스크만 보기',newNoticeOnly:'새 공지는 문서 보기의 공지에 있어요',readAll:'모두 읽음',
       hint:'<kbd>/</kbd> 찾기 · <kbd>j</kbd><kbd>k</kbd> 이동 · <kbd>Enter</kbd> 열기 · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 보기 · <kbd>Esc</kbd> 닫기',
       h_now:'지금',h_people:'누가 무엇을',peopleSub:'끝나지 않은 일만 보여요. 완료는 아래 숫자로.',h_items:'항목판',itemsSub:'기능 단위로 묶었어요. 줄을 누르면 상세와 스레드가 열려요.',
-      h_notices:'공지',noticesSub:'스펙·결정 변경, main 병합, 공용 인터페이스 변경처럼 모두 알아야 할 것만.',noticeRead:'공지 읽음',
-      h_rules:'함께 쓰는 규칙',rulesSub:'에이전트가 따르는 규칙의 사람용 사본이에요.',h_kanban:'칸반',kanbanSub:'상태별로 모았어요. 카드 왼쪽 색이 담당이에요.',
+      h_notices:'공지',noticesSub:'스펙·결정 변경, main 병합, 공용 인터페이스 변경처럼 모두 알아야 할 것만.',noticeRead:'공지 읽음',showAll:'모두 보기 ({n})',showLess:'접기',writeNotice:'공지 쓰기',live:'실시간',offline:'다시 연결 중…',
+      h_rules:'함께 쓰는 규칙',rulesSub:'에이전트가 따르는 규칙의 사람용 사본이에요. 눌러서 펼쳐요.',h_kanban:'칸반',kanbanSub:'상태별로 모았어요. 카드 왼쪽 색이 담당이에요.',
       h_graph:'선행 그래프',graphSub:'왼쪽 단계가 끝나야 오른쪽이 풀려요. 태스크에 마우스를 올리면 앞뒤로 이어진 것만 남아요.',
       nowSub:'진행 중 {a} · 검토 {b} · 막힘 {c}',noneYet:'아직 집은 일 없음',meTag:'나',total:'{n}개',
       tallyParts:{doing:'진행',review:'검토',blocked:'막힘',done:'완료'},unassigned:'미배정',unassignedN:'미배정 · {n}개',readyN:'바로 집을 수 있는 것 {n}',
       needsHands:'손이 필요한 것',blockedNote:'막혔어요. 스레드에서 이유를 확인하세요.',reviewNote:'PR 검토와 병합을 기다려요.',noPr:' (PR 주소 없음)',openPr:'PR 열기',
-      ready:'바로 집을 수 있는 일',readyNone:'선행이 끝난 미배정 태스크가 없어요.',unlocks:'끝나면 {k}이(가) 풀려요.',claim:'{p}(이)가 집기',
+      ready:'바로 집을 수 있는 일',readyNone:'선행이 끝난 미배정 태스크가 없어요.',unlocks:'끝나면 {k}이(가) 풀려요.',claim:'집기',claimTitle:'{p}(으)로 집기',
       alreadyClaimed:'방금 다른 쪽이 집었어요.',claimed:'{k}을(를) {p}(이)가 집었어요.',claimFail:'집지 못했어요 ({e})',saveFail:'저장하지 못했어요 ({e})',postFail:'남기지 못했어요 ({e})',
       laneOpen:'진행 중인 일 {n}개',laneEmpty:'맡은 일이 없어요. 위 ‘바로 집을 수 있는 일’에서 고르세요.',laneNoMatch:'찾는 조건에 맞는 일이 없어요.',laneDone:'완료 {n}개',waitingDeps:'선행 {k} 대기',
       all:'전체',filterGroup:'기능으로 거르기',th:['번호','항목','선행','담당','상태','최근'],doneOf:'{d}/{n} 완료',none:'없음',noMatch:'찾는 조건에 맞는 태스크가 없어요.',
@@ -1125,11 +1140,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var me=read('ab-me')||'';
   // who is viewing, from the user capability: uid null = unknown (keep the honor-system picker), canWrite null = not told (keep controls)
   var uid=null,canWrite=null,links={},picked=false;
+  var live=null,noticesAll=false,composing=false,protoUnsub=null,protoLoaded=false;
   var q='',newOnly=false,cursor=null,order=[],openPrevSeen='',det=null,unsubDet=null,sumEditing=false;
   var seen=readJSON('ab-seen')||{},noticeSeen=read('ab-notice-seen')||'';
 
-  function read(k){try{return localStorage.getItem(k)}catch(e){return null}}
-  function write(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+  // a hosted site keeps several boards on one origin, so its browser storage is namespaced by project
+  var ns=window.AB_PROJECT?window.AB_PROJECT+':':'';
+  function read(k){try{return localStorage.getItem(ns+k)}catch(e){return null}}
+  function write(k,v){try{localStorage.setItem(ns+k,v)}catch(e){}}
   function readJSON(k){try{return JSON.parse(read(k)||'null')}catch(e){return null}}
   function el(tag,a,kids){var n=document.createElement(tag);if(a)for(var k in a){var v=a[k];if(v==null)continue;if(k==='text')n.textContent=v;else if(k==='class')n.className=v;else if(k.slice(0,2)==='on')n.addEventListener(k.slice(2),v);else n.setAttribute(k,v)}(kids||[]).forEach(function(c){if(c!=null&&c!==false)n.appendChild(typeof c==='string'?document.createTextNode(c):c)});return n}
   var SVGNS='http://www.w3.org/2000/svg';
@@ -1189,7 +1207,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     staticText();
   }
   function staticText(){
-    $('hTitle').textContent=config.title||'Project Board';
+    $('hTitle').textContent=config.title||'Project Board';document.title=config.title||'Project Board';
     $('hLede').textContent=config.subtitle||'';$('hLede').hidden=!config.subtitle;
     $('meLabel').textContent=T('iAm');
     $('meWrap').hidden=people.length<2;
@@ -1232,6 +1250,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     $('mCount').textContent=!loaded?(failed||T('loading')):T('tasksCount',{n:tasks.length,d:c.done});
     var last=tasks.map(lastTouch).concat(notices.map(function(n){return n.at||''})).filter(Boolean).sort().pop();
     $('mUpdated').textContent=last?T('lastChange',{t:ago(last)}):'';
+    var bk=$('backLink');bk.hidden=!window.AB_PROJECT;bk.textContent=T('back');
+    var lv=$('mLive');lv.hidden=live==null||!loaded;lv.textContent=live?T('live'):T('offline');lv.className='live'+(live?'':' off');
     var p=$('progress');p.textContent='';var lg=$('legend');lg.textContent='';
     if(!tasks.length)return;
     ['done','review','doing','blocked','todo'].forEach(function(k){
@@ -1307,7 +1327,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var ul2=el('ul',{class:'picks'});
     rd.forEach(function(t){
       var unlocks=tasks.filter(function(o){return (o.deps||[]).indexOf(t.key)>=0}).map(function(o){return o.key});
-      ul2.appendChild(pickItem(t,'',unlocks.length?T('unlocks',{k:unlocks.join(', ')}):'',me&&writable()?el('div',{class:'row'},[el('button',{type:'button',class:'btn small primary',text:T('claim',{p:pname(me)}),onclick:function(e){claim(t,e.currentTarget)}})]):null));
+      ul2.appendChild(pickItem(t,'',unlocks.length?T('unlocks',{k:unlocks.join(', ')}):'',me&&writable()?el('div',{class:'row'},[el('button',{type:'button',class:'btn small',text:T('claim',{p:pname(me)}),title:T('claimTitle',{p:pname(me)}),onclick:function(e){claim(t,e.currentTarget)}})]):null));
     });
     box.appendChild(ul2);
   }
@@ -1383,27 +1403,34 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     ul.textContent='';
     if(!loaded)ul.appendChild(el('li',{},[el('span',{}),el('span',{class:'empty',text:failed||T('loading')})]));
     else if(!notices.length)ul.appendChild(el('li',{},[el('span',{}),el('span',{class:'empty',text:T('noNotices')})]));
-    notices.forEach(function(n){
+    var unread=notices.filter(noticeNew).length,shown=noticesAll?notices:notices.slice(0,Math.max(3,unread));
+    shown.forEach(function(n){
       var nw=noticeNew(n);
       ul.appendChild(el('li',{class:nw?'new':null},[
         el('div',{class:'at'},[el('span',{style:'display:flex;align-items:center;gap:6px'},[stamp(n.at),newDot(nw)]),el('span',{style:'display:flex;gap:4px;flex-wrap:wrap'},[who(n.author),n.kind==='agent'?el('span',{class:'agent-mark',text:T('agent')}):null])]),
         el('div',{class:'text',text:n.text||''})
       ]));
     });
-    if(loaded&&writable()&&me){
+    var canPost=loaded&&writable()&&me,more=notices.length>3&&(noticesAll||shown.length<notices.length);
+    if(loaded&&(more||(canPost&&!composing&&!draft)))ul.appendChild(el('li',{class:'more'},[
+      more?el('button',{type:'button',class:'linkbtn',text:noticesAll?T('showLess'):T('showAll',{n:notices.length}),onclick:function(){noticesAll=!noticesAll;renderFeed()}}):null,
+      canPost&&!composing&&!draft?el('button',{type:'button',class:'btn small',text:T('writeNotice'),onclick:function(){composing=true;renderFeed();var a=$('noticeText');if(a)a.focus()}}):null]));
+    if(canPost&&(composing||draft)){
       var ta=el('textarea',{id:'noticeText','aria-label':T('noticeBtn'),placeholder:T('noticePh',{p:pname(me)})});ta.value=draft;
       var btn=el('button',{type:'button',class:'btn primary',text:T('noticeBtn')});
       btn.addEventListener('click',function(){var v=ta.value.trim();if(!v)return;btn.disabled=true;var at=now();
         db.doc('notices/n-'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:'note',text:v})
-          .then(function(){ta.value=''}).catch(function(e){toast(T('postFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false})});
-      ul.appendChild(el('li',{class:'form'},[warnLine(),ta,el('div',{class:'form-row'},[btn])]));
+          .then(function(){ta.value='';composing=false;renderFeed()}).catch(function(e){toast(T('postFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false})});
+      var cancel=el('button',{type:'button',class:'btn',text:T('cancel'),onclick:function(){ta.value='';composing=false;renderFeed()}});
+      ul.appendChild(el('li',{class:'form'},[warnLine(),ta,el('div',{class:'form-row'},[btn,cancel])]));
       if(hadFocus)ta.focus();
     }
   }
 
   function renderRules(){
     var root=$('rules');root.textContent='';
-    if(!protocol||!protocol.text){root.appendChild(el('p',{class:'empty',text:loaded?T('noRules'):T('loading')}));return}
+    if(!$('rulesBox').open)return;
+    if(!protocol||!protocol.text){root.appendChild(el('p',{class:'empty',text:protoLoaded?T('noRules'):T('loading')}));return}
     var cards=[],cur={num:'',title:T('rulesIntro'),items:[],paras:[]};
     protocol.text.split('\n').forEach(function(line){
       var l=line.trim();if(!l)return;
@@ -1632,7 +1659,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var keep={};['msgText','msgType','fBranch','fPr','sumText'].forEach(function(id){var n=$(id);if(n)keep[id]=n.value});
     var activeId=document.activeElement&&document.activeElement.id;
     var oldBody=root.querySelector('.body'),scroll=oldBody?oldBody.scrollTop:0;
-    var atBottom=oldBody?oldBody.scrollTop+oldBody.clientHeight>=oldBody.scrollHeight-8:false;
+    var atBottom=oldBody?oldBody.scrollHeight>oldBody.clientHeight+8&&oldBody.scrollTop+oldBody.clientHeight>=oldBody.scrollHeight-8:false;
     root.textContent='';
 
     var s=el('select',{id:'fStatus','aria-label':T('f_status')});STATUS.forEach(function(x){s.appendChild(el('option',{value:x,text:SL(x)}))});s.value=st(t);
@@ -1763,11 +1790,21 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         renderHead();renderToolbar();if(view==='doc')renderFeed();
       },function(){});
       db.collection('people').onSnapshot(function(s){links={};s.docs.forEach(function(x){var o=x.data();if(o&&typeof o.uid==='string')links[x.id]=o.uid});identify();renderAll()},function(){});
-      db.doc('meta/protocol').onSnapshot(function(s){protocol=s.exists?s.data():null;if(view==='doc')renderRules()},function(){});
+      if(db.onStatus)db.onStatus(function(on){live=on;renderHead()});
+      $('rulesBox').addEventListener('toggle',function(){
+        if($('rulesBox').open&&!protoUnsub)protoUnsub=db.doc('meta/protocol').onSnapshot(function(s){protocol=s.exists?s.data():null;protoLoaded=true;renderRules()},function(){protoLoaded=true;renderRules()});
+        renderRules();
+      });
     });
   }
+  window.addEventListener('hashchange',function(){
+    var h=decodeURIComponent(location.hash.slice(1));
+    if(!h){if(sel)close();return}
+    if(VIEWS.indexOf(h)>=0){setView(h);return}
+    var t=byKeyStr(h);if(t&&sel!==t.id)open(t.id);
+  });
   applyConfig({});
   if(window.DEMO)start();else{failed=T('noDb');renderAll()}
-  setInterval(function(){if(loaded){renderHead();if(view==='doc'&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#feed'))){renderTable();applyCursor()}}},60000);
+  setInterval(function(){if(loaded&&!document.hidden){renderHead();if(view==='doc'&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#feed'))){renderTable();applyCursor()}}},60000);
 })();
 </script>

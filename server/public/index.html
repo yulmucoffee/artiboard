@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* The project list: one card per board, drawn from /api/projects. Same tokens as the board page. */
+:root{
+  --bg:#FAF9F7; --surface:#FFFFFF; --sunk:#F3F2EE; --ink:#1A1A18; --text2:#4F4D48; --muted:#75726B;
+  --line:#E2DFD9; --line-soft:#EDEBE6; --edge:#D3CFC8;
+  --accent:#2B6BEF; --on-accent:#FFFFFF; --accent-soft:#EAF0FD;
+  --warn:#9A5F0E; --danger:#C23B3B;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#181715; --surface:#201F1C; --sunk:#1C1B19; --ink:#ECEAE4; --text2:#B9B6AE; --muted:#8F8C85;
+  --line:#34322D; --line-soft:#2A2925; --edge:#45423C;
+  --accent:#5B93FF; --on-accent:#0E1420; --accent-soft:#1B2438;
+  --warn:#E3A853; --danger:#F07272; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#181715; --surface:#201F1C; --sunk:#1C1B19; --ink:#ECEAE4; --text2:#B9B6AE; --muted:#8F8C85;
+  --line:#34322D; --line-soft:#2A2925; --edge:#45423C;
+  --accent:#5B93FF; --on-accent:#0E1420; --accent-soft:#1B2438;
+  --warn:#E3A853; --danger:#F07272; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14.5px;line-height:1.6;
+  padding:28px max(16px,env(safe-area-inset-left,0px)) 72px}
+button,input{font:inherit;color:inherit}
+.page{max-width:1080px;margin-inline:auto;display:flex;flex-direction:column;gap:28px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:0}
+h2{font-size:19px;font-weight:700;margin:0}
+.me{margin-left:auto;color:var(--muted);font-size:13px;display:flex;gap:12px;align-items:baseline}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font-size:13px;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;color:inherit;text-decoration:none;min-width:0}
+.card:hover{border-color:var(--edge)}
+.card .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.card strong{font-size:17px}
+.card .id{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.card .sub{color:var(--text2);font-size:13.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .nums{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12.5px;color:var(--muted)}
+.progress{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--line-soft)}
+.progress span{display:block;height:100%}
+.empty{color:var(--muted)}
+.err{color:var(--danger);font-size:13px}
+form{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;gap:10px;align-items:end}
+label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted);min-width:0}
+input{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 10px;min-height:36px;min-width:0;font-weight:400}
+input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.btn{min-height:36px;padding:0 16px;border-radius:6px;border:0;background:var(--accent);color:var(--on-accent);font-weight:600;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+form .hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:0}
+@media (max-width:640px){form{grid-template-columns:1fr}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1 id="hSite"></h1>
+    <span class="me"><span id="who"></span><button type="button" class="linkbtn" id="signOut" hidden></button></span>
+  </header>
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <h2 id="hBoards"></h2>
+    <div class="grid" id="list"></div>
+  </section>
+  <section style="display:flex;flex-direction:column;gap:14px" id="newSec" hidden>
+    <h2 id="hNew"></h2>
+    <form id="newForm">
+      <label><span id="lTitle"></span><input id="nTitle" required maxlength="120"></label>
+      <label><span id="lId"></span><input id="nId" required maxlength="40" pattern="[a-z0-9][a-z0-9\-]{0,39}"></label>
+      <button type="submit" class="btn" id="nGo"></button>
+      <p class="hint" id="nHint"></p>
+      <p class="err" id="nErr" hidden></p>
+    </form>
+  </section>
+</div>
+<script src="/shim.js"></script>
+<script>
+(function(){
+  var I18N={
+    en:{boards:'Boards',loading:'Loading…',loadFail:'Could not load the projects ({e})',none:'No projects yet. Make one below.',signOut:'Sign out',
+      new:'New project',title:'Name',titlePh:'e.g. Checkout redesign',id:'Address (lowercase letters, digits, -)',idPh:'e.g. checkout',create:'Create',
+      hint:'Creates a board at {u} with every member on it. Agents can also create one with the MCP tool board_create_project.',
+      tasks:'{n} tasks',done:'done {n}',last:'last change {t}',now:'just now',m:'{n}m ago',h:'{n}h ago',d:'{n}d ago',
+      st:{todo:'to do',doing:'doing',review:'review',blocked:'blocked',done:'done'}},
+    ko:{boards:'작업판',loading:'불러오는 중이에요.',loadFail:'불러오지 못했어요 ({e})',none:'아직 프로젝트가 없어요. 아래에서 만드세요.',signOut:'로그아웃',
+      new:'새 프로젝트',title:'이름',titlePh:'예: 결제 화면 개편',id:'주소 (영문 소문자 · 숫자 · -)',idPh:'예: checkout',create:'만들기',
+      hint:'만들면 {u} 에 판이 생기고, 멤버 모두가 사람 목록에 들어가요. 에이전트는 MCP 도구 board_create_project로도 만들 수 있어요.',
+      tasks:'태스크 {n}',done:'완료 {n}',last:'마지막 변화 {t}',now:'방금',m:'{n}분 전',h:'{n}시간 전',d:'{n}일 전',
+      st:{todo:'할 일',doing:'진행 중',review:'검토',blocked:'막힘',done:'완료'}}
+  };
+  var L=I18N.en;
+  function T(k,v){return String(L[k]).replace(/\{(\w+)\}/g,function(_,x){return v&&v[x]!=null?v[x]:''})}
+  var BAR={done:'var(--ink)',review:'var(--muted)',doing:'var(--warn)',blocked:'var(--danger)',todo:'var(--line)'};
+  function $(id){return document.getElementById(id)}
+  function el(tag,a,kids){var n=document.createElement(tag);for(var k in a||{}){if(a[k]==null)continue;if(k==='text')n.textContent=a[k];else if(k==='class')n.className=a[k];else n.setAttribute(k,a[k])}(kids||[]).forEach(function(c){if(c!=null)n.appendChild(typeof c==='string'?document.createTextNode(c):c)});return n}
+  function ago(iso){var d=new Date(iso);if(!iso||isNaN(d))return '';var s=(Date.now()-d)/1000;if(s<60)return T('now');if(s<3600)return T('m',{n:Math.floor(s/60)});if(s<86400)return T('h',{n:Math.floor(s/3600)});return T('d',{n:Math.floor(s/86400)})}
+
+  window.abSession.then(function(s){
+    L=I18N[s.config.lang]||I18N.en;document.documentElement.lang=s.config.lang||'en';
+    document.title=s.config.site;$('hSite').textContent=s.config.site;$('hBoards').textContent=T('boards');$('hNew').textContent=T('new');
+    $('lTitle').textContent=T('title');$('lId').textContent=T('id');$('nGo').textContent=T('create');
+    $('nTitle').placeholder=T('titlePh');$('nId').placeholder=T('idPh');
+    function hint(id){$('nHint').textContent=T('hint',{u:'/p/'+(id||'…')})}
+    hint('');
+    $('who').textContent=(s.me.name||s.me.person)+' · '+s.me.role;
+    $('signOut').textContent=T('signOut');$('signOut').hidden=false;$('signOut').onclick=s.signOut;
+    $('newSec').hidden=s.me.role==='viewer';
+    $('list').appendChild(el('p',{class:'empty',text:T('loading')}));
+
+    function load(){
+      s.api('GET','/api/projects').then(function(r){return r.json().then(function(b){return {ok:r.ok,body:b}})}).then(function(r){
+        var list=$('list');list.textContent='';
+        if(!r.ok){list.appendChild(el('p',{class:'err',text:T('loadFail',{e:r.body.message||r.body.error})}));return}
+        if(!r.body.length){list.appendChild(el('p',{class:'empty',text:T('none')}));return}
+        r.body.forEach(function(p){
+          var bar=el('div',{class:'progress','aria-hidden':'true'});
+          ['done','review','doing','blocked','todo'].forEach(function(k){var n=p.tasks[k]||0;if(n)bar.appendChild(el('span',{style:'width:'+(n/p.total*100)+'%;background:'+BAR[k]}))});
+          var nums=[T('tasks',{n:p.total})].concat(['doing','review','blocked'].filter(function(k){return p.tasks[k]}).map(function(k){return L.st[k]+' '+p.tasks[k]})).concat([T('done',{n:p.tasks.done||0})]);
+          list.appendChild(el('a',{class:'card',href:'/p/'+p.id},[
+            el('div',{class:'top'},[el('strong',{text:p.title}),el('span',{class:'id',text:'/p/'+p.id})]),
+            p.subtitle?el('p',{class:'sub',text:p.subtitle}):null,
+            p.total?bar:null,
+            el('div',{class:'nums'},nums.map(function(t){return el('span',{text:t})}).concat(p.last?[el('span',{text:T('last',{t:ago(p.last)})})]:[]))
+          ]));
+        });
+      },function(e){$('list').textContent='';$('list').appendChild(el('p',{class:'err',text:T('loadFail',{e:e.message})}))});
+    }
+    load();
+    document.addEventListener('visibilitychange',function(){if(!document.hidden)load()});
+
+    var title=$('nTitle'),id=$('nId'),touched=false;
+    title.addEventListener('input',function(){if(touched)return;var g=title.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);id.value=g;hint(g)});
+    id.addEventListener('input',function(){touched=true;hint(id.value)});
+    $('newForm').addEventListener('submit',function(e){
+      e.preventDefault();var err=$('nErr');err.hidden=true;$('nGo').disabled=true;
+      s.api('POST','/api/projects',{id:id.value.trim(),title:title.value.trim()}).then(function(r){return r.json().then(function(b){return {ok:r.ok,body:b}})}).then(function(r){
+        $('nGo').disabled=false;
+        if(!r.ok){err.textContent=r.body.message||r.body.error;err.hidden=false;return}
+        location.href='/p/'+r.body.id;
+      },function(e){$('nGo').disabled=false;err.textContent=e.message;err.hidden=false});
+    });
+  });
+})();
+</script>
+</body>
+</html>

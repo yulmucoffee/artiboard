@@ -11,16 +11,18 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Claude Code](https://img.shields.io/badge/Claude_Code-skill-D97757)
 ![claude.ai](https://img.shields.io/badge/claude.ai-artifact_+_db-2B6BEF)
+![Codex](https://img.shields.io/badge/Codex-MCP-111111)
+![Self-host](https://img.shields.io/badge/self--host-SQLite_·_Supabase-3ECF8E)
 
 [English](README.md) · **한국어** · [日本語](README.ja.md) · [简体中文](README.zh-CN.md) · [Español](README.es.md)
 
-### "작업 보드 만들어줘" 한마디면, 팀 전체와 모든 Claude 에이전트가 같은 판에서 일합니다.
+### "작업 보드 만들어줘" 한마디면, 팀 전체와 모든 에이전트가 같은 판에서 일합니다.
 
-**claude.ai 아티팩트 하나가 보드가 됩니다. 태스크, 스레드, 공지, 선행 그래프까지.**<br/>
-화면은 페이지 코드가 아티팩트 DB에서 바로 그려서, 토큰 한 개 쓰지 않고도 늘 최신입니다.<br/>
+**페이지 하나가 보드가 됩니다. 태스크, 스레드, 공지, 선행 그래프까지.** claude.ai 아티팩트로 두어도 되고, Claude Code와 Codex를 위해 직접 호스팅해도 됩니다.<br/>
+화면은 페이지 코드가 보드 DB에서 바로 그려서, 토큰 한 개 쓰지 않고도 늘 최신입니다.<br/>
 에이전트는 저장소에 둔 짧은 규칙을 따릅니다. 통째로 읽지 않고 질의하고, 쓰기는 한 번에 묶고, 긴 스레드 대신 요약을 읽습니다.
 
-[데모](#미리-보기) · [빠른 시작](#빠른-시작) · [사용법](#사용법) · [동작 방식](#동작-방식) · [토큰 설계](#토큰-설계) · [에이전트용 안내](FOR_AGENTS.md)
+[데모](#미리-보기) · [빠른 시작](#빠른-시작) · [사용법](#사용법) · [직접 호스팅](#직접-호스팅) · [동작 방식](#동작-방식) · [토큰 설계](#토큰-설계) · [에이전트용 안내](FOR_AGENTS.md)
 
 </div>
 
@@ -101,7 +103,17 @@ artiboard는 그 상황을 팀이 함께 보는 실시간 판 하나에 모으�
 
 ## 빠른 시작
 
-보드가 `Artifact`, `ArtifactData` 도구를 쓰기 때문에, claude.ai로 로그인한 Claude Code(데스크톱 앱 또는 CLI)가 필요합니다.
+보드는 두 곳 중 한 곳에 둡니다. 어느 쪽이든 같은 페이지, 같은 문서, 같은 규칙을 쓰고, 스킬은 둘 다 설치해 줍니다.
+
+| | claude.ai 아티팩트 | 직접 호스팅한 사이트 |
+| --- | --- | --- |
+| 에이전트 | claude.ai로 로그인한 Claude Code (`Artifact`, `ArtifactData`) | Claude Code, Codex, 모든 MCP 클라이언트 (`artiboard` MCP 서버) |
+| 데이터 | 아티팩트 DB | SQLite(파일 하나) 또는 Supabase |
+| 실행 위치 | claude.ai, 따로 띄울 것 없음 | 이 컴퓨터, 내 도메인(Docker), 또는 Vercel |
+| 동료가 들어오는 방법 | 아티팩트의 Share 메뉴 | `artiboard member add`로 받은 토큰 |
+| 보드 | 보드마다 아티팩트 하나 | 사이트 하나, 프로젝트마다 `/p/<project>`에 보드 하나 |
+
+직접 호스팅하는 보드라면 [직접 호스팅](#직접-호스팅)을 따라 사이트부터 띄우세요.
 
 **방법 A: Claude에게 맡기기.** 위 상자의 문장을 붙여 넣으세요. Claude가 [FOR_AGENTS.md](FOR_AGENTS.md)를 따릅니다.
 
@@ -123,6 +135,14 @@ mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/
 mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
 ```
 
+**방법 D: Codex.** 같은 스킬이 Codex에서도 동작합니다. 모든 프로젝트에서 쓰려면 `~/.codex/skills/artiboard`에, 저장소 하나에서만 쓰려면 `.agents/skills/artiboard`에 복사하세요.
+
+```bash
+mkdir -p "$HOME/.codex/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.codex/skills/artiboard/"
+```
+
+Codex에는 claude.ai 아티팩트가 없으니, 직접 호스팅한 보드에서 씁니다.
+
 업그레이드할 때는 `git -C "$HOME/.artiboard/src" pull --ff-only`를 실행한 뒤 같은 복사 명령을 다시 실행하면 됩니다. Windows PowerShell에서는 [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill)의 명령을 쓰세요.
 
 <details>
@@ -143,12 +163,115 @@ mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboar
 
 | 이렇게 말하면 | 이렇게 됩니다 |
 | --- | --- |
-| "이 프로젝트에 작업 보드 만들어줘", "Set up a task board" | **setup**: 인원, 나누는 방식, 언어, 태스크 출처를 묻습니다. 문서에서 태스크를 뽑아 보여 주고 확인을 받습니다. 보드를 올리고 데이터를 넣은 뒤, `docs/artiboard.md`와 `CLAUDE.md`의 짧은 안내를 씁니다. |
+| "이 프로젝트에 작업 보드 만들어줘", "Set up a task board" | **setup**: 보드를 어디에 둘지, 인원, 나누는 방식, 언어, 태스크 출처를 묻습니다. 문서에서 태스크를 뽑아 보여 주고 확인을 받습니다. 보드를 올리거나 만들고 데이터를 넣은 뒤, `docs/artiboard.md`와 `CLAUDE.md`(Codex라면 `AGENTS.md`도)의 짧은 안내를 씁니다. |
 | "보드에 Cy 추가해줘", "보드를 일본어로 바꿔줘" | **adapt**: 보드 설정만 바꿉니다. 다시 올리지 않습니다. |
-| "QA 상태 추가해줘", "카드에 예상 시간 보여줘" | **adapt**: 페이지와 규칙을 함께 고칩니다. |
+| "QA 상태 추가해줘", "카드에 예상 시간 보여줘" | **adapt**: 페이지와 규칙을 함께 고칩니다. 직접 호스팅한 보드에서는 `board_page` 편집으로 고칩니다. |
+| "우리 보드를 우리 서버로 옮겨줘" | **move**: 아티팩트 보드의 문서를 직접 호스팅한 프로젝트로 복사합니다. |
+| "보드 로그인 링크 줘", "Give me a board sign-in link" | 직접 호스팅한 보드에 브라우저로 한 번 로그인할 수 있는 일회용 링크를 줍니다. |
 | "다음 태스크 집어", "M1-4 이어서 해" | 평소 작업입니다. 에이전트가 저장소의 `docs/artiboard.md`를 따릅니다. 집기, 스레드, 요약, 검토, 완료. |
 
 설치가 끝나면 아티팩트의 **Share** 메뉴에서 동료에게 편집 권한으로 공유하세요. 동료의 에이전트는 저장소를 받아 오면 규칙을 읽습니다. 페이지는 누가 보는지 압니다. 동료가 "나는"에서 처음 자기 이름을 고르면 그 claude.ai 계정에 연결하고, 다음부터는 알아서 골라 둡니다. 다른 계정에 연결된 이름으로 글을 남기려 하면 경고하고, 보기 전용 사용자에게는 집기, 남기기, 고치기 버튼을 숨깁니다.
+
+## 직접 호스팅
+
+직접 호스팅한 사이트는 `/`에서 프로젝트 목록을, `/p/<project>`에서 프로젝트마다 보드를, `/mcp`에서 MCP 서버를 제공합니다. 보드 페이지는 아티팩트가 올리는 것과 같은 `board.html`이고, 작은 런타임(`server/public/shim.js`)이 claude.ai 대신 일합니다. 사람을 로그인시키고, 사이트 데이터를 읽고 쓰고, 바뀐 내용을 열린 페이지에 바로 밀어 줍니다. Node 22.13 이상이 필요합니다.
+
+**이 컴퓨터에서** (SQLite, 데이터는 `~/.artiboard/board.db`)
+
+```bash
+cd "$HOME/.artiboard/src" && npm install --omit=dev
+```
+
+```bash
+node server/cli.js init --person ana --name Ana --project acme --title "Acme Board"
+```
+
+```bash
+node server/cli.js serve
+```
+
+`init`은 첫 관리자를 만들고, 토큰과 함께 Claude Code와 Codex를 연결하는 명령을 출력합니다. `http://localhost:4100`을 열어 토큰을 붙여 넣거나, 에이전트에게 로그인 링크를 달라고 하세요. 같은 네트워크의 동료도 들어오게 하려면 `--host 0.0.0.0`으로 띄우고 `BOARD_URL`을 동료가 쓰는 주소로 정하세요.
+
+**내 도메인에서 Docker로** (SQLite, TLS는 Caddy): DNS 레코드가 서버를 가리키게 하고, [docker-compose.yml](docker-compose.yml)에 도메인을 넣은 뒤 실행합니다.
+
+```bash
+docker compose up -d
+```
+
+```bash
+docker compose exec board node server/cli.js init --person ana --name Ana
+```
+
+**Vercel과 Supabase로:** Supabase 프로젝트를 만든 뒤, 스키마를 올리고 사이트 환경을 설정합니다.
+
+```bash
+supabase link --project-ref <ref> && supabase db push
+```
+
+Vercel 프로젝트에 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `BOARD_URL`을 설정하고, 도메인을 추가한 뒤 `vercel link`, 그다음 `npm run deploy:vercel`을 실행합니다(`VERCEL_REGION=icn1`이면 함수가 서울 DB 가까이에서 돕니다). Supabase Auth의 리디렉션 URL에 `<BOARD_URL>/`을 추가하세요. 관리자 명령은 이 변수들을 파일에 담아 두면 어디서든 실행할 수 있습니다. 예: `node server/cli.js --env site.env member list`. 같은 서버를 어느 호스트에서든 Supabase로 돌릴 수도 있습니다. `SUPABASE_*` 변수 세 개를 설정하고 `serve`하면 됩니다.
+
+**에이전트 연결.** 사람마다 토큰을 하나씩 받고(`member add` 또는 `member token`) 다음을 실행합니다.
+
+```bash
+claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
+```
+
+```bash
+codex mcp add artiboard --url https://board.example.com/mcp --bearer-token-env-var ARTIBOARD_TOKEN
+```
+
+Codex라면 셸 프로필에 `export ARTIBOARD_TOKEN=abt_…`를 넣어 두세요. Codex는 문서를 덮어쓸 수 있는 도구(`board_batch`, `board_page`)를 부를 때마다 먼저 묻습니다. `board_batch`를 묻지 않고 실행하게 하려면 `~/.codex/config.toml`에 다음을 넣으세요.
+
+```toml
+[mcp_servers.artiboard.tools.board_batch]
+approval_mode = "approve"
+```
+
+그런 다음 에이전트에게 "이 저장소에 보드 세팅해줘"라고 하면 됩니다.
+
+**맞춤 설정**은 claude.ai에서와 똑같습니다. 제목, 사람, 언어, 모든 화면 문구는 `meta/config`에 있고 바로 반영됩니다. 페이지 자체는 프로젝트마다 따로 있습니다. 관리자의 에이전트가 `board_page` 도구로 작고 정확한 편집을 해서 바꾸거나(상태, 필드, 보기), 관리자가 `artiboard page set --project acme --file page.html`을 실행합니다. `page reset`은 함께 들어 있는 기본 페이지로 되돌리며, 이 페이지는 사이트와 함께 업데이트됩니다.
+
+| 설정 | 기본값 | 뜻 |
+| --- | --- | --- |
+| `BOARD_URL` | `http://localhost:4100` | 사람과 에이전트가 쓰는 주소 |
+| `PORT`, `HOST` | `4100`, `127.0.0.1` | `serve`가 요청을 받는 곳 |
+| `ARTIBOARD_DB` | `~/.artiboard/board.db` | SQLite 파일 |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | | 데이터를 SQLite 대신 Supabase에 둡니다 |
+| `ARTIBOARD_SITE` | `artiboard` | 화면에 보이는 사이트 이름 |
+| `ARTIBOARD_LANG` | `en` | 새 보드와 사이트 화면의 언어 (`en`, `ko`) |
+
+<details>
+<summary><b>관리자 명령</b></summary>
+
+```text
+artiboard serve [--port N] [--host H]
+artiboard init --person ID [--name N] [--project ID --title T]
+artiboard member add|token|link|revoke|access|join|remove|list
+artiboard project add|drop|list
+artiboard page show|set|reset --project ID
+artiboard import --project ID --file FILE [--map old=new]
+```
+
+명령 없이 `node server/cli.js`를 실행하면 모든 옵션이 나옵니다. 권한은 `admin`, `member`(쓰기), `viewer`(읽기)이고, 사이트 전체에 똑같이 적용됩니다. 모든 멤버가 모든 프로젝트를 봅니다. 멤버에게는 비밀번호가 없습니다. 에이전트는 토큰으로 로그인하고, 페이지는 토큰이나 일회용 링크를 브라우저 세션으로 바꿔 줍니다.
+
+</details>
+
+<details>
+<summary><b>MCP 도구</b></summary>
+
+| 도구 | 하는 일 |
+| --- | --- |
+| `board_start` | 커서 이후의 새 공지(커서도 옮김), 내가 맡은 열린 태스크, 준비된 태스크 |
+| `board_claim {id, text}` | 준비된 태스크를 집고, 집었다는 글을 남기고, 스펙, 인수 조건, 요약을 돌려줍니다 |
+| `board_task {id}` | 상태, 세부 내용, 요약 이후의 메시지 |
+| `board_post {task, text, status?, branch?, pr?, summary?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. `done`이면 뒤따르는 태스크가 풀립니다. `task`가 없으면 공지 |
+| `board_get`, `board_query`, `board_batch` | 문서를 `ArtifactData`와 같은 방식으로 읽고 씁니다 |
+| `board_page` | 프로젝트 페이지: 크기, `find`, `read`, 관리자는 `edits`, `html`, `reset`까지 |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 사이트 |
+
+평소 쓰는 도구는 짧은 줄로 답하고 버전 확인과 시각 기록을 서버에서 하므로, 집기나 업데이트 한 번이 100토큰이 안 되는 호출 하나로 끝납니다.
+
+</details>
 
 ## 동작 방식
 
@@ -217,11 +340,16 @@ flowchart LR
 ```text
 skills/artiboard/SKILL.md               스킬: 설치, 조정, 업그레이드, 토큰 규칙
 skills/artiboard/assets/board.html      보드 페이지 (아티팩트 DB에서 그림)
-skills/artiboard/references/protocol.md 저장소에 들어갈 규칙 파일 틀
+skills/artiboard/references/          규칙 틀(아티팩트용, 호스팅용)과 에이전트용 직접 호스팅 안내
+server/                                 직접 호스팅 사이트: HTTP 앱, MCP 서버, SQLite와 Supabase 저장소, CLI, 페이지 런타임
+api/, vercel.json                       Supabase를 쓰는 사이트용 Vercel 함수
+supabase/                               Supabase 스키마(마이그레이션)와 로컬 설정
+Dockerfile, docker-compose.yml          컨테이너 속 SQLite 사이트, 내 도메인에서 Caddy 뒤에 둠
 examples/                               board.html과 demo-data.json으로 공개 데모를 만듦: build-demo.cjs, demo-data.json, demo.html
 FOR_AGENTS.md                           AI 에이전트용 설치 안내
 .claude-plugin/                         Claude Code 플러그인 정의
 tests/smoke.cjs                         보드 페이지 jsdom 시험
+tests/server.test.js                    호스팅 사이트의 처음부터 끝까지 시험 (SQLite, 설정했다면 Supabase도)
 docs/assets/                            배너
 ```
 
@@ -233,6 +361,12 @@ docs/assets/                            배너
 ```bash
 npm install --no-save jsdom@24.1.1 && node tests/smoke.cjs
 ```
+
+```bash
+npm install && npm test
+```
+
+`npm test`는 쓰고 버리는 SQLite 파일로 호스팅 사이트를 돌립니다. 로컬 Supabase(`supabase start`)가 있으면 `AB_SUPABASE=1`과 그 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`를 더해 같은 시험을 거기서 돌릴 수 있습니다.
 
 페이지를 고친 뒤 데모를 다시 만듭니다.
 
