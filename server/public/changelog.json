@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.9.2",
+      "date": "2026-10-23",
+      "prs": [
+        19
+      ],
+      "lines": {
+        "en": [
+          "The artiboard skill catches up with 1.9: adding a status with its color, the archive, and upgrading a board's rules file or a Supabase site's database."
+        ],
+        "ko": [
+          "artiboard 스킬이 1.9에 맞춰졌어요: 색을 포함한 상태 추가, 보관함, 판의 규칙 파일과 Supabase 사이트 DB 업그레이드 방법."
+        ]
+      }
+    },
+    {
       "version": "1.9.1",
       "date": "2026-10-23",
       "prs": [
