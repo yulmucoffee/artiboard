@@ -15,6 +15,7 @@ import { makeApp } from '../server/app.js';
 import { loadConfig, openStore } from '../server/config.js';
 import { toBoardError } from '../server/core.js';
 import { openSqlite } from '../server/store/sqlite.js';
+import { makeFlow } from '../server/flow.js';
 import { entryFor, setPerson } from '../server/members.js';
 import { CHANGE_CASES } from './task-cases.js';
 
@@ -407,6 +408,54 @@ for (const backend of backends) {
       } finally {
         stop?.();
         other.close();
+      }
+    });
+
+    test('a claim or a post that loses a race rereads and decides again', async () => {
+      const at = new Date().toISOString(), me = people.admin, them = people.member;
+      const task = (n) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `race ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at } });
+      await store.apply(null, P, [task('r1'), task('r2')]);
+      // the other member's write lands between this flow's read of the task and its write
+      const between = (path, write) => {
+        let done = false;
+        const once = async (hit, r) => { if (!done && hit) { done = true; await write(); } return r; };
+        return { ...store,
+          get: async (project, p) => once(p === path, await store.get(project, p)),
+          readMany: async (project, reads) => once(reads.some((r) => r.path === path), await store.readMany(project, reads)) };
+      };
+      const claimer = makeFlow(between(`tasks/${K('r1')}`, () => makeFlow(store).claim(them, P, K('r1'))));
+      const lost = await claimer.claim(me, P, K('r1')).then(() => null, (e) => toBoardError(e));
+      assert.equal(lost?.code, 'taken', 'the late claim rereads, sees the winner and says taken');
+      assert.equal((await store.get(P, `tasks/${K('r1')}`)).data.claimedBy.who, them.person, 'and the winner keeps it');
+
+      await makeFlow(store).claim(me, P, K('r2'));
+      const poster = makeFlow(between(`tasks/${K('r2')}`, () => makeFlow(store).post(them, P, { task: K('r2'), due: '2026-12-24' })));
+      assert.equal(await poster.post(me, P, { task: K('r2'), status: 'review' }), `ok ${K('r2')} → review`, 'a post whose task moved meanwhile goes through on a reread');
+      const r2 = (await store.get(P, `tasks/${K('r2')}`)).data;
+      assert.deepEqual([r2.status, r2.due], ['review', '2026-12-24'], 'keeping the other write');
+      await store.apply(null, P, ['r1', 'r2'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })));
+    });
+
+    test('the everyday tools make the store calls they promise', async () => {
+      // each separate store call is a request on Supabase; these counts are what 1.12 and 1.13.1 made them
+      const id = `rt-${R}`, at = new Date().toISOString();
+      await store.createProject(null, { id, title: 'Round trips', lang: 'en', repos: [] });
+      try {
+        await store.apply(null, id, [
+          { op: 'set', path: 'tasks/A-1', data: { key: 'A-1', title: 'dep', status: 'done', deps: [], waitingOn: [], updatedAt: at } },
+          { op: 'set', path: 'tasks/A-2', data: { key: 'A-2', title: 'next', status: 'todo', deps: ['A-1'], waitingOn: [], updatedAt: at } },
+          { op: 'set', path: 'details/A-2', data: { spec: 'x' } },
+        ]);
+        const calls = [];
+        const counting = Object.fromEntries(Object.entries(store).map(([k, f]) => [k, typeof f === 'function' && ['get', 'query', 'readMany', 'apply'].includes(k)
+          ? (...a) => { calls.push(k); return f(...a); } : f]));
+        const flow = makeFlow(counting), me = people.admin;
+        const count = async (run) => { calls.length = 0; await run(); return calls.join(' '); };
+        assert.equal(await count(() => flow.task(id, 'A-2')), 'readMany', 'board_task: one request');
+        assert.equal(await count(() => flow.start(me, { project: id, peek: true })), 'readMany readMany', 'board_start: the lists, then the deps');
+        assert.equal(await count(() => flow.claim(me, id, 'A-2')), 'readMany get readMany apply', 'board_claim: details and config together, the task, its deps, one write');
+      } finally {
+        await store.dropProject(id);
       }
     });
 
