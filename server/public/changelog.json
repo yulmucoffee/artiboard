@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.13.4",
+      "date": "2026-10-23",
+      "prs": [
+        31
+      ],
+      "lines": {
+        "en": [
+          "A self-hosted site stores Korean (and any other multibyte) text intact when a request arrives in pieces, and refuses a body that is not JSON instead of reading it as empty.",
+          "board_task shows the message posted together with a summary, such as a reviewer's list of fixes.",
+          "Open pages on a SQLite site see changes the CLI makes even when the site writes right after, and board_query refuses after together with order_by instead of returning the first page again."
+        ],
+        "ko": [
+          "직접 띄운 사이트에서 요청이 나뉘어 들어와도 한글 같은 멀티바이트 글자가 깨지지 않아요. JSON이 아닌 요청은 빈 요청으로 읽지 않고 거절해요.",
+          "요약과 함께 남긴 메시지(검토자의 수정 목록 같은 것)가 board_task에 보여요.",
+          "SQLite 사이트에서 CLI가 바꾼 내용이 바로 뒤에 사이트가 써도 열린 페이지에 반영되고, board_query는 after와 order_by를 함께 주면 첫 페이지를 다시 주는 대신 거절해요."
+        ]
+      }
+    },
+    {
       "version": "1.13.3",
       "date": "2026-10-23",
       "prs": [
