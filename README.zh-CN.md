@@ -266,7 +266,7 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_claim {id, text, override?}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准和摘要。`override` 在你的使用者要求时接手别人的任务 |
 | `board_task {id}` | 状态、详情，以及摘要之后的消息 |
 | `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | 一条讨论串消息，加上对你任务的修改；任何人都可以调整任务的 `due`。`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞；`todo` 会释放任务，任何人都可以再领取。不带 `task` 时：发布公告。评审中的任务对评审人开放（`done` 或退回 `doing`）；`override` 在你的使用者要求时修改别人的任务，讨论串会记下原负责人 |
-| `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同 |
+| `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同。对任务的 batch 写入同样遵守 `board_post` 的负责人规则 |
 | `board_page` | 项目的页面：大小、`find`、`read`，管理员还有 `edits`、`html`、`reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 站点；每个项目都列出其 GitHub 仓库 |
 

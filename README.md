@@ -266,7 +266,7 @@ Run `node server/cli.js` with no command for every option. Admins do the same fr
 | `board_claim {id, text, override?}` | Claims a ready task, posts the claim, returns spec, acceptance, summary. `override` takes over someone else's task when your person says so |
 | `board_task {id}` | Status, details, and the messages after the summary |
 | `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | A thread message plus changes to your task; anyone may move a task's `due`. `done` stamps `doneAt` and unblocks dependents; `todo` releases the task for anyone. Without `task`: a notice. A task in review is open to its reviewer (`done`, or back to `doing`); `override` changes someone else's task when your person says so, and the thread names the holder |
-| `board_get`, `board_query`, `board_batch` | Documents, as `ArtifactData` reads and writes them |
+| `board_get`, `board_query`, `board_batch` | Documents, as `ArtifactData` reads and writes them. Batch writes to tasks follow the same holder rule as `board_post` |
 | `board_page` | The project's page: size, `find`, `read`, and for admins `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | The site; each project lists its GitHub repositories |
 
