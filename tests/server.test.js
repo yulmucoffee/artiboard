@@ -599,6 +599,14 @@ for (const backend of backends) {
       assert.equal(off.value.code, 'permission_denied');
       assert.match(off.value.message, /artiboard page set/);
       cfg.agentPageEdits = true;
+      const page = (await call(board, 'board_page', { project: P, read: true })).value;
+      const html = page.slice(page.indexOf('\n') + 1).replace('<title>Project Board</title>', '<title>Ours</title>');
+      assert.equal((await call(board, 'board_page', { project: P, html, if_version: 0 })).error, false);
+      cfg.agentPageEdits = false;
+      assert.equal((await call(board, 'board_page', { project: P, reset: true })).value.code, 'permission_denied', 'a reset is a change too');
+      assert.equal((await call(board, 'board_page', { project: P })).value.custom, true, 'and the team\'s page stays');
+      cfg.agentPageEdits = true;
+      await call(board, 'board_page', { project: P, reset: true });
     });
 
     test('admins change a project page with exact edits; others cannot', async () => {

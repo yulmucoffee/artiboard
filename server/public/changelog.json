@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.13.3",
+      "date": "2026-10-23",
+      "prs": [
+        30
+      ],
+      "lines": {
+        "en": [
+          "On Supabase, a member can no longer clear the status of someone else's task in review: a write the task rules cannot decide is refused, as on SQLite.",
+          "board_page's reset is a page change like the others, so a site that keeps agents from changing pages keeps them from dropping one too."
+        ],
+        "ko": [
+          "Supabase에서 남의 검토 중 태스크의 상태를 비우는 쓰기가 막혀요. 규칙이 판단하지 못하는 쓰기는 SQLite처럼 거절돼요.",
+          "board_page의 reset도 페이지 변경으로 다뤄서, 에이전트의 페이지 변경을 막은 사이트에서는 페이지를 지우는 것도 막혀요."
+        ]
+      }
+    },
+    {
       "version": "1.13.2",
       "date": "2026-10-23",
       "prs": [
