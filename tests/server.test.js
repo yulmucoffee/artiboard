@@ -101,6 +101,7 @@ for (const backend of backends) {
       const me = (await call(board, 'board_whoami')).value;
       assert.equal(me.person, people.admin.person);
       assert.equal(me.backend, backend.name);
+      assert.match(me.version, /^\d+\.\d+\.\d+$/);
       assert.ok((await call(board, 'board_projects')).value.some((p) => p.id === P));
     });
 
@@ -314,6 +315,7 @@ for (const backend of backends) {
       assert.deepEqual(listed.repos, [`${api} (api)`, web]);
       const s = (await call(board, 'board_start', { project: undefined, repo: `git@github.com:${api.toLowerCase()}.git`, ready: 50, peek: true })).value;
       assert.match(s, new RegExp(`^${people.admin.person} · ${P}`), 'the remote finds the project');
+      assert.match(s.split('\n')[0], new RegExp(` · artiboard ${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}$`), 'the first line names the site\'s version, for comparing with the installed skill');
       assert.match(s, new RegExp(`^repos: ${api} \\(api\\) · ${web}$`, 'm'));
       assert.match(s, /^board rules \(every board\):$/m);
       const rules = /^board rules \(every board\):\n(?:- .*\n)+/m.exec(s)[0];

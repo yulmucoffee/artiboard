@@ -3,6 +3,7 @@
 // so an agent spends no tokens on reads before a write, on version numbers or on `date`.
 import { BOARD_RULES, BoardError, now, repoName, reposOf, stampId, toBoardError } from './core.js';
 import { holderOf, isReady, mayChange, statusEffects, statusOf, unmetDeps } from './tasks.js';
+import { VERSION } from './version.js';
 
 // 2026-10-21T08:57:33.000Z -> 10-21 08:57Z
 const short = (iso) => (typeof iso === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(iso) ? `${iso.slice(5, 10)} ${iso.slice(11, 16)}Z` : '');
@@ -142,7 +143,7 @@ export function makeFlow(store) {
     const elsewhere = want ? free.filter((t) => { const r = taskRepo(t.data, repos); return r && r !== want; }).length : 0;
     if (want) free = free.filter((t) => { const r = taskRepo(t.data, repos); return !r || r === want; });
 
-    const out = [`${me} · ${project}${c.milestone ? ` · ${c.milestone}` : ''}`];
+    const out = [`${me} · ${project}${c.milestone ? ` · ${c.milestone}` : ''} · artiboard ${VERSION}`];
     if (repos.length) out.push(`repos: ${repoList(repos)}`);
     if (stray) out.push(stray);
     if (rules) {

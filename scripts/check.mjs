@@ -3,6 +3,7 @@
 import { spawnSync } from 'node:child_process';
 
 const steps = [
+  ['the version is stamped where agents read it', 'node', ['scripts/stamp-version.mjs', '--check']],
   ['READMEs share one shape', 'node', ['scripts/readme-shape.mjs']],
   ['the page carries the current task rules', 'node', ['scripts/inline-rules.mjs', '--check']],
   ['the demo is built from the current page', 'node', ['examples/build-demo.cjs', '--check']],

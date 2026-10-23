@@ -14,7 +14,8 @@
     "start": "node server/cli.js serve",
     "test": "node --test \"tests/*.test.js\"",
     "deploy:vercel": "sh scripts/deploy-vercel.sh",
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "version": "node scripts/stamp-version.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
