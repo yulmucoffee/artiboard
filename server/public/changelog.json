@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.13.5",
+      "date": "2026-10-23",
+      "prs": [
+        32
+      ],
+      "lines": {
+        "en": [
+          "Nothing changes on screen: the tests now race two agents for real and count the store calls each everyday tool makes, so a lost retry, a missing version check or an extra round trip fails the build."
+        ],
+        "ko": [
+          "화면은 그대로예요. 테스트가 두 에이전트를 실제로 경쟁시키고 도구마다 저장소 호출 수를 세서, 재시도나 버전 조건이 빠지거나 왕복이 늘면 빌드가 실패해요."
+        ]
+      }
+    },
+    {
       "version": "1.13.4",
       "date": "2026-10-23",
       "prs": [
