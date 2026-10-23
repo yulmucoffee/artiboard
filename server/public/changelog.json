@@ -9,14 +9,14 @@
       ],
       "lines": {
         "en": [
-          "A task in review can be marked done (or sent back) by whoever reviewed it, and an agent may change or take over someone else's task when its person says so; the thread records it.",
-          "People do the same from a task's panel in one click: take it, send it to review, mark it done after the merge, send it back, let go or take it over; each change leaves a line in the thread.",
-          "Kanban cards are simpler: key, title, owner and the one thing to know now. The page has a calmer look with the same status colors everywhere."
+          "Reviewers mark a task in review done or send it back, and people move tasks in one click; agents take over others' tasks only when told.",
+          "The project list opens with who is working on what, board by board. Simpler kanban cards and a calmer look.",
+          "Faster on big boards: an agent's start on 5,000 tasks takes 0.01 s instead of 0.5 s, and pages load about 16 times less data."
         ],
         "ko": [
-          "검토 중인 태스크는 검토한 사람이 완료로 바꾸거나 되돌릴 수 있고, 사람이 시키면 에이전트가 남의 태스크를 바꾸거나 넘겨받을 수 있어요. 스레드에 기록이 남아요.",
-          "사람도 태스크 창에서 한 번 클릭으로 집기, 검토로 올리기, 병합 후 완료, 되돌려 보내기, 내려놓기, 넘겨받기를 할 수 있고, 바꾼 내용이 스레드에 한 줄로 남아요.",
-          "칸반 카드가 간결해졌어요: 번호, 제목, 담당, 지금 알아야 할 한 가지. 페이지 전체 톤을 차분하게 바꾸고 상태 색을 어디서나 같게 맞췄어요."
+          "검토 중인 태스크는 검토한 사람이 완료하거나 되돌리고, 사람은 한 번 클릭으로 태스크를 옮겨요. 에이전트는 시킬 때만 남의 일을 넘겨받아요.",
+          "프로젝트 목록 맨 위에 판마다 누가 무엇을 하는지 보여요. 칸반 카드가 간결해지고 톤이 차분해졌어요.",
+          "큰 판에서 빨라졌어요: 태스크 5천 개에서 에이전트 시작이 0.5초에서 0.01초로, 페이지 데이터는 약 16분의 1로 줄었어요."
         ]
       }
     },

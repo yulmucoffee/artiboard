@@ -198,7 +198,8 @@
       if (gone) { if (i < 0) return; l.rows.splice(i, 1); }
       else if (i >= 0) { if (l.rows[i].version >= row.version) return; l.rows[i] = row; }
       else l.rows.push(row);
-      emit(l);
+      // rows of one batch arrive one by one: hand the listener one snapshot for all of them
+      if (!l.soon) l.soon = setTimeout(function () { l.soon = 0; if (listeners.indexOf(l) >= 0) emit(l); }, 30);
     }
     function first(l, rows) {
       if (listeners.indexOf(l) < 0) return;

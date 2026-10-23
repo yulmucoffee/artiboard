@@ -1613,7 +1613,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       if(!db){failed=T('noDb');renderAll();return}
       var first=true;
       db.doc('meta/config').onSnapshot(function(s){applyConfig(s.exists?s.data():{});renderAll()},function(){});
-      db.collection('tasks').onSnapshot(function(s){
+      // a burst of changes (an agent's batch) is drawn once per frame, from the latest snapshot
+      var lastTasks=null,taskFrame=0,frame=window.requestAnimationFrame||function(f){return setTimeout(f,16)};
+      db.collection('tasks').onSnapshot(function(s){lastTasks=s;if(!taskFrame)taskFrame=frame(onTasks)},function(e){failed=T('loadFail',{e:errText(e)});renderAll()});
+      function onTasks(){
+        taskFrame=0;var s=lastTasks;
         tasks=s.docs.map(function(x){var o=x.data();o.id=x.id;return o});loaded=true;
         if(first){first=false;
           // a browser opening the board for the first time treats the current state as seen; only later changes count as new
@@ -1626,7 +1630,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           if(VIEWS.indexOf(h)>=0){setView(h);try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
           else{var t=byKeyStr(h);if(t)open(t.id)}
         }
-      },function(e){failed=T('loadFail',{e:errText(e)});renderAll()});
+      }
       db.collection('notices').orderBy('at','desc').limit(30).onSnapshot(function(s){
         notices=s.docs.map(function(x){return x.data()});
         if(!noticesLoaded){noticesLoaded=true;if(!read('ab-notice-init')){readNotices();write('ab-notice-init','1')}}

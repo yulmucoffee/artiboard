@@ -226,6 +226,9 @@ for (const backend of backends) {
         assert.equal((await last('h2')).text, `taking this (taken over from ${me})`);
         await call(board, 'board_post', { project: P, task: K('h1'), status: 'done' });
         assert.match((await call(other, 'board_claim', { project: P, id: K('h1'), override: true })).value, /^taken: /, 'a done task is not taken over');
+        const working = (await store.overview()).find((p) => p.id === P).working;
+        assert.deepEqual(working.map(({ who, n, agent, tasks }) => ({ who, n, agent, tasks })),
+          [{ who: them, n: 1, agent: true, tasks: [{ key: K('h2'), title: 'held h2', status: 'doing' }] }], 'the project list says who has what in hand');
       } finally {
         await other.close();
       }

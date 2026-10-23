@@ -3,6 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { BoardError, isToken, PERSON_ID, PROJECT_ID, toBoardError } from './core.js';
 import { buildServer } from './mcp.js';
@@ -23,8 +24,15 @@ const MAX_BODY = 2 * 1048576;
 function send(res, status, body, headers = {}) {
   res.statusCode = status;
   for (const [k, v] of Object.entries({ ...SECURITY, 'Cache-Control': 'no-store', ...headers })) res.setHeader(k, v);
-  if (typeof body === 'string' || Buffer.isBuffer(body)) res.end(body);
-  else { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)); }
+  let out = body;
+  if (typeof body !== 'string' && !Buffer.isBuffer(body)) { res.setHeader('Content-Type', 'application/json'); out = JSON.stringify(body); }
+  // a board's whole task list is large and compresses about tenfold; a host that compresses itself leaves an encoded body alone
+  if (out.length > 8192 && /\bgzip\b/.test(res.req?.headers?.['accept-encoding'] || '')) {
+    out = gzipSync(out);
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('Vary', 'Accept-Encoding');
+  }
+  res.end(out);
 }
 function fail(res, e) {
   const err = toBoardError(e);

@@ -31,7 +31,7 @@ function boot({user=null,docs={},me=null,deny=false,storage={}}={}){
   return {w,d:w.document,store,writes,errors,notify,key:k=>w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:k,bubbles:true})),pick:id=>{const x=w.document.querySelector('#meSel [data-me="'+id+'"]');if(x)x.click();return !!x}};
 }
 const fakeUser=(id,write)=>({id:async()=>id,can:async n=>n==='data.write'?write:false,isOwner:async()=>false,canEdit:async()=>false});
-const tick=()=>new Promise(r=>setTimeout(r,25));const heal=()=>new Promise(r=>setTimeout(r,600));
+const tick=()=>new Promise(r=>setTimeout(r,50));const heal=()=>new Promise(r=>setTimeout(r,600));
 let failed=0;const ok=(c,m)=>{console.log((c?'ok   ':'FAIL ')+m);if(!c)failed++};
 const note=d=>{const n=d.getElementById('meNote');return n.hidden?'':n.textContent};
 const writeNotice=d=>d.querySelector('#feed li.more .btn');

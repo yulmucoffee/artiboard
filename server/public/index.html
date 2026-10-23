@@ -5,41 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Projects</title>
 <script>/* the theme a viewer picked on a board page holds across the site */try{var t=localStorage.getItem('ab-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* The project list: one card per board, drawn from /api/projects. Admins also manage members here, and
    everyone keeps their own profile. Same tokens as the board page. */
 :root{
-  --bg:#FAF9F7; --surface:#FFFFFF; --sunk:#F3F2EE; --ink:#1A1A18; --text2:#4F4D48; --muted:#75726B;
-  --line:#E2DFD9; --line-soft:#EDEBE6; --edge:#D3CFC8; --scrim:rgba(26,26,24,.28);
-  --accent:#2B6BEF; --on-accent:#FFFFFF; --accent-soft:#EAF0FD;
-  --warn:#9A5F0E; --warn-soft:#F8EEDC; --danger:#C23B3B; --danger-soft:#FBE9E7;
-  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --bg:#F7F7F8; --surface:#FFFFFF; --sunk:#F1F1F3; --ink:#18181B; --text2:#52525B; --muted:#71717A;
+  --line:#E4E4E7; --line-soft:#EEEEF0; --edge:#D4D4D8; --scrim:rgba(24,24,27,.28);
+  --accent:#2563EB; --on-accent:#FFFFFF; --accent-soft:#EBF1FE;
+  --warn:#B45309; --warn-soft:#FDF1E1; --danger:#DC2626; --danger-soft:#FDECEC; --agent:#7C3AED;
+  --s-todo:#D4D4D8; --s-doing:#3B82F6; --s-review:#8B5CF6; --s-blocked:#EF4444; --s-done:#22A35A;
+  --p0:#1D4ED8; --p0-soft:#E6EEFE; --p1:#15803D; --p1-soft:#E3F4E9; --p2:#B45309; --p2-soft:#FCEFDD;
+  --p3:#6D28D9; --p3-soft:#F0EAFD; --p4:#0F766E; --p4-soft:#DEF3F1; --p5:#BE185D; --p5-soft:#FCE7F0;
+  --shadow:0 1px 2px rgba(24,24,27,.05);
+  --f-body:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Segoe UI","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#181715; --surface:#201F1C; --sunk:#1C1B19; --ink:#ECEAE4; --text2:#B9B6AE; --muted:#8F8C85;
-  --line:#34322D; --line-soft:#2A2925; --edge:#45423C; --scrim:rgba(0,0,0,.5);
-  --accent:#5B93FF; --on-accent:#0E1420; --accent-soft:#1B2438;
-  --warn:#E3A853; --warn-soft:#33270F; --danger:#F07272; --danger-soft:#3A1D1D; color-scheme:dark}}
+  --bg:#111113; --surface:#1A1A1D; --sunk:#151517; --ink:#EDEDEF; --text2:#B4B4BC; --muted:#8B8B94;
+  --line:#2A2A2F; --line-soft:#222226; --edge:#3B3B42; --scrim:rgba(0,0,0,.5);
+  --accent:#60A5FA; --on-accent:#0B1220; --accent-soft:#172238;
+  --warn:#F0B35C; --warn-soft:#30230F; --danger:#F87171; --danger-soft:#3A1B1B; --agent:#C4B1FA;
+  --s-todo:#3B3B42; --s-doing:#5B8DF6; --s-review:#9D7BF5; --s-blocked:#F87171; --s-done:#3FB872;
+  --p0:#93B8FF; --p0-soft:#18233A; --p1:#7FD0A0; --p1-soft:#13281C; --p2:#F5B26B; --p2-soft:#302110;
+  --p3:#C4B1FA; --p3-soft:#251E3C; --p4:#74D3CC; --p4-soft:#102927; --p5:#F59BC0; --p5-soft:#371826;
+  --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#181715; --surface:#201F1C; --sunk:#1C1B19; --ink:#ECEAE4; --text2:#B9B6AE; --muted:#8F8C85;
-  --line:#34322D; --line-soft:#2A2925; --edge:#45423C; --scrim:rgba(0,0,0,.5);
-  --accent:#5B93FF; --on-accent:#0E1420; --accent-soft:#1B2438;
-  --warn:#E3A853; --warn-soft:#33270F; --danger:#F07272; --danger-soft:#3A1D1D; color-scheme:dark}
+  --bg:#111113; --surface:#1A1A1D; --sunk:#151517; --ink:#EDEDEF; --text2:#B4B4BC; --muted:#8B8B94;
+  --line:#2A2A2F; --line-soft:#222226; --edge:#3B3B42; --scrim:rgba(0,0,0,.5);
+  --accent:#60A5FA; --on-accent:#0B1220; --accent-soft:#172238;
+  --warn:#F0B35C; --warn-soft:#30230F; --danger:#F87171; --danger-soft:#3A1B1B; --agent:#C4B1FA;
+  --s-todo:#3B3B42; --s-doing:#5B8DF6; --s-review:#9D7BF5; --s-blocked:#F87171; --s-done:#3FB872;
+  --p0:#93B8FF; --p0-soft:#18233A; --p1:#7FD0A0; --p1-soft:#13281C; --p2:#F5B26B; --p2-soft:#302110;
+  --p3:#C4B1FA; --p3-soft:#251E3C; --p4:#74D3CC; --p4-soft:#102927; --p5:#F59BC0; --p5-soft:#371826;
+  --shadow:0 1px 2px rgba(0,0,0,.3); color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14.5px;line-height:1.6;
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14.5px;line-height:1.6;-webkit-font-smoothing:antialiased;
   padding:28px max(16px,env(safe-area-inset-left,0px)) 72px}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .page{max-width:1080px;margin-inline:auto;display:flex;flex-direction:column;gap:32px}
 header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
-h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:0}
-h2{font-size:19px;font-weight:700;margin:0}
+h1{font-size:26px;font-weight:700;letter-spacing:-.025em;margin:0}
+h2{font-size:18px;font-weight:650;letter-spacing:-.015em;margin:0}
 h3{font-size:14.5px;font-weight:700;margin:0}
 p{margin:0}
 section{display:flex;flex-direction:column;gap:14px}
@@ -52,7 +61,7 @@ section{display:flex;flex-direction:column;gap:14px}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent);font-size:13px;font-weight:500}
 .linkbtn:hover{text-decoration:underline;text-underline-offset:3px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
-.card{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;color:inherit;text-decoration:none;min-width:0}
+.card{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;color:inherit;text-decoration:none;min-width:0;box-shadow:var(--shadow)}
 .card:hover{border-color:var(--edge)}
 .card .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .card strong{font-size:17px}
@@ -60,7 +69,7 @@ section{display:flex;flex-direction:column;gap:14px}
 .card .sub{color:var(--text2);font-size:13.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .card .nums{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12.5px;color:var(--muted)}
 .card .repos{display:flex;flex-wrap:wrap;gap:2px 10px;font-family:var(--f-mono);font-size:12px;color:var(--text2)}
-.progress{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--line-soft)}
+.progress{display:flex;gap:2px;height:6px;border-radius:99px;overflow:hidden;background:var(--line-soft)}
 .progress span{display:block;height:100%}
 .empty{color:var(--muted)}
 .err{color:var(--danger);font-size:13px}
@@ -79,6 +88,24 @@ select{padding-block:0}
 .btn:disabled{opacity:.5;cursor:default}
 form .hint{grid-column:1/-1;font-size:12.5px;color:var(--muted);margin:0}
 form .err{grid-column:1/-1}
+
+/* working now: the boards where someone has work in hand, each person once with how many */
+.work{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.work>li{display:grid;grid-template-columns:minmax(140px,220px) minmax(0,1fr);gap:8px 20px;align-items:center;padding:12px 20px;border-top:1px solid var(--line-soft)}
+.work>li:first-child{border-top:0}
+.work .proj{color:var(--ink);font-weight:600;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.work .proj:hover{text-decoration:underline;text-underline-offset:3px}
+.work .proj span{display:block;font-family:var(--f-mono);font-weight:400;font-size:11.5px;color:var(--muted)}
+.ppl{display:flex;flex-wrap:wrap;gap:6px}
+.pp{display:inline-flex;align-items:center;gap:7px;padding:3px 10px 3px 3px;border-radius:99px;background:var(--sunk);font-size:13px;color:var(--text2);white-space:nowrap}
+.pp i{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;font-style:normal;font-size:11px;font-weight:700;color:var(--pc);background:var(--ps)}
+.pp.agent i{box-shadow:0 0 0 1.5px var(--surface),0 0 0 3px var(--agent)}
+.pp b{font-weight:600;color:var(--ink)}
+.pp .n{font-variant-numeric:tabular-nums;color:var(--muted)}
+.pp.mine{background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.c0{--pc:var(--p0);--ps:var(--p0-soft)} .c1{--pc:var(--p1);--ps:var(--p1-soft)} .c2{--pc:var(--p2);--ps:var(--p2-soft)}
+.c3{--pc:var(--p3);--ps:var(--p3-soft)} .c4{--pc:var(--p4);--ps:var(--p4-soft)} .c5{--pc:var(--p5);--ps:var(--p5-soft)}
+@media (max-width:640px){.work>li{grid-template-columns:1fr}}
 
 /* members */
 .scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
@@ -136,6 +163,10 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
     <a class="ver" id="ver" href="#changes" hidden></a>
     <span class="me"><button type="button" class="who" id="meBtn" hidden></button><button type="button" class="linkbtn" id="signOut" hidden></button></span>
   </header>
+  <section id="workSec" hidden>
+    <div class="sec-head"><h2 id="hWork"></h2><p id="workSub"></p></div>
+    <ul class="work" id="work"></ul>
+  </section>
   <section>
     <div class="sec-head"><h2 id="hBoards"></h2></div>
     <div class="grid" id="list"></div>
@@ -173,7 +204,8 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
 <script>
 (function(){
   var I18N={
-    en:{boards:'Boards',loading:'Loading…',loadFail:'Could not load the projects ({e})',none:'No projects yet. Make one below.',signOut:'Sign out',
+    en:{working:'Working now',workSub:'Boards where someone has work in hand (in progress, review, blocked). A ring: an agent has it.',workMe:'You: {n} on {p} boards.',workNone:'Nothing in hand right now.',
+      boards:'Boards',loading:'Loading…',loadFail:'Could not load the projects ({e})',none:'No projects yet. Make one below.',signOut:'Sign out',
       new:'New project',title:'Name',titlePh:'e.g. Checkout redesign',id:'Address (lowercase letters, digits, -)',idPh:'e.g. checkout',create:'Create',
       hint:'Creates a board at {u} with every member on it. Agents can also create one with the MCP tool board_create_project.',
       tasks:'{n} tasks',done:'done {n}',last:'last change {t}',now:'just now',m:'{n}m ago',h:'{n}h ago',d:'{n}d ago',never:'never',
@@ -189,7 +221,8 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
       pHint:'Your name and role show on every board you sit on. The person id and the access level are set by site admins.',pFixed:'Person {p} · {a}',
       changes:'Updates',older:'Show {n} earlier versions',fewer:'Show fewer',
       fail:'Could not do that ({e})'},
-    ko:{boards:'작업판',loading:'불러오는 중이에요.',loadFail:'불러오지 못했어요 ({e})',none:'아직 프로젝트가 없어요. 아래에서 만드세요.',signOut:'로그아웃',
+    ko:{working:'지금 작업 중',workSub:'누군가 손에 쥔 일(진행 중 · 검토 · 막힘)이 있는 판만 보여요. 테두리는 에이전트가 맡고 있다는 뜻이에요.',workMe:'나: 판 {p}개에서 {n}개',workNone:'지금 손에 쥔 일이 없어요.',
+      boards:'작업판',loading:'불러오는 중이에요.',loadFail:'불러오지 못했어요 ({e})',none:'아직 프로젝트가 없어요. 아래에서 만드세요.',signOut:'로그아웃',
       new:'새 프로젝트',title:'이름',titlePh:'예: 결제 화면 개편',id:'주소 (영문 소문자 · 숫자 · -)',idPh:'예: checkout',create:'만들기',
       hint:'만들면 {u} 에 판이 생기고, 멤버 모두가 사람 목록에 들어가요. 에이전트는 MCP 도구 board_create_project로도 만들 수 있어요.',
       tasks:'태스크 {n}',done:'완료 {n}',last:'마지막 변화 {t}',now:'방금',m:'{n}분 전',h:'{n}시간 전',d:'{n}일 전',never:'없음',
@@ -208,7 +241,9 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
   };
   var L=I18N.en;
   function T(k,v){return String(L[k]).replace(/\{(\w+)\}/g,function(_,x){return v&&v[x]!=null?v[x]:''})}
-  var BAR={done:'var(--ink)',review:'var(--muted)',doing:'var(--warn)',blocked:'var(--danger)',todo:'var(--line)'};
+  var BAR={done:'var(--s-done)',review:'var(--s-review)',doing:'var(--s-doing)',blocked:'var(--s-blocked)',todo:'var(--s-todo)'};
+  // one color per person, the same on every visit
+  function hue(id){var h=0;for(var i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))>>>0;return 'c'+h%6}
   function $(id){return document.getElementById(id)}
   function el(tag,a,kids){var n=document.createElement(tag);for(var k in a||{}){if(a[k]==null)continue;if(k==='text')n.textContent=a[k];else if(k==='class')n.className=a[k];else if(k.slice(0,2)==='on')n.addEventListener(k.slice(2),a[k]);else n.setAttribute(k,a[k])}(kids||[]).forEach(function(c){if(c!=null&&c!==false)n.appendChild(typeof c==='string'?document.createTextNode(c):c)});return n}
   // owner/name of each GitHub repository the project lists (meta/config.repos)
@@ -236,6 +271,7 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
 
     function load(){
       call('GET','/api/projects').then(function(ps){
+        renderWork(ps);
         var list=$('list');list.textContent='';
         if(!ps.length){list.appendChild(el('p',{class:'empty',text:T('none')}));return}
         ps.forEach(function(p){
@@ -251,6 +287,25 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
           ]));
         });
       },function(e){$('list').textContent='';$('list').appendChild(el('p',{class:'err',text:T('loadFail',{e:e.message})}))});
+    }
+    // who has what in hand, board by board; a board nobody is working on stays out
+    function renderWork(ps){
+      var rows=ps.filter(function(p){return Array.isArray(p.working)&&p.working.length});
+      var mine=rows.filter(function(p){return p.working.some(function(w){return w.who===me.person})});
+      rows=mine.concat(rows.filter(function(p){return mine.indexOf(p)<0}));
+      var n=0;mine.forEach(function(p){p.working.forEach(function(w){if(w.who===me.person)n+=w.n})});
+      $('hWork').textContent=T('working');$('workSec').hidden=!ps.length;
+      $('workSub').textContent=rows.length?(n?T('workMe',{n:n,p:mine.length})+' ':'')+T('workSub'):T('workNone');
+      var ul=$('work');ul.textContent='';ul.hidden=!rows.length;
+      rows.forEach(function(p){
+        ul.appendChild(el('li',{},[
+          el('a',{class:'proj',href:'/p/'+p.id,title:p.title},[p.title,el('span',{text:'/p/'+p.id})]),
+          el('div',{class:'ppl'},p.working.map(function(w){
+            var name=w.name||w.who,tip=(w.tasks||[]).map(function(t){return t.key+' '+t.title+' · '+(L.st[t.status]||t.status)}).join('\n');
+            return el('span',{class:'pp '+hue(w.who)+(w.agent?' agent':'')+(w.who===me.person?' mine':''),title:tip},[el('i',{text:name.charAt(0).toUpperCase()}),el('b',{text:name}),el('span',{class:'n',text:String(w.n)})]);
+          }))
+        ]));
+      });
     }
     load();
     document.addEventListener('visibilitychange',function(){if(!document.hidden){load();if(me.role==='admin')loadMembers()}});
