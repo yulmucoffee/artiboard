@@ -10,8 +10,9 @@ const AT = '2026-10-23T09:00:00.000Z';
 const doneKeys = new Set(['A-1']);
 const isDone = (k) => doneKeys.has(k);
 
-test('a claim or an assignment holds a task; nothing else does', () => {
-  assert.equal(holderOf({ status: 'doing', owner: 'ana', claimedBy: { who: 'ben' } }), 'ben', 'the claim wins over the owner');
+test('the owner holds a task, whether a claim or an assignment set it; nothing else does', () => {
+  assert.equal(holderOf({ status: 'doing', owner: 'ana', claimedBy: { who: 'ben' } }), 'ana', 'a task reassigned after a claim is its new owner\'s');
+  assert.equal(holderOf({ status: 'doing', claimedBy: { who: 'ben' } }), null, 'a claim alone holds nothing');
   assert.equal(holderOf({ status: 'todo', owner: 'ana' }), 'ana', 'an assignment holds a task not yet started');
   assert.equal(holderOf({ status: 'todo' }), null);
 });

@@ -3,9 +3,9 @@
 // and in SQL can't drift apart. People are 'ana' and 'ben'; a database run maps them to two real members.
 
 const AT = '2026-10-23T09:00:00.000Z';
-const doing = { status: 'doing', claimedBy: { who: 'ana' } };
-const review = { status: 'review', claimedBy: { who: 'ana' } };
-const done = { status: 'done', claimedBy: { who: 'ana' }, doneAt: AT };
+const doing = { status: 'doing', owner: 'ana', claimedBy: { who: 'ana' } };
+const review = { status: 'review', owner: 'ana', claimedBy: { who: 'ana' } };
+const done = { status: 'done', owner: 'ana', claimedBy: { who: 'ana' }, doneAt: AT };
 
 // [task, writer, patch, override, allowed, why]
 export const CHANGE_CASES = [

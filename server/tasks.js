@@ -25,8 +25,9 @@ export function changedFields(before, after) {
 
 export function statusOf(t) { return (t && t.status) || 'todo'; }
 
-// who has the task: whoever claimed it, else whoever it is assigned to; an assignment holds it like a claim
-export function holderOf(t) { return (t && ((t.claimedBy && t.claimedBy.who) || t.owner)) || null; }
+// who has the task: its owner, whether a claim or an assignment set it. claimedBy only says how it was taken (an
+// agent, which session, when); reassigning a task changes its owner and so its holder.
+export function holderOf(t) { return (t && t.owner) || null; }
 
 // the deps not done yet; isDone(key) says whether the task with that key is done
 export function unmetDeps(t, isDone) {

@@ -90,6 +90,11 @@ export function openSqlite({ file, boardUrl }) {
   const db = new DatabaseSync(file);
   db.exec('pragma journal_mode = wal; pragma foreign_keys = on; pragma busy_timeout = 5000;');
   db.exec(SCHEMA);
+  // Tasks written before the owner alone held a task, whose claim names someone else: the claimer held it then, so
+  // they own it now and nothing changes hands. Converges: a second open finds nothing to repair.
+  db.prepare(`update docs set data = json_set(data, '$.owner', json_extract(data, '$.claimedBy.who')), version = version + 1
+    where collection = 'tasks' and json_type(data, '$.claimedBy.who') = 'text'
+      and json_extract(data, '$.owner') is not json_extract(data, '$.claimedBy.who')`).run();
   const changes = new EventEmitter();
   changes.setMaxListeners(0);
   const q = (sql) => db.prepare(sql);
@@ -297,7 +302,7 @@ export function openSqlite({ file, boardUrl }) {
       const held = new Map();
       for (const r of q(`select doc_id, data from docs where project = ? and collection = 'tasks'
           and json_extract(data, '$."status"') in ('doing', 'review', 'blocked')`).all(p.id)) {
-        const d = JSON.parse(r.data), who = d.claimedBy?.who || d.owner;
+        const d = JSON.parse(r.data), who = d.owner;
         if (typeof who !== 'string' || !who) continue;
         const w = held.get(who) || { who, name: names.get(who) || null, n: 0, agent: false, tasks: [] };
         w.n++;

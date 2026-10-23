@@ -239,7 +239,7 @@ export function makeFlow(store) {
     const d = t.data;
     const since = det?.data?.summaryAt;
     const msgs = latest.filter((m) => !since || (typeof m.data.at === 'string' && m.data.at >= since)).reverse();
-    const who = d.claimedBy?.who ? `${d.claimedBy.who}${d.claimedBy.agent ? ' (agent)' : ''}` : d.owner || 'unassigned';
+    const who = d.owner ? `${d.owner}${d.claimedBy?.agent && d.claimedBy.who === d.owner ? ' (agent)' : ''}` : 'unassigned';
     const out = [`${d.key || id} ${d.status || 'todo'} · ${who}${d.repo ? ` · repo:${d.repo}` : ''}${d.branch ? ` · ${d.branch}` : ''}${d.pr ? ` · ${d.pr}` : ''}`, d.title || ''];
     if (d.deps?.length) out.push(`deps ${d.deps.join(', ')}${d.waitingOn?.length ? ` · waiting on ${d.waitingOn.join(', ')}` : ''}`);
     const dates = [day(d.start) && `start ${d.start}`, day(d.due) && `due ${d.due}`, d.doneAt && `done ${short(d.doneAt)}`, d.archivedAt && `archived ${short(d.archivedAt)}`].filter(Boolean);

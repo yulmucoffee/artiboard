@@ -269,6 +269,8 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   b.sneak('tasks/M1-1',c=>({...c,due:'2026-02-01'}));
   change(b.d,'fBranch','feat/schema');await tick();await tick();
   ok(b.store['tasks/M1-1'].branch==='feat/schema'&&b.store['tasks/M1-1'].due==='2026-02-01','a change on top of someone else\'s keeps theirs');
+  change(b.d,'fOwner','ben');await tick();await tick();
+  ok(b.store['tasks/M1-1'].owner==='ben'&&b.store['tasks/M1-1'].claimedBy===null,'handing a task to someone else drops the old claim, so its owner holds it');
   b.key('Escape');
 
   console.log('# view-only viewer');
