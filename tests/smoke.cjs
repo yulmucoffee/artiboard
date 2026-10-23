@@ -16,8 +16,8 @@ const seed=()=>({
 });
 // user: the namespace claude.use('user') resolves (null = no identity, today's picker); deny: every write rejects like a view-only viewer's
 // race: a path someone else claims right after the page reads it; bump: a path someone touches without claiming it
-// (both make the store keep versions, like a hosted site's)
-function boot({user=null,docs={},me=null,deny=false,storage={},race=null,bump=null}={}){
+// (both make the store keep versions, like a hosted site's, as versions does on its own)
+function boot({user=null,docs={},me=null,deny=false,storage={},race=null,bump=null,versions=false}={}){
   const store={...seed(),...docs},subs=[],writes=[],errors=[],vers={};
   const notify=()=>subs.slice().forEach(s=>s());
   const put=(p,f,o)=>{if(deny)return Promise.reject({code:'invalid_argument'});
@@ -26,7 +26,7 @@ function boot({user=null,docs={},me=null,deny=false,storage={},race=null,bump=nu
   function snapColl(p,o){let docs=Object.keys(store).filter(k=>k.startsWith(p+'/')&&!k.slice(p.length+1).includes('/')).map(k=>({id:k.slice(p.length+1),data:()=>store[k]}));
     if(o.order)docs.sort((a,b)=>(a.data()[o.order]>b.data()[o.order]?1:-1)*(o.dir==='desc'?-1:1));return {docs:o.limit?docs.slice(0,o.limit):docs}}
   function coll(p,o={}){return {orderBy:(f,d)=>coll(p,{...o,order:f,dir:d}),limit:n=>coll(p,{...o,limit:n}),onSnapshot(cb){const run=()=>cb(snapColl(p,o));subs.push(run);run();return()=>subs.splice(subs.indexOf(run),1)}}}
-  const versioned=!!(race||bump);
+  const versioned=!!(race||bump||versions);
   function doc(p){return {get:async()=>{const seen=store[p],r={exists:!!seen,version:versioned?vers[p]||0:undefined,data:()=>seen};
       if(race===p){race=null;await put(p,c=>({...c,status:'doing',owner:'ben',claimedBy:{who:'ben',agent:true,at:T0}}))}
       if(bump===p){bump=null;await put(p,c=>({...c,waitingOn:[]}))}return r},onSnapshot(cb){const run=()=>cb({exists:!!store[p],data:()=>store[p]});subs.push(run);run();return()=>subs.splice(subs.indexOf(run),1)},
@@ -35,7 +35,9 @@ function boot({user=null,docs={},me=null,deny=false,storage={},race=null,bump=nu
     beforeParse(w){w.Math.random=()=>0;if(me)w.localStorage.setItem('ab-me',me);for(const k in storage)w.localStorage.setItem(k,storage[k]);
       w.claude={use:n=>Promise.resolve(n==='db'?{collection:coll,doc}:n==='user'?user:null)};w.HTMLElement.prototype.scrollIntoView=()=>{}}});
   const w=dom.window;w.addEventListener('error',e=>errors.push(e.message));
-  return {w,d:w.document,store,writes,errors,notify,key:k=>w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:k,bubbles:true})),pick:id=>{const x=w.document.querySelector('#meSel [data-me="'+id+'"]');if(x)x.click();return !!x}};
+  // sneak: another writer's change the page has not heard about yet
+  const sneak=(p,f)=>{store[p]=f(store[p]);vers[p]=(vers[p]||0)+1};
+  return {w,d:w.document,store,writes,errors,notify,sneak,key:k=>w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:k,bubbles:true})),pick:id=>{const x=w.document.querySelector('#meSel [data-me="'+id+'"]');if(x)x.click();return !!x}};
 }
 const fakeUser=(id,write)=>({id:async()=>id,can:async n=>n==='data.write'?write:false,isOwner:async()=>false,canEdit:async()=>false});
 const tick=()=>new Promise(r=>setTimeout(r,50));const heal=()=>new Promise(r=>setTimeout(r,600));
@@ -256,6 +258,18 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   b=boot({bump:'tasks/M1-1'});all.push(b);await tick();await heal();b.pick('ana');await tick();
   [...b.d.querySelectorAll('.rows.ready li')].find(li=>/M1-1/.test(li.textContent)).querySelector('.btn').click();await tick();await tick();await tick();
   ok(b.store['tasks/M1-1'].claimedBy&&b.store['tasks/M1-1'].claimedBy.who==='ana','a change that left the task free does not stop the claim');
+
+  console.log('# a change from a copy the page has not refreshed yet');
+  b=boot({versions:true,docs:{'tasks/M1-1':{key:'M1-1',title:'Schema',feature:'Data',status:'doing',owner:'ana',deps:[],waitingOn:[],claimedBy:{who:'ana',agent:true,at:T0},updatedAt:T0}}});
+  all.push(b);await tick();await heal();b.pick('ana');await tick();
+  b.d.querySelector('tr.item[data-k="M1-1"]').click();await tick();
+  b.sneak('tasks/M1-1',c=>({...c,status:'done',doneAt:T0}));
+  change(b.d,'fStatus','review');await tick();await tick();
+  ok(b.store['tasks/M1-1'].status==='review'&&!b.store['tasks/M1-1'].doneAt,'a status change works from the task as it is now: leaving done takes back the done day');
+  b.sneak('tasks/M1-1',c=>({...c,due:'2026-02-01'}));
+  change(b.d,'fBranch','feat/schema');await tick();await tick();
+  ok(b.store['tasks/M1-1'].branch==='feat/schema'&&b.store['tasks/M1-1'].due==='2026-02-01','a change on top of someone else\'s keeps theirs');
+  b.key('Escape');
 
   console.log('# view-only viewer');
   b=boot({user:fakeUser('u_ana',false)});all.push(b);await tick();await heal();

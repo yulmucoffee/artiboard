@@ -121,6 +121,11 @@ export function openSqlite({ file, boardUrl }) {
     return r ? docOut(r) : null;
   }
 
+  // reads as get ({path}) and query ({collection, where, order, limit, after}) take them; on Supabase, one request
+  async function readMany(project, reads) {
+    return Promise.all(reads.map((r) => (r.path ? get(project, r.path) : query(project, r.collection, r))));
+  }
+
   async function query(project, collection, { where = [], order = [], limit = 20, after = null } = {}) {
     checkProject(project);
     checkCollection(collection);
@@ -427,7 +432,7 @@ export function openSqlite({ file, boardUrl }) {
   async function endSession(sid) { if (sid) q('delete from sessions where hash = ?').run(hashToken(sid)); }
 
   return {
-    kind: 'sqlite', get, query, apply, readRows, acquire, subscribe, overview, createProject, dropProject, projectIds,
+    kind: 'sqlite', get, query, readMany, apply, readRows, acquire, subscribe, overview, createProject, dropProject, projectIds,
     getPage, setPage, resetPage, memberForToken, memberByPerson, listMembers, addMember, setRole, setMemberName, removeMember, issueToken,
     revokeTokens, loginLink, startSession, memberForSession, endSession, close: () => db.close(),
   };

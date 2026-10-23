@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.13.1",
+      "date": "2026-10-23",
+      "prs": [
+        28
+      ],
+      "lines": {
+        "en": [
+          "A change made on the page reads the task first and writes only if nobody changed it since, so a status picked from a copy the page had not refreshed no longer leaves a done day on a task in review.",
+          "board_start, board_task, board_claim and board_post send their reads to the database as one request on Supabase instead of one each."
+        ],
+        "ko": [
+          "페이지에서 바꾸면 태스크를 먼저 읽고, 그 사이 바뀌지 않았을 때만 써요. 아직 갱신되지 않은 화면에서 상태를 골라도 검토 중인 태스크에 완료 날짜가 남지 않아요.",
+          "board_start, board_task, board_claim, board_post가 Supabase에서 읽기를 하나씩 보내지 않고 한 번에 보내요."
+        ]
+      }
+    },
+    {
       "version": "1.13.0",
       "date": "2026-10-23",
       "prs": [

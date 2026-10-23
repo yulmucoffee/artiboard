@@ -340,6 +340,13 @@ for (const backend of backends) {
       await call(board, 'board_batch', { project: P, writes: ['d1', 'd2', 'd3', 'd4', 'd5'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })) });
     });
 
+    test('several reads in one call return what each read returns', async () => {
+      const reads = [{ path: 'meta/config' }, { path: `tasks/none-${R}` }, { collection: 'notices', order: [{ field: 'at', dir: 'desc' }], limit: 3 },
+        { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'todo' }], limit: 5 }];
+      const one = await Promise.all(reads.map((r) => (r.path ? store.get(P, r.path) : store.query(P, r.collection, r))));
+      assert.deepEqual(await store.readMany(P, reads), one, 'one round trip for what board_start reads first');
+    });
+
     test('the start says where someone else wrote last, and folds my work in review into one line', async () => {
       const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
       const task = (n) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `last ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at } });

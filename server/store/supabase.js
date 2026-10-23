@@ -14,6 +14,8 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
   const get = (project, path) => rpc('ab_get', { p_project: project, p_path: path });
   const query = (project, collection, { where = [], order = [], limit = 20, after = null } = {}) =>
     rpc('ab_query', { p_project: project, p_collection: collection, p_where: where || [], p_order: order || [], p_limit: limit, p_after: after });
+  // reads as get ({path}) and query ({collection, where, order, limit, after}) take them, in one request
+  const readMany = (project, reads) => rpc('ab_read', { p_project: project, p_reads: reads });
   const apply = (actor, project, writes) => rpc('ab_apply', { p_actor: actor ?? null, p_project: project, p_writes: writes });
 
   async function overview() { return rpc('ab_overview', {}); }
@@ -113,7 +115,7 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
   }
 
   return {
-    kind: 'supabase', browser: { supabaseUrl: url, supabaseKey: publishableKey }, get, query, apply, overview, projectIds,
+    kind: 'supabase', browser: { supabaseUrl: url, supabaseKey: publishableKey }, get, query, readMany, apply, overview, projectIds,
     createProject, dropProject, getPage, setPage, resetPage, memberForToken, memberForJwt, memberByPerson, listMembers,
     addMember, setRole, setMemberName, removeMember, issueToken, revokeTokens, loginLink, close() {},
   };

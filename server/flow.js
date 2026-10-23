@@ -67,6 +67,12 @@ export function makeFlow(store) {
   const get = (project, path) => store.get(project, path);
   const query = (project, collection, opts) => store.query(project, collection, opts);
   const apply = (member, project, writes) => store.apply(member.uid, project, writes);
+  // reads that do not wait on each other go together, as one database request on Supabase (at most 20 a request)
+  const read = async (project, reads) => {
+    const parts = [];
+    for (let i = 0; i < reads.length; i += 20) parts.push(store.readMany(project, reads.slice(i, i + 20)));
+    return (await Promise.all(parts)).flat();
+  };
 
   // The project a repository belongs to: the one whose meta/config.repos lists it.
   async function projectFor(repo) {
@@ -82,7 +88,7 @@ export function makeFlow(store) {
   async function doneKeys(project, keys) {
     const all = [...new Set(keys)], done = new Set(), chunks = [];
     for (let i = 0; i < all.length; i += 100) chunks.push(all.slice(i, i + 100));
-    for (const found of await Promise.all(chunks.map((ks) => query(project, 'tasks', { where: [{ field: 'key', op: 'in', value: ks }, { field: 'status', op: '==', value: 'done' }], limit: 200 })))) {
+    for (const found of await read(project, chunks.map((ks) => ({ collection: 'tasks', where: [{ field: 'key', op: 'in', value: ks }, { field: 'status', op: '==', value: 'done' }], limit: 200 })))) {
       for (const d of found) done.add(d.data.key);
     }
     return done;
@@ -118,16 +124,18 @@ export function makeFlow(store) {
     if (!project && !repo) throw new BoardError('invalid_argument', 'pass project, or repo (owner/name from git remote) to find it');
     if (!project) project = await projectFor(repo);
     const me = member.person;
-    const [config, cursor, owned, todo, own, notes, latest, inReview] = await Promise.all([
-      get(project, 'meta/config'),
-      get(project, `cursors/${me}`),
-      query(project, 'tasks', { where: [{ field: 'owner', op: '==', value: me }], limit: 50 }),
-      ready ? query(project, 'tasks', { where: [{ field: 'status', op: '==', value: 'todo' }], limit: 200 }) : [],
-      rules ? get(project, 'meta/rules') : null,
-      rules ? get(project, 'meta/notes') : null,
-      query(project, 'notices', { order: [{ field: 'at', dir: 'desc' }], limit: 20 }),
-      ready ? query(project, 'tasks', { where: [{ field: 'status', op: '==', value: 'review' }], limit: 50 }) : [],
-    ]);
+    const reads = [
+      { path: 'meta/config' },
+      { path: `cursors/${me}` },
+      { collection: 'tasks', where: [{ field: 'owner', op: '==', value: me }], limit: 50 },
+      ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'todo' }], limit: 200 },
+      rules && { path: 'meta/rules' },
+      rules && { path: 'meta/notes' },
+      { collection: 'notices', order: [{ field: 'at', dir: 'desc' }], limit: 20 },
+      ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'review' }], limit: 50 },
+    ];
+    const got = await read(project, reads.filter(Boolean));
+    const [config, cursor, owned, todo = [], own = null, notes = null, latest, inReview = []] = reads.map((r) => (r ? got.shift() : undefined));
     // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
     const mine = owned.filter((t) => (t.data.status || 'todo') !== 'done');
     // the 20 latest notices: those after the cursor are new (all 20 new: older ones went unread); no cursor yet, the latest 5
@@ -203,8 +211,8 @@ export function makeFlow(store) {
   async function task(project, id, { thread = 8 } = {}) {
     // the latest messages come in the same round trip, then those before the summary drop out: the same messages a
     // query after the summary time would give, one round trip sooner
-    const [t, det, latest] = await Promise.all([get(project, `tasks/${id}`), get(project, `details/${id}`),
-      thread ? query(project, `tasks/${id}/messages`, { order: [{ field: 'at', dir: 'desc' }], limit: thread }) : []]);
+    const [t, det, latest = []] = await read(project, [{ path: `tasks/${id}` }, { path: `details/${id}` },
+      ...(thread ? [{ collection: `tasks/${id}/messages`, order: [{ field: 'at', dir: 'desc' }], limit: thread }] : [])]);
     if (!t) throw new BoardError('not_found', `no task ${id}`);
     const d = t.data;
     const since = det?.data?.summaryAt;
@@ -226,7 +234,7 @@ export function makeFlow(store) {
   // override takes over a task someone else holds (not a done one), when the agent's person says so.
   async function claim(member, project, id, { text, session, override } = {}) {
     const me = member.person;
-    const [det, config] = await Promise.all([get(project, `details/${id}`), get(project, 'meta/config')]);
+    const [det, config] = await read(project, [{ path: `details/${id}` }, { path: 'meta/config' }]);
     const result = await retrying(async () => {
       const t = await get(project, `tasks/${id}`);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
@@ -284,7 +292,8 @@ export function makeFlow(store) {
     // the asked-for change, empty strings clearing a field
     const change = Object.fromEntries(Object.entries({ status, branch, pr, start, due, repo, summary }).filter(([, v]) => v !== undefined));
     return retrying(async () => {
-      const [ts, det] = await Promise.all([Promise.all(ids.map((i) => get(project, `tasks/${i}`))), summary !== undefined ? get(project, `details/${id}`) : null]);
+      const got = await read(project, [...ids.map((i) => ({ path: `tasks/${i}` })), ...(summary !== undefined ? [{ path: `details/${id}` }] : [])]);
+      const ts = got.slice(0, ids.length), det = got[ids.length] ?? null;
       const at = now(), patches = new Map(), writes = [], keys = [];
       ts.forEach((t, n) => {
         if (!t) throw new BoardError('not_found', `no task ${ids[n]}`);

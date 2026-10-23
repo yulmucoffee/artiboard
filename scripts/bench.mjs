@@ -27,7 +27,7 @@ async function board(n) {
   }
   if (!RTT) return store;
   const slow = (fn) => async (...a) => { await new Promise((r) => setTimeout(r, RTT)); return fn(...a); };
-  return { ...store, get: slow(store.get), query: slow(store.query), apply: slow(store.apply), overview: slow(store.overview) };
+  return { ...store, get: slow(store.get), query: slow(store.query), readMany: slow(store.readMany), apply: slow(store.apply), overview: slow(store.overview) };
 }
 
 async function time(fn) {

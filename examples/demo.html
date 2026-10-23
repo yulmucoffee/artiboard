@@ -1646,11 +1646,22 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function filtering(){return !!q||newOnly||mineOnly}
 
   // A person's change from the page: the task, then one line in its thread saying what changed, as agents' changes do,
-  // so the holder and their agents see who moved it.
+  // so the holder and their agents see who moved it. It reads the task first and writes with that version: the page's
+  // copy may lag an agent's write, and status side effects and the holder rule must see the task as it is now. A task
+  // that moved again in between is read once more.
+  function change(t,patch,extra){
+    if(!writable()||!me)return Promise.resolve();
+    function attempt(left){
+      return db.doc('tasks/'+t.id).get().then(function(s){
+        var cur=s.exists?Object.assign({},s.data(),{id:t.id}):t;
+        return changeAt(cur,Object.assign({},patch),extra,s.version).then(function(r){return r==='stale'&&left?attempt(left-1):r});
+      });
+    }
+    return attempt(1).then(function(r){if(r==='stale')toast(T('saveFail',{e:'version_conflict'}));return r});
+  }
   // ifVersion (a runtime that reports versions): write only if the task is still the version read; 'stale' if it is
   // not any more, false on any other failure
-  function change(t,patch,extra,ifVersion){
-    if(!writable()||!me)return Promise.resolve();
+  function changeAt(t,patch,extra,ifVersion){
     var at=now(),bits=[],dash='—';
     if('status' in patch)patch=Object.assign({},patch,statusEffects(t,patch.status,at));
     function was(k,a,b,f){if(k in patch&&(a||null)!==(b||null))bits.push(T(k==='status'?'f_status':'f_'+k)+' '+(a?f(a):dash)+' → '+(b?f(b):dash))}
@@ -1804,7 +1815,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       return db.doc('tasks/'+t.id).get().then(function(s){
         var d=s.exists?s.data():null;
         if(!d||statusOf(d)!=='todo'||(holderOf(d)&&holderOf(d)!==me)){toast(T('alreadyClaimed'));return}
-        return change(t,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}},'',s.version).then(function(r){
+        return changeAt(Object.assign({},d,{id:t.id}),{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}},'',s.version).then(function(r){
           if(r==='stale')return left?attempt(left-1):toast(T('alreadyClaimed'));
           if(r!==false)toast(T('claimed',{p:pname(me),k:t.key}));
         });
