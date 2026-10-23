@@ -51,6 +51,10 @@ function taskLine(d, id, withStatus) {
   bits.push(...dateBits(d));
   return `${bits.join(' ')} ${d.title || ''}`.trim();
 }
+// equal as stored data: a missing field equals null, and object keys compare in any order
+const canon = (v) => (v == null ? null : Array.isArray(v) ? v.map(canon)
+  : typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 const msgLine = (m) => `${short(m.at)} ${m.author || '?'}${m.type && m.type !== 'note' ? ` ${m.type}` : ''}: ${oneLine(m.text)}`;
 const repoList = (repos) => repos.map((r) => `${r.repo}${r.label ? ` (${r.label})` : ''}`).join(' · ');
 
@@ -298,24 +302,41 @@ export function makeFlow(store) {
     });
   }
 
-  // An agent's batch writes to tasks follow the same rules as board_post: a task someone else holds changes only
-  // in the ways the rules open to everyone. Override lives on board_post alone, where the thread records it.
-  async function batch(member, project, writes) {
-    const onTasks = writes.map((w, i) => [w, i]).filter(([w]) => /^tasks\/[^/]+$/.test(w.path));
-    const current = await Promise.all(onTasks.map(([w]) => get(project, w.path)));
-    onTasks.forEach(([w, i], j) => {
-      const before = current[j]?.data;
-      if (!before) return;
-      const after = w.op === 'delete' ? {} : w.op === 'set' ? w.data || {} : { ...before, ...w.data };
+  // An agent's batch writes to a task or its details follow the same rules as board_post. Override, passed when the
+  // agent's person says so, lets a refused write through and leaves a line in that task's thread naming the holder.
+  // The first write to each existing document is pinned to the version this check read, so the check still holds
+  // when the write lands.
+  async function batch(member, project, writes, override = false) {
+    const me = member.person, target = (w) => /^(tasks|details)\/([^/]+)$/.exec(w.path);
+    const ids = [...new Set(writes.map(target).filter(Boolean).map((m) => m[2]))];
+    const paths = ids.flatMap((id) => [`tasks/${id}`, `details/${id}`]);
+    const docs = new Map(await Promise.all(paths.map(async (p) => [p, await get(project, p)])));
+    const pinned = new Set(), overridden = new Map();
+    const out = writes.map((w, i) => {
+      // a task that exists rules its own document and its details, even details not written yet
+      const m = target(w), cur = m && docs.get(w.path), task = m && docs.get(`tasks/${m[2]}`)?.data;
+      if (!task) return w;
+      const before = cur?.data || {}, after = w.op === 'delete' ? {} : w.op === 'set' ? w.data || {} : { ...before, ...w.data };
       const patch = {};
-      for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) {
-        if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) patch[k] = after[k] ?? null;
+      for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) if (!same(before[k], after[k])) patch[k] = after[k] ?? null;
+      // a details document's text belongs to the task's holder; summaryAt only travels with the summary
+      if (m[1] === 'details') delete patch.summaryAt;
+      if (!mayChange(task, me, patch, false)) {
+        if (!override) throw new BoardError('not_yours', `${task.key || m[2]} is held by ${holderOf(task)}; pass override true only when your person says so (the thread records it)`, i);
+        const o = overridden.get(m[2]) || { holder: holderOf(task), fields: new Set() };
+        Object.keys(patch).forEach((f) => o.fields.add(f));
+        overridden.set(m[2], o);
       }
-      if (!mayChange(before, member.person, patch, false)) {
-        throw new BoardError('not_yours', `${before.key || w.path} is held by ${holderOf(before)}; change it with board_post (override true only when your person says so)`, i);
-      }
+      if (!cur || w.if_version !== undefined || w.if_absent || pinned.has(w.path)) return w;
+      pinned.add(w.path);
+      return { ...w, if_version: cur.version };
     });
-    return apply(member, project, writes);
+    const at = now();
+    for (const [id, o] of overridden) {
+      out.push({ op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true,
+        data: { at, author: me, kind: 'agent', type: 'update', text: `changed ${[...o.fields].join(', ')} (override; held by ${o.holder})` } });
+    }
+    return apply(member, project, out);
   }
 
   return { start, task, claim, post, batch, projectFor };

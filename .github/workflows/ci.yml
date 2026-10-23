@@ -8,6 +8,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,6 +35,7 @@ jobs:
   # the same server tests against the second backend: a local Supabase stack with this repository's migrations
   supabase:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,7 +47,7 @@ jobs:
       - name: Install
         run: npm ci --no-audit --no-fund
       - name: Start Supabase with the migrations
-        run: supabase start -x studio,logflare,vector,imgproxy,inbucket,edge-runtime,storage-api
+        run: supabase start -x studio,logflare,vector,imgproxy,mailpit,edge-runtime,storage-api
       - name: Tests on SQLite and Supabase
         run: |
           eval "$(sh scripts/supabase-env.sh)"

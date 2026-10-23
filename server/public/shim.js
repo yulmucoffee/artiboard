@@ -308,7 +308,8 @@
       var mine = w.op === 'delete' ? null : { collection: c, doc_id: id, version: was ? was.version : 0, updated_at: was ? was.updated_at : '',
         data: w.op === 'set' ? copy(w.data) : Object.assign(was ? copy(was.data) : {}, copy(w.data)) };
       if (mine || was) force(c, id, mine);
-      return function () { force(c, id, was); };
+      // a refused write puts back what was there, unless the server's newer copy arrived meanwhile
+      return function () { var cur = known(c, id); if (cur === mine || (!mine && !cur)) force(c, id, was); };
     }
     function write(w) {
       var undo = local(w);

@@ -10,12 +10,12 @@
       "lines": {
         "en": [
           "A task assigned to someone is theirs everywhere: no one else's agent claims it, and it leaves Ready to pick.",
-          "When two people or agents claim the same task at once, exactly one gets it; agents' batch writes follow the same holder rule.",
+          "When two claim the same task at once, exactly one gets it. Agents' batch writes follow the holder rule too, with override only when their person says so.",
           "board_start names the site's artiboard version, so an agent can tell when its installed skill is older."
         ],
         "ko": [
           "누군가에게 배정된 태스크는 어디서나 그 사람 것이에요. 다른 에이전트가 집지 못하고 ‘바로 집을 수 있는 일’에도 안 나와요.",
-          "두 사람이나 에이전트가 같은 일을 동시에 집으면 정확히 한쪽만 가져가요. 에이전트의 batch 쓰기도 같은 담당자 규칙을 따라요.",
+          "두 쪽이 같은 일을 동시에 집으면 정확히 한쪽만 가져가요. 에이전트의 batch 쓰기도 담당자 규칙을 따르고, 사람이 시킬 때만 override로 넘어가요.",
           "board_start가 사이트의 artiboard 버전을 알려 줘서, 설치된 스킬이 오래됐는지 에이전트가 알 수 있어요."
         ]
       }

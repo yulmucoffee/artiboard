@@ -83,7 +83,7 @@
      "type": "string"
     },
     "override": {
-     "description": "Only when your person tells you to change a task someone else holds",
+     "description": "Only when your person says so",
      "type": "boolean"
     }
    },
@@ -153,7 +153,7 @@
      "type": "string"
     },
     "override": {
-     "description": "Only when your person tells you to change a task someone else holds",
+     "description": "Only when your person says so",
      "type": "boolean"
     }
    },
@@ -408,6 +408,10 @@
        "path"
       ]
      }
+    },
+    "override": {
+     "description": "Only when your person says so",
+     "type": "boolean"
     }
    },
    "required": [

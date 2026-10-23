@@ -227,6 +227,21 @@ for (const backend of backends) {
         assert.equal(refused.value.index, 1, 'and names the write it refused');
         assert.equal((await viaBatch({}, 'delete')).value.code, 'not_yours', 'nor deletes someone else\'s task');
         assert.equal((await viaBatch({ due: '2026-11-30', waitingOn: [] })).error, false, 'the due day and bookkeeping stay open to anyone');
+        assert.equal((await viaBatch({ title: 'renamed', status: 'review' }, 'set')).value.code, 'not_yours', 'a whole-document set too');
+        assert.equal((await viaBatch({ archivedAt: null, claimedBy: { at: '', who: me, agent: true } })).value.code, 'not_yours',
+          'a changed claim is a change');
+        const h1 = (await call(other, 'board_get', { project: P, path: `tasks/${K('h1')}` })).value.data;
+        const same = { claimedBy: Object.fromEntries(Object.entries(h1.claimedBy).reverse()), archivedAt: null, due: '2026-12-01' };
+        assert.equal((await viaBatch(same)).error, false, 'a missing field equals null, and key order does not matter');
+        const details = await call(other, 'board_batch', { project: P, writes: [{ op: 'set', path: `details/${K('h1')}`, data: { summary: 'not mine to write' } }] });
+        assert.equal(details.value.code, 'not_yours', 'a held task\'s details are the holder\'s too');
+        const fresh = await call(other, 'board_batch', { project: P, writes: [
+          { op: 'set', path: `tasks/${K('new')}`, if_absent: true, data: { key: K('new'), title: 'new', status: 'todo', deps: [], waitingOn: [] } },
+          { op: 'set', path: `details/${K('new')}`, if_absent: true, data: { spec: 'x' } }] });
+        assert.equal(fresh.error, false, 'new tasks and their details are anyone\'s to write');
+        const over = await call(other, 'board_batch', { project: P, override: true, writes: [{ op: 'update', path: `tasks/${K('h1')}`, data: { title: 'retitled', milestone: 'M2' } }] });
+        assert.equal(over.error, false, 'override lets a person-approved change through');
+        assert.deepEqual(await last('h1'), { text: `changed title, milestone (override; held by ${me})`, author: them }, 'and the thread names the holder');
         assert.match((await call(other, 'board_post', { project: P, task: K('h1'), status: 'done', branch: 'x' })).value, /^not_yours: .*review it/, 'a reviewer changes only the status');
         assert.equal((await call(other, 'board_post', { project: P, task: K('h1'), text: 'merged', status: 'done' })).value, `ok ${K('h1')} → done`);
         assert.match((await call(other, 'board_task', { project: P, id: K('h1'), thread: 0 })).value, new RegExp(`^${K('h1')} done · ${me} \\(agent\\)`), 'the holder keeps the credit');

@@ -937,7 +937,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // A person's change from the page: the task, then one line in its thread saying what changed, as agents' changes do,
   // so the holder and their agents see who moved it.
-  // ifVersion (a runtime that reports versions): write only if the task is still the version read; false if not
+  // ifVersion (a runtime that reports versions): write only if the task is still the version read; 'stale' if it is
+  // not any more, false on any other failure
   function change(t,patch,extra,ifVersion){
     if(!writable()||!me)return Promise.resolve();
     var at=now(),bits=[],dash='—';
@@ -948,7 +949,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     patch.updatedAt=patch.lastMessageAt=at;markSeen(t.id,at);
     return db.doc('tasks/'+t.id).update(patch,typeof ifVersion==='number'?{ifVersion:ifVersion}:undefined)
       .then(function(){return db.doc('tasks/'+t.id+'/messages/'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:'update',text:bits.join(' · ')+(extra||'')})})
-      .catch(function(e){if(e&&e.code==='version_conflict'&&typeof ifVersion==='number'){toast(T('alreadyClaimed'));return false}toast(T('saveFail',{e:errText(e)}));refused(e);return false});
+      .catch(function(e){if(e&&e.code==='version_conflict'&&typeof ifVersion==='number')return 'stale';toast(T('saveFail',{e:errText(e)}));refused(e);return false});
   }
   // one-click moves for the task in the sheet: the review step is anyone's, taking over asks twice
   function actions(t){
@@ -957,7 +958,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     function b(label,patch,primary,extra){bs.push(el('button',{type:'button',class:'btn small'+(primary?' primary':''),text:label,onclick:function(e){var x=e.currentTarget;x.disabled=true;change(t,patch,extra).then(function(){x.disabled=false})}}))}
     if(s==='review'){b(T('act_done'),{status:'done'},true);b(T('act_back'),{status:'doing'})}
     else if(s==='done'){b(T('act_reopen'),{status:'doing'});b(t.archivedAt?T('unarch'):T('archSheet'),{archivedAt:t.archivedAt?null:now()})}
-    else if(s==='todo'&&!t.claimedBy&&(!h||h===me)){if(!unmet(t).length)bs.push(el('button',{type:'button',class:'btn small primary',text:T('act_claim'),onclick:function(e){claim(t,e.currentTarget)}}))}
+    else if(statusOf(t)==='todo'&&!t.claimedBy&&(!h||h===me)){if(!unmet(t).length)bs.push(el('button',{type:'button',class:'btn small primary',text:T('act_claim'),onclick:function(e){claim(t,e.currentTarget)}}))}
     else if(h===me){b(T('act_review'),{status:'review'},true);b(s==='blocked'?T('act_resume'):T('act_blocked'),{status:s==='blocked'?'doing':'blocked'});b(T('act_release'),{status:'todo'})}
     if(h&&h!==me&&s!=='done'){
       var tk=el('button',{type:'button',class:'btn small',text:T('act_take',{p:pname(h)})});
@@ -1081,13 +1082,20 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     box.appendChild(ul2);
     if(rd.length>NOW_MAX)box.appendChild(moreBtn(!!nowAll.ready,rd.length-NOW_MAX,function(){nowAll.ready=!nowAll.ready;renderNow()}));
   }
+  // read, then write only if nothing changed since; a change that left the task free (a repair, a post) gets one retry
   function claim(t,btn){
     if(!writable()||!me)return;btn.disabled=true;
-    db.doc('tasks/'+t.id).get().then(function(s){
-      var d=s.exists?s.data():null;
-      if(!d||statusOf(d)!=='todo'||(holderOf(d)&&holderOf(d)!==me)){toast(T('alreadyClaimed'));return}
-      return change(t,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}},'',s.version).then(function(ok){if(ok!==false)toast(T('claimed',{p:pname(me),k:t.key}))});
-    }).catch(function(e){toast(T('claimFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false});
+    function attempt(left){
+      return db.doc('tasks/'+t.id).get().then(function(s){
+        var d=s.exists?s.data():null;
+        if(!d||statusOf(d)!=='todo'||(holderOf(d)&&holderOf(d)!==me)){toast(T('alreadyClaimed'));return}
+        return change(t,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}},'',s.version).then(function(r){
+          if(r==='stale')return left?attempt(left-1):toast(T('alreadyClaimed'));
+          if(r!==false)toast(T('claimed',{p:pname(me),k:t.key}));
+        });
+      });
+    }
+    attempt(1).catch(function(e){toast(T('claimFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false});
   }
 
   // The tasks touched most recently, each with its latest message: one small listener per task, dropped when the
