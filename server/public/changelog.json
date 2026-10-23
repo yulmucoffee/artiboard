@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.9.1",
+      "date": "2026-10-23",
+      "prs": [
+        18
+      ],
+      "lines": {
+        "en": [
+          "The README in every language and the live demo now show 1.9: the Notion-style kanban, the archive, taking over tasks and the project list's Working now."
+        ],
+        "ko": [
+          "모든 언어의 README와 라이브 데모가 1.9 기준이 됐어요: Notion식 칸반, 보관함, 넘겨받기, 프로젝트 목록의 ‘지금 작업 중’."
+        ]
+      }
+    },
+    {
       "version": "1.9.0",
       "date": "2026-10-23",
       "prs": [

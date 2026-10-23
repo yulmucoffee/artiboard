@@ -37,7 +37,7 @@ Agent 遵循放在你仓库里的几条精简规则：用查询代替全量读�
 
 ## 演示
 
-**[打开在线演示 →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** 一个正在开发菜谱应用的虚构三人团队，共 14 个任务。它用页面内的示例数据运行真实的看板页面，随便点：认领任务、在讨论串里留言、搜索、按 `j`/`k` 移动。几秒后会自动收到两条 agent 更新。顶部的 English / 한국어 按钮可以把整个演示（包括示例数据）切换成韩语。
+**[打开在线演示 →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** 一个正在开发菜谱应用的虚构三人团队，共 14 个任务。它用页面内的示例数据运行真实的看板页面，随便点：认领任务、在讨论串里留言、搜索、按 `j`/`k` 移动。几秒后会自动收到两条 agent 更新。顶部的 English / 한국어 按钮可以把整个演示（包括示例数据）切换成韩语。 在看板里可以折叠一列、以两列卡片显示，或把已完成的工作归档。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">
@@ -81,14 +81,14 @@ artiboard 把这些状态集中到团队共享的一块实时看板上，并给 
 
 ### 🗂️ 一块看板，三种视图
 
-从上往下读的文档视图、看板视图，以及突出最长剩余链路的依赖图。最近动态列出每个有动静的任务的最后一条消息，"当前"会突出被阻塞、已逾期或今天到期的任务。支持搜索、按列排序、"我的"筛选、`j`/`k` 快捷键和"上次查看后的变化"标记。浅色、深色或自动主题。
+从上往下读的文档视图、看板视图，以及突出最长剩余链路的依赖图。最近动态列出每个有动静的任务的最后一条消息，"当前"会突出被阻塞、已逾期或今天到期的任务。支持搜索、按列排序、"我的"筛选、`j`/`k` 快捷键和"上次查看后的变化"标记。浅色、深色或自动主题。 看板像 Notion 一样铺满窗口，列可以折叠或以两列卡片显示，堆积的已完成任务可一次归档。
 
 </td>
 <td width="33%" valign="top">
 
 ### 🤝 人与 agent 协同
 
-每个人有自己的颜色。Agent 通过带版本校验的写入认领任务，两个 agent 不会抢到同一个任务。决定、问题和交接写在讨论串里，所有人都要知道的事写在公告里。
+每个人有自己的颜色。Agent 通过带版本校验的写入认领任务，两个 agent 不会抢到同一个任务。决定、问题和交接写在讨论串里，所有人都要知道的事写在公告里。 评审中的任务由评审人直接完成；别人负责的任务，只有在使用者明确要求时 agent 才会接手。人也能一键移动任务，每次改动都会记在讨论串里。
 
 </td>
 <td width="33%" valign="top">
@@ -174,7 +174,7 @@ Codex 用于自托管看板（它没有 claude.ai artifact）。
 
 ## 自托管
 
-自托管站点在 `/` 提供项目列表，在 `/p/<project>` 为每个项目提供一块看板，在 `/mcp` 提供 MCP 服务器。看板页面就是 artifact 发布的那个 `board.html`，由一个小型运行时（`server/public/shim.js`）代替 claude.ai：它负责让人登录、读写站点数据，并把每次变更推送到打开的页面。需要 Node 22.13 或更高版本。
+自托管站点在 `/` 提供项目列表，在 `/p/<project>` 为每个项目提供一块看板，在 `/mcp` 提供 MCP 服务器。看板页面就是 artifact 发布的那个 `board.html`，由一个小型运行时（`server/public/shim.js`）代替 claude.ai：它负责让人登录、读写站点数据，并把每次变更推送到打开的页面。需要 Node 22.13 或更高版本。 项目列表顶部按看板显示现在谁在做什么。
 
 **在这台电脑上**（SQLite，数据在 `~/.artiboard/board.db`）：
 
@@ -208,7 +208,7 @@ docker compose exec board node server/cli.js init --person ana --name Ana
 supabase link --project-ref <ref> && supabase db push
 ```
 
-在 Vercel 项目上设置 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY` 和 `BOARD_URL`，添加你的域名，执行 `vercel link`，然后执行 `npm run deploy:vercel`（`VERCEL_REGION=icn1` 让函数靠近位于首尔的数据库）。在 Supabase Auth 中把 `<BOARD_URL>/` 加入重定向 URL。只要把这些变量写进一个文件，管理命令就能在任何地方运行：`node server/cli.js --env site.env member list`。同一个服务器也可以在任何主机上以 Supabase 运行：设置三个 `SUPABASE_*` 变量，然后 `serve`。
+在 Vercel 项目上设置 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY` 和 `BOARD_URL`，添加你的域名，执行 `vercel link`，然后执行 `npm run deploy:vercel`（`VERCEL_REGION=icn1` 让函数靠近位于首尔的数据库）。在 Supabase Auth 中把 `<BOARD_URL>/` 加入重定向 URL。只要把这些变量写进一个文件，管理命令就能在任何地方运行：`node server/cli.js --env site.env member list`。同一个服务器也可以在任何主机上以 Supabase 运行：设置三个 `SUPABASE_*` 变量，然后 `serve`。 更新站点时，先拉取代码，如有新的迁移先运行 `supabase db push`，再重新部署。
 
 **连接 agent。** 每个人拿到一个令牌（管理员在项目列表页的 **成员** 面板签发，或用 `member add`、`member token`），然后运行：
 
@@ -263,9 +263,9 @@ artiboard import --project ID --file FILE [--map old=new]
 | 工具 | 作用 |
 | --- | --- |
 | `board_start {project 或 repo}` | 看板规则和项目规则、游标之后的新公告（并移动游标）、你未完成的任务、可领取的任务。传入 `repo`（git remote）时会找到项目并列出该仓库的工作 |
-| `board_claim {id, text}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准和摘要 |
+| `board_claim {id, text, override?}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准和摘要。`override` 在你的使用者要求时接手别人的任务 |
 | `board_task {id}` | 状态、详情，以及摘要之后的消息 |
-| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | 一条讨论串消息，加上对你任务的修改；任何人都可以调整任务的 `due`。`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞；`todo` 会释放任务，任何人都可以再领取。不带 `task` 时：发布公告 |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | 一条讨论串消息，加上对你任务的修改；任何人都可以调整任务的 `due`。`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞；`todo` 会释放任务，任何人都可以再领取。不带 `task` 时：发布公告。评审中的任务对评审人开放（`done` 或退回 `doing`）；`override` 在你的使用者要求时修改别人的任务，讨论串会记下原负责人 |
 | `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同 |
 | `board_page` | 项目的页面：大小、`find`、`read`，管理员还有 `edits`、`html`、`reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 站点；每个项目都列出其 GitHub 仓库 |
@@ -290,7 +290,7 @@ flowchart LR
 
 | 组成 | 内容 | 谁来读 |
 | --- | --- | --- |
-| `tasks/<id>` | 只有状态：负责人、依赖、`waitingOn`、认领信息、分支、PR | 页面；agent 通过查询 |
+| `tasks/<id>` | 只有状态：负责人、依赖、`waitingOn`、认领信息、分支、PR, `archivedAt` | 页面；agent 通过查询 |
 | `details/<id>` | 规格位置、验收标准、五行摘要 | Agent，仅限手头的任务 |
 | `tasks/<id>/messages` | 讨论串：进展、问题、交接、阻塞 | Agent 读最近 8 条，人读全部 |
 | `notices` | 所有人都要知道的事 | Agent 只读游标之后的新内容 |
@@ -312,6 +312,7 @@ flowchart LR
 | 摘要优先于讨论串 | 交接时重写五行摘要，下一个人可以跳过旧消息。 |
 | 每个动作一次批量写入 | 认领就是一次调用：任务、消息、游标一起写，并校验版本。 |
 | 自我修复的数据 | 只要有人打开看板，页面就会纠正 `waitingOn`；`board_start` 也会按依赖任务本身核对可领取状态并顺手修正，agent 不必为记账花调用。 |
+| 对所有人同一份列表 | 工具列表和服务器说明对每位成员完全相同，提示缓存可以原样保留；体积上限由测试守住。 |
 
 ## 参考
 

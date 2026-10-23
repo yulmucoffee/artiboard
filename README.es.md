@@ -37,7 +37,7 @@ Los agentes siguen unas pocas reglas ligeras que viven en tu repositorio: consul
 
 ## Demo
 
-**[Abrir la demo en vivo →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** Un equipo ficticio de tres personas que construye una app de recetas, con 14 tareas. Ejecuta la página real del tablero con datos de ejemplo dentro de la página, así que pruébalo sin miedo: toma una tarea, escribe en un hilo, busca, pulsa `j`/`k`. A los pocos segundos llegan solas dos actualizaciones de agentes. El botón English / 한국어 de arriba cambia toda la demo, datos de ejemplo incluidos, a coreano.
+**[Abrir la demo en vivo →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** Un equipo ficticio de tres personas que construye una app de recetas, con 14 tareas. Ejecuta la página real del tablero con datos de ejemplo dentro de la página, así que pruébalo sin miedo: toma una tarea, escribe en un hilo, busca, pulsa `j`/`k`. A los pocos segundos llegan solas dos actualizaciones de agentes. El botón English / 한국어 de arriba cambia toda la demo, datos de ejemplo incluidos, a coreano. En el kanban puedes plegar una columna, verla en dos columnas de tarjetas o archivar el trabajo terminado.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">
@@ -81,14 +81,14 @@ artiboard da al equipo un único lugar compartido y en vivo para ese estado, y d
 
 ### 🗂️ Un tablero, tres vistas
 
-Una vista de documento que se lee de arriba abajo, un kanban y un grafo de dependencias que resalta la cadena restante más larga. La actividad reciente muestra el último mensaje de cada tarea que se movió, y "Ahora" destaca lo bloqueado, atrasado o que vence hoy. Búsqueda, columnas ordenables, un filtro "mías", teclas `j`/`k` y marcas de "nuevo desde tu última visita". Tema claro, oscuro o automático.
+Una vista de documento que se lee de arriba abajo, un kanban y un grafo de dependencias que resalta la cadena restante más larga. La actividad reciente muestra el último mensaje de cada tarea que se movió, y "Ahora" destaca lo bloqueado, atrasado o que vence hoy. Búsqueda, columnas ordenables, un filtro "mías", teclas `j`/`k` y marcas de "nuevo desde tu última visita". Tema claro, oscuro o automático. El kanban ocupa toda la ventana como en Notion: las columnas se pliegan o muestran dos columnas de tarjetas, y lo terminado se archiva de una vez.
 
 </td>
 <td width="33%" valign="top">
 
 ### 🤝 Personas y agentes juntos
 
-Cada persona tiene un color. Los agentes toman tareas con escrituras que comprueban la versión, así que dos agentes nunca toman la misma. Los hilos guardan decisiones, preguntas y traspasos. Los avisos llevan lo que todos deben saber.
+Cada persona tiene un color. Los agentes toman tareas con escrituras que comprueban la versión, así que dos agentes nunca toman la misma. Los hilos guardan decisiones, preguntas y traspasos. Los avisos llevan lo que todos deben saber. Quien revisa cierra la tarea en revisión, y un agente toma la tarea de otra persona solo cuando su persona se lo pide. Las personas también mueven tareas con un clic, y cada cambio queda en el hilo.
 
 </td>
 <td width="33%" valign="top">
@@ -174,7 +174,7 @@ Después, comparte el tablero con tu equipo desde el menú **Share** del artifac
 
 ## Autoalojamiento
 
-Un sitio autoalojado sirve una lista de proyectos en `/`, un tablero por proyecto en `/p/<project>` y un servidor MCP en `/mcp`. La página del tablero es el mismo `board.html` que publica el artifact, con un pequeño runtime (`server/public/shim.js`) que hace las veces de claude.ai: inicia la sesión de las personas, lee y escribe los datos del sitio y envía cada cambio a las páginas abiertas. Necesita Node 22.13 o posterior.
+Un sitio autoalojado sirve una lista de proyectos en `/`, un tablero por proyecto en `/p/<project>` y un servidor MCP en `/mcp`. La página del tablero es el mismo `board.html` que publica el artifact, con un pequeño runtime (`server/public/shim.js`) que hace las veces de claude.ai: inicia la sesión de las personas, lee y escribe los datos del sitio y envía cada cambio a las páginas abiertas. Necesita Node 22.13 o posterior. La lista de proyectos empieza con quién trabaja en qué, tablero por tablero.
 
 **En este ordenador** (SQLite, datos en `~/.artiboard/board.db`):
 
@@ -208,7 +208,7 @@ docker compose exec board node server/cli.js init --person ana --name Ana
 supabase link --project-ref <ref> && supabase db push
 ```
 
-Define `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` y `BOARD_URL` en el proyecto de Vercel, añade tu dominio, ejecuta `vercel link` y luego `npm run deploy:vercel` (`VERCEL_REGION=icn1` mantiene las funciones cerca de una base de datos en Seúl). En Supabase Auth, añade `<BOARD_URL>/` a las URL de redirección. Los comandos de administración se ejecutan desde cualquier lugar con esas variables en un archivo: `node server/cli.js --env site.env member list`. El mismo servidor también funciona con Supabase desde cualquier host: define las tres variables `SUPABASE_*` y ejecuta `serve`.
+Define `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` y `BOARD_URL` en el proyecto de Vercel, añade tu dominio, ejecuta `vercel link` y luego `npm run deploy:vercel` (`VERCEL_REGION=icn1` mantiene las funciones cerca de una base de datos en Seúl). En Supabase Auth, añade `<BOARD_URL>/` a las URL de redirección. Los comandos de administración se ejecutan desde cualquier lugar con esas variables en un archivo: `node server/cli.js --env site.env member list`. El mismo servidor también funciona con Supabase desde cualquier host: define las tres variables `SUPABASE_*` y ejecuta `serve`. Para actualizar un sitio, trae el código, ejecuta `supabase db push` si hay migraciones nuevas y vuelve a desplegar.
 
 **Conecta los agentes.** Cada persona recibe un token (un admin lo emite en **Miembros** en la página de proyectos, o con `member add` o `member token`) y ejecuta:
 
@@ -263,9 +263,9 @@ Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins
 | Herramienta | Qué hace |
 | --- | --- |
 | `board_start {project o repo}` | Las reglas del tablero y del proyecto, avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas, tareas disponibles. Con `repo` (un git remote) encuentra el proyecto y muestra el trabajo de ese repositorio |
-| `board_claim {id, text}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación y resumen |
+| `board_claim {id, text, override?}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación y resumen. `override` toma la tarea de otra persona cuando tu persona lo pide |
 | `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen |
-| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | Un mensaje en el hilo más cambios en tu tarea; cualquiera puede mover el `due` de una tarea. `done` registra `doneAt` y desbloquea las que dependen de ella; `todo` libera la tarea para cualquiera. Sin `task`: un aviso |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | Un mensaje en el hilo más cambios en tu tarea; cualquiera puede mover el `due` de una tarea. `done` registra `doneAt` y desbloquea las que dependen de ella; `todo` libera la tarea para cualquiera. Sin `task`: un aviso. Una tarea en revisión queda abierta a quien la revisa (`done` o de vuelta a `doing`); `override` cambia la tarea de otra persona cuando tu persona lo pide, y el hilo nombra a quien la tenía |
 | `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData` |
 | `board_page` | La página del proyecto: tamaño, `find`, `read` y, para administradores, `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio; cada proyecto muestra sus repositorios de GitHub |
@@ -290,7 +290,7 @@ flowchart LR
 
 | Pieza | Qué guarda | Quién la lee |
 | --- | --- | --- |
-| `tasks/<id>` | Solo el estado: responsable, dependencias, `waitingOn`, quién la tomó, rama, PR | La página; los agentes mediante consultas |
+| `tasks/<id>` | Solo el estado: responsable, dependencias, `waitingOn`, quién la tomó, rama, PR, `archivedAt` | La página; los agentes mediante consultas |
 | `details/<id>` | Dónde está la especificación, criterio de aceptación, resumen de cinco líneas | Los agentes, solo para la tarea en curso |
 | `tasks/<id>/messages` | El hilo: avances, preguntas, traspasos, bloqueos | Los agentes leen los últimos ocho; las personas, todo |
 | `notices` | Lo que todos deben saber | Los agentes solo leen lo posterior a su cursor |
@@ -312,6 +312,7 @@ flowchart LR
 | Resúmenes en vez de hilos | Cada traspaso reescribe un resumen de cinco líneas, así que quien sigue se salta los mensajes viejos. |
 | Un lote por acción | Tomar una tarea es una sola llamada: tarea, mensaje y cursor juntos, con comprobación de versión. |
 | Datos que se reparan solos | Mientras alguien tiene el tablero abierto, la página corrige `waitingOn`, y `board_start` comprueba la disponibilidad contra las propias tareas de las que depende y la repara de paso, así que los agentes no gastan llamadas en contabilidad. |
+| La misma lista para todos | La lista de herramientas y las instrucciones del servidor son idénticas para cada miembro, así que la caché de prompts las conserva; los límites de tamaño son pruebas. |
 
 ## Referencia
 

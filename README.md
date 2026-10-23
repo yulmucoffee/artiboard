@@ -37,7 +37,7 @@ Agents follow a few lean rules that live in your repo: query instead of list, on
 
 ## See it
 
-**[Open the live demo →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** A sample three-person team building a recipe app, with 14 tasks. It runs the real board page on in-page sample data, so click around freely: claim a task, post in a thread, search, press `j`/`k`. Two agent updates arrive on their own after a few seconds. The English / 한국어 toggle at the top switches the whole demo, sample data included, to Korean.
+**[Open the live demo →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** A sample three-person team building a recipe app, with 14 tasks. It runs the real board page on in-page sample data, so click around freely: claim a task, post in a thread, search, press `j`/`k`. Two agent updates arrive on their own after a few seconds. The English / 한국어 toggle at the top switches the whole demo, sample data included, to Korean. In the kanban, fold a column, show it as two card columns, or archive the done work.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">
@@ -81,14 +81,14 @@ artiboard gives the team one shared, live place for that state, and gives agents
 
 ### 🗂️ One board, three views
 
-A document view you read top to bottom, a kanban, and a dependency graph that highlights the longest remaining chain. A recent-activity feed shows the last message on every task that moved, and "Now" flags what is blocked, late or due today. Search, sortable columns, a "mine" filter, `j`/`k` keys and "new since you last looked" markers. Light, dark or auto.
+A document view you read top to bottom, a kanban, and a dependency graph that highlights the longest remaining chain. A recent-activity feed shows the last message on every task that moved, and "Now" flags what is blocked, late or due today. Search, sortable columns, a "mine" filter, `j`/`k` keys and "new since you last looked" markers. Light, dark or auto. The kanban fills the window like Notion's: fold a column, show two card columns, and move piled-up done work to the archive in one go.
 
 </td>
 <td width="33%" valign="top">
 
 ### 🤝 People and agents together
 
-Each person gets a color. Agents claim tasks with version-checked writes, so two agents never take the same task. Threads hold decisions, questions and handoffs. Notices carry what everyone must know.
+Each person gets a color. Agents claim tasks with version-checked writes, so two agents never take the same task. Threads hold decisions, questions and handoffs. Notices carry what everyone must know. A reviewer finishes a task in review, and an agent takes over someone else's task only when its person says so. People move tasks in one click too, and every change lands in the thread.
 
 </td>
 <td width="33%" valign="top">
@@ -174,7 +174,7 @@ After setup, share the board with teammates from the artifact's **Share** menu w
 
 ## Self-host
 
-A self-hosted site serves a project list at `/`, a board per project at `/p/<project>` and an MCP server at `/mcp`. The board page is the same `board.html` the artifact publishes, with a small runtime (`server/public/shim.js`) standing in for claude.ai: it signs people in, reads and writes the site's data, and pushes every change to open pages. Needs Node 22.13 or newer.
+A self-hosted site serves a project list at `/`, a board per project at `/p/<project>` and an MCP server at `/mcp`. The board page is the same `board.html` the artifact publishes, with a small runtime (`server/public/shim.js`) standing in for claude.ai: it signs people in, reads and writes the site's data, and pushes every change to open pages. Needs Node 22.13 or newer. The project list opens with who is working on what, board by board.
 
 **On this computer** (SQLite, data in `~/.artiboard/board.db`):
 
@@ -208,7 +208,7 @@ docker compose exec board node server/cli.js init --person ana --name Ana
 supabase link --project-ref <ref> && supabase db push
 ```
 
-Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `BOARD_URL` on the Vercel project, add your domain, `vercel link`, then `npm run deploy:vercel` (`VERCEL_REGION=icn1` keeps the functions near a Seoul database). In Supabase Auth, add `<BOARD_URL>/` to the redirect URLs. Admin commands run anywhere with those variables in a file: `node server/cli.js --env site.env member list`. The same server also runs on Supabase from any host: set the three `SUPABASE_*` variables and `serve`.
+Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` and `BOARD_URL` on the Vercel project, add your domain, `vercel link`, then `npm run deploy:vercel` (`VERCEL_REGION=icn1` keeps the functions near a Seoul database). In Supabase Auth, add `<BOARD_URL>/` to the redirect URLs. Admin commands run anywhere with those variables in a file: `node server/cli.js --env site.env member list`. The same server also runs on Supabase from any host: set the three `SUPABASE_*` variables and `serve`. To upgrade a site, pull, run `supabase db push` when there are new migrations, then deploy again.
 
 **Connect agents.** Each person gets a token (an admin issues it in **Members** on the projects page, or with `member add` or `member token`) and runs:
 
@@ -263,9 +263,9 @@ Run `node server/cli.js` with no command for every option. Admins do the same fr
 | Tool | Does |
 | --- | --- |
 | `board_start {project or repo}` | The board rules and the project's rules, new notices since your cursor (and moves it), your open tasks, ready tasks. With `repo` (a git remote) it finds the project and lists that repository's work |
-| `board_claim {id, text}` | Claims a ready task, posts the claim, returns spec, acceptance, summary |
+| `board_claim {id, text, override?}` | Claims a ready task, posts the claim, returns spec, acceptance, summary. `override` takes over someone else's task when your person says so |
 | `board_task {id}` | Status, details, and the messages after the summary |
-| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | A thread message plus changes to your task; anyone may move a task's `due`. `done` stamps `doneAt` and unblocks dependents; `todo` releases the task for anyone. Without `task`: a notice |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | A thread message plus changes to your task; anyone may move a task's `due`. `done` stamps `doneAt` and unblocks dependents; `todo` releases the task for anyone. Without `task`: a notice. A task in review is open to its reviewer (`done`, or back to `doing`); `override` changes someone else's task when your person says so, and the thread names the holder |
 | `board_get`, `board_query`, `board_batch` | Documents, as `ArtifactData` reads and writes them |
 | `board_page` | The project's page: size, `find`, `read`, and for admins `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | The site; each project lists its GitHub repositories |
@@ -290,7 +290,7 @@ flowchart LR
 
 | Piece | What it holds | Who reads it |
 | --- | --- | --- |
-| `tasks/<id>` | Status only: owner, deps, `waitingOn`, claim, branch, PR | The page; agents through queries |
+| `tasks/<id>` | Status only: owner, deps, `waitingOn`, claim, branch, PR, `archivedAt` | The page; agents through queries |
 | `details/<id>` | Spec pointer, acceptance, a five-line summary | Agents, only for the task in hand |
 | `tasks/<id>/messages` | The thread: updates, questions, handoffs, blockers | Agents read the last eight; people read all |
 | `notices` | What everyone must know | Agents read only what is newer than their cursor |
@@ -312,6 +312,7 @@ flowchart LR
 | Summaries over threads | Handoffs rewrite a five-line summary, so the next reader skips old messages. |
 | One batch per action | A claim is one call: task, message and cursor together, version-checked. |
 | Self-repairing data | The page keeps `waitingOn` right while anyone has it open, and `board_start` checks readiness against the dependency tasks themselves and repairs it in passing, so agents never spend calls on bookkeeping. |
+| Same listing for everyone | The tool listing and the server's instructions are the same bytes for every member, so a prompt cache keeps them; size budgets are tests. |
 
 ## Reference
 
