@@ -441,6 +441,15 @@ for (const backend of backends) {
         const at = new Date().toISOString();
         await deny([{ op: 'set', path: `notices/n-${R}-fake`, data: { at, author: people.admin.person, text: 'not me' } }], 'no posting as someone else');
         assert.equal((await call(member, 'board_batch', { project: P, writes: [{ op: 'set', path: `notices/n-${R}-mine`, data: { at, author: me, text: 'me' } }] })).error, false);
+        const theirs = [`notices/n-${R}-theirs`, `tasks/${R}-T/messages/${R}-theirs`];
+        await store.apply(null, P, theirs.map((path) => ({ op: 'set', path, data: { at, author: people.admin.person, text: 'changed status (override)' } })));
+        for (const path of theirs) {
+          await deny([{ op: 'update', path, data: { text: 'nothing happened' } }], `no rewriting someone else's post: ${path}`);
+          await deny([{ op: 'set', path, data: { at, author: me, text: 'mine now' } }], `no replacing someone else's post: ${path}`);
+          await deny([{ op: 'delete', path }], `no deleting someone else's post: ${path}`);
+        }
+        assert.equal((await call(member, 'board_batch', { project: P, writes: [{ op: 'update', path: `notices/n-${R}-mine`, data: { text: 'me, fixed' } },
+          { op: 'delete', path: `notices/n-${R}-mine` }] })).error, false, 'a member edits and deletes their own post');
         if (store.kind === 'sqlite') {
           const cookie = (await api('/api/login', { method: 'POST', body: { token: tokens.member } })).headers.get('set-cookie').split(';')[0];
           const r = await api(`/api/p/${P}/batch`, { method: 'POST', cookie, body: { writes: [{ op: 'set', path: `people/${people.admin.person}`, data: { uid: people.member.uid } }] } });
