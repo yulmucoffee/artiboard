@@ -73,7 +73,15 @@ begin
         raise exception 'ab:permission_denied:%:author must be your own person (%)', i, v_person;
       end if;
     end if;
-    -- the task rules on every member's write to a task or its details (the system, actor null, is not held to them)
+    if w ? 'if_version' and (not had or cur.version <> (w->>'if_version')::bigint) then
+      raise exception 'ab:version_conflict:%:% is at version %, not %', i, w->>'path',
+        case when had then cur.version::text else 'none (missing)' end, w->>'if_version';
+    end if;
+    if coalesce((w->>'if_absent')::boolean, false) and had then
+      raise exception 'ab:already_exists:%:% already exists', i, w->>'path';
+    end if;
+    -- the task rules on every member's write to a task or its details (the system, actor null, is not held to them),
+    -- after the version check: a write that lost a race rereads and decides again, rather than being refused
     if p_actor is not null and c in ('tasks', 'details') then
       v_task := case when c = 'tasks' then cur.data
         else (select t.data from public.ab_docs t where t.project = p_project and t.collection = 'tasks' and t.doc_id = d) end;
@@ -86,13 +94,6 @@ begin
             coalesce(v_task->>'key', d), public.ab_task_holder(v_task);
         end if;
       end if;
-    end if;
-    if w ? 'if_version' and (not had or cur.version <> (w->>'if_version')::bigint) then
-      raise exception 'ab:version_conflict:%:% is at version %, not %', i, w->>'path',
-        case when had then cur.version::text else 'none (missing)' end, w->>'if_version';
-    end if;
-    if coalesce((w->>'if_absent')::boolean, false) and had then
-      raise exception 'ab:already_exists:%:% already exists', i, w->>'path';
     end if;
     if op = 'set' then
       insert into public.ab_docs as t (project, collection, doc_id, data, updated_by)

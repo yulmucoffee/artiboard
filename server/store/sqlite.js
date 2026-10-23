@@ -171,11 +171,12 @@ export function openSqlite({ file, boardUrl }) {
       }
       const cur = q('select * from docs where project = ? and collection = ? and doc_id = ?').get(project, c, d);
       if (role !== 'admin') guardWrite(member, w, c, d, cur && JSON.parse(cur.data), payload, i);
-      if (member && (c === 'tasks' || c === 'details')) holdTo(project, member.person, w, c, d, cur, payload, i);
       if (w.if_version != null && (!cur || cur.version !== Number(w.if_version))) {
         throw new BoardError('version_conflict', `${w.path} is at version ${cur ? cur.version : 'none (missing)'}, not ${w.if_version}`, i);
       }
       if (w.if_absent && cur) throw new BoardError('already_exists', `${w.path} already exists`, i);
+      // after the version check: a write that lost a race rereads and decides again, rather than being refused
+      if (member && (c === 'tasks' || c === 'details')) holdTo(project, member.person, w, c, d, cur, payload, i);
       const at = stamp();
       if (w.op === 'delete') {
         q('delete from docs where project = ? and collection = ? and doc_id = ?').run(project, c, d);
