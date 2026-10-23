@@ -187,6 +187,21 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   ok(!!b.d.querySelector('.lane .agent-mark.live'),'an agent that just posted shows as live');
   b.d.querySelector('section[data-fold="activity"] .fold').click();await tick();
   ok(isFolded(b.d,'activity')&&!b.d.querySelectorAll('#activity li').length,'the activity section folds');
+  b.pick('ana');await tick();
+  [...b.d.querySelectorAll('tr.item')].find(r=>/M1-2/.test(r.textContent)).click();await tick();
+  const acts=()=>[...b.d.querySelectorAll('.sheet .acts button')];
+  ok(acts().length===1&&/Take over from Ben/.test(acts()[0].textContent),'someone else\'s task offers only a take-over');
+  acts()[0].click();await tick();
+  ok(b.store['tasks/M1-2'].owner==='ben','taking over asks twice');
+  acts()[0].click();await tick();
+  ok(b.store['tasks/M1-2'].owner==='ana'&&b.store['tasks/M1-2'].claimedBy.who==='ana'&&!b.store['tasks/M1-2'].claimedBy.agent,'then takes it');
+  const lastMsg=()=>Object.keys(b.store).filter(k=>k.startsWith('tasks/M1-2/messages/')).sort().map(k=>b.store[k]).pop();
+  ok(lastMsg().author==='ana'&&lastMsg().kind==='human'&&/taken over from Ben/.test(lastMsg().text),'and says so in the thread');
+  acts().find(x=>/review/.test(x.textContent)).click();await tick();
+  b.pick('ben');await tick();
+  acts().find(x=>/mark done/.test(x.textContent)).click();await tick();
+  ok(b.store['tasks/M1-2'].status==='done'&&b.store['tasks/M1-2'].owner==='ana'&&/^\d{4}-/.test(b.store['tasks/M1-2'].doneAt),'a reviewer marks it done in one click; the holder keeps it');
+  ok(lastMsg().author==='ben'&&/Review → Done/.test(lastMsg().text),'the thread says who finished it');
 
   console.log('# view-only viewer');
   b=boot({user:fakeUser('u_ana',false)});all.push(b);await tick();await heal();

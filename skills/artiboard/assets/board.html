@@ -296,6 +296,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 .card .meta-line .feat{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .card .meta-line .dot-new{margin-left:auto}
 .card .title{font-weight:600;line-height:1.4;font-size:13.5px;color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.sheet .acts{margin-top:4px}
 .card .foot{display:flex;align-items:center;gap:8px;min-height:20px}
 .card .foot .flag{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .card .foot .flag.ready{color:var(--accent);font-weight:600}
@@ -546,7 +547,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       tallyParts:{doing:'in progress',review:'review',blocked:'blocked',done:'done'},unassigned:'Unassigned',unassignedN:'Unassigned · {n}',readyN:'Ready to pick {n}',
       needsHands:'Needs attention',blockedNote:'Blocked. See the thread for why.',reviewNote:'Waiting for PR review and merge.',noPr:' (no PR link)',openPr:'Open PR',
       ready:'Ready to pick',readyNone:'No unassigned task has all its dependencies done.',unlocks:'Unlocks {k} when done.',claim:'Claim',claimTitle:'Claim as {p}',
-      alreadyClaimed:'Someone just claimed it.',claimed:'{p} claimed {k}.',claimFail:'Could not claim ({e})',saveFail:'Could not save ({e})',postFail:'Could not post ({e})',
+      alreadyClaimed:'Someone just claimed it.',act_claim:'Take it',act_review:'Send to review',act_blocked:'Mark blocked',act_resume:'Back in progress',act_release:'Let go',act_done:'Merged: mark done',act_back:'Send back',act_reopen:'Reopen',act_take:'Take over from {p}',act_sure:'Click again to take it over',saidTake:' (taken over from {p})',claimed:'{p} claimed {k}.',claimFail:'Could not claim ({e})',saveFail:'Could not save ({e})',postFail:'Could not post ({e})',
       laneOpen:'{n} open',laneEmpty:'Nothing assigned. Pick from “Ready to pick” above.',laneNoMatch:'Nothing matches the filter.',laneDone:'Done {n}',waitingDeps:'waiting on {k}',
       f_due:'Due',f_doneAt:'Done',dueOn:'due {d}',dueToday:'due today',dueLate:'due {d} · late',doneOn:'done {d}',wd:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
       all:'All',filterGroup:'Filter by feature',th:['Key','Item','Depends on','Owner','Status','Dates','Updated'],doneOf:'{d}/{n} done',none:'none',noMatch:'No task matches the filter.',
@@ -599,7 +600,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       tallyParts:{doing:'진행',review:'검토',blocked:'막힘',done:'완료'},unassigned:'미배정',unassignedN:'미배정 · {n}개',readyN:'바로 집을 수 있는 것 {n}',
       needsHands:'손이 필요한 것',blockedNote:'막혔어요. 스레드에서 이유를 확인하세요.',reviewNote:'PR 검토와 병합을 기다려요.',noPr:' (PR 주소 없음)',openPr:'PR 열기',
       ready:'바로 집을 수 있는 일',readyNone:'선행이 끝난 미배정 태스크가 없어요.',unlocks:'끝나면 {k}이(가) 풀려요.',claim:'집기',claimTitle:'{p}(으)로 집기',
-      alreadyClaimed:'방금 다른 쪽이 집었어요.',claimed:'{k}을(를) {p}(이)가 집었어요.',claimFail:'집지 못했어요 ({e})',saveFail:'저장하지 못했어요 ({e})',postFail:'남기지 못했어요 ({e})',
+      alreadyClaimed:'방금 다른 쪽이 집었어요.',act_claim:'내가 집기',act_review:'검토로 올리기',act_blocked:'막힘으로',act_resume:'다시 진행',act_release:'내려놓기',act_done:'병합됨: 완료로',act_back:'되돌려 보내기',act_reopen:'다시 열기',act_take:'{p}에게서 넘겨받기',act_sure:'한 번 더 누르면 넘겨받아요',saidTake:' ({p}에게서 넘겨받음)',claimed:'{k}을(를) {p}(이)가 집었어요.',claimFail:'집지 못했어요 ({e})',saveFail:'저장하지 못했어요 ({e})',postFail:'남기지 못했어요 ({e})',
       laneOpen:'진행 중인 일 {n}개',laneEmpty:'맡은 일이 없어요. 위 ‘바로 집을 수 있는 일’에서 고르세요.',laneNoMatch:'찾는 조건에 맞는 일이 없어요.',laneDone:'완료 {n}개',waitingDeps:'선행 {k} 대기',
       f_due:'마감일',f_doneAt:'끝난 날',dueOn:'{d}까지',dueToday:'오늘까지',dueLate:'{d}까지 · 지남',doneOn:'{d} 완료',wd:['일','월','화','수','목','금','토'],
       all:'전체',filterGroup:'기능으로 거르기',th:['번호','항목','선행','담당','상태','날짜','최근'],doneOf:'{d}/{n} 완료',none:'없음',noMatch:'찾는 조건에 맞는 태스크가 없어요.',
@@ -848,6 +849,41 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function match(t){return matchQ(t)&&(!newOnly||isNew(t))&&(!mineOnly||t.owner===me)}
   function filtering(){return !!q||newOnly||mineOnly}
 
+  // A person's change from the page: the task, then one line in its thread saying what changed, as agents' changes do,
+  // so the holder and their agents see who moved it.
+  function change(t,patch,extra){
+    if(!writable()||!me)return Promise.resolve();
+    var at=now(),bits=[],dash='—';
+    function was(k,a,b,f){if(k in patch&&(a||null)!==(b||null))bits.push(T(k==='status'?'f_status':'f_'+k)+' '+(a?f(a):dash)+' → '+(b?f(b):dash))}
+    was('status',st(t),patch.status,SL);was('owner',t.owner,patch.owner,pname);was('start',startOf(t),patch.start,dayLabel);was('due',dueOf(t),patch.due,dayLabel);
+    if(patch.status==='done'&&st(t)!=='done')patch.doneAt=at;else if('status' in patch&&patch.status!=='done'&&t.doneAt)patch.doneAt=null;
+    if(!bits.length&&!extra)return save(t.id,patch);
+    patch.updatedAt=patch.lastMessageAt=at;markSeen(t.id,at);
+    return db.doc('tasks/'+t.id).update(patch)
+      .then(function(){return db.doc('tasks/'+t.id+'/messages/'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:'update',text:bits.join(' · ')+(extra||'')})})
+      .catch(function(e){toast(T('saveFail',{e:errText(e)}));refused(e)});
+  }
+  // who has a task: its claimer, or once it left To do, its owner
+  function holder(t){return (t.claimedBy&&t.claimedBy.who)||(st(t)!=='todo'?t.owner:null)||null}
+  // one-click moves for the task in the sheet: the review step is anyone's, taking over asks twice
+  function actions(t){
+    if(!writable()||!me)return null;
+    var s=st(t),h=holder(t),bs=[];
+    function b(label,patch,primary,extra){bs.push(el('button',{type:'button',class:'btn small'+(primary?' primary':''),text:label,onclick:function(e){var x=e.currentTarget;x.disabled=true;change(t,patch,extra).then(function(){x.disabled=false})}}))}
+    if(s==='review'){b(T('act_done'),{status:'done'},true);b(T('act_back'),{status:'doing'})}
+    else if(s==='done')b(T('act_reopen'),{status:'doing'});
+    else if(!h){if(!unmet(t).length)bs.push(el('button',{type:'button',class:'btn small primary',text:T('act_claim'),onclick:function(e){claim(t,e.currentTarget)}}))}
+    else if(h===me){b(T('act_review'),{status:'review'},true);b(s==='blocked'?T('act_resume'):T('act_blocked'),{status:s==='blocked'?'doing':'blocked'});b(T('act_release'),{status:'todo',claimedBy:null,owner:null})}
+    if(h&&h!==me&&s!=='done'){
+      var tk=el('button',{type:'button',class:'btn small',text:T('act_take',{p:pname(h)})});
+      tk.addEventListener('click',function(){
+        if(!tk.dataset.sure){tk.dataset.sure='1';tk.textContent=T('act_sure');return}
+        tk.disabled=true;change(t,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}},T('saidTake',{p:pname(h)})).then(function(){tk.disabled=false});
+      });
+      bs.push(tk);
+    }
+    return bs.length?el('div',{class:'form-row acts'},bs):null;
+  }
   function save(id,patch){if(!db)return Promise.resolve();patch.updatedAt=now();markSeen(id,patch.updatedAt);return db.doc('tasks/'+id).update(patch).catch(function(e){toast(T('saveFail',{e:errText(e)}));refused(e)})}
 
   // ---------- header and toolbar ----------
@@ -967,7 +1003,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     db.doc('tasks/'+t.id).get().then(function(s){
       var d=s.exists?s.data():null;
       if(!d||d.claimedBy||(d.status||'todo')!=='todo'){toast(T('alreadyClaimed'));return}
-      return save(t.id,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}}).then(function(){toast(T('claimed',{p:pname(me),k:t.key}))});
+      return change(t,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}}).then(function(){toast(T('claimed',{p:pname(me),k:t.key}))});
     }).catch(function(e){toast(T('claimFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false});
   }
 
@@ -1454,21 +1490,20 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     root.textContent='';
 
     var s=el('select',{id:'fStatus','aria-label':T('f_status')});STATUS.forEach(function(x){s.appendChild(el('option',{value:x,text:SL(x)}))});s.value=st(t);
-    s.addEventListener('change',function(){var p={status:s.value};if(s.value==='todo')p.claimedBy=null;
-      if(s.value==='done'&&st(t)!=='done')p.doneAt=now();else if(s.value!=='done'&&t.doneAt)p.doneAt=null;save(t.id,p)});
+    s.addEventListener('change',function(){var p={status:s.value};if(s.value==='todo')p.claimedBy=null;change(t,p)});
     var o=el('select',{id:'fOwner','aria-label':T('f_owner')});o.appendChild(el('option',{value:'',text:T('unassigned')}));
     people.forEach(function(p){o.appendChild(el('option',{value:p.id,text:p.name||p.id}))});
     if(t.owner&&!person(t.owner))o.appendChild(el('option',{value:t.owner,text:t.owner}));
     o.value=t.owner||'';
-    o.addEventListener('change',function(){save(t.id,{owner:o.value||null})});
+    o.addEventListener('change',function(){change(t,{owner:o.value||null})});
     var br=el('input',{type:'text',id:'fBranch',placeholder:'feature/…','aria-label':T('f_branch')});br.value=activeId==='fBranch'?keep.fBranch:(t.branch||'');
     br.addEventListener('change',function(){save(t.id,{branch:br.value.trim()||null})});
     var pr=el('input',{type:'url',id:'fPr',placeholder:'https://github.com/…/pull/N','aria-label':T('f_pr')});pr.value=activeId==='fPr'?keep.fPr:(t.pr||'');
     pr.addEventListener('change',function(){save(t.id,{pr:pr.value.trim()||null})});
     var sd=el('input',{type:'date',id:'fStart','aria-label':T('f_start')});sd.value=startOf(t);
-    sd.addEventListener('change',function(){save(t.id,{start:sd.value||null})});
+    sd.addEventListener('change',function(){change(t,{start:sd.value||null})});
     var du=el('input',{type:'date',id:'fDue','aria-label':T('f_due')});du.value=dueOf(t);
-    du.addEventListener('change',function(){save(t.id,{due:du.value||null})});
+    du.addEventListener('change',function(){change(t,{due:du.value||null})});
     // the repo a task belongs to: a label (or owner/name) from meta/config.repos
     var rs=repoList(),rp=null;
     if(rs.length||t.repo){
@@ -1502,7 +1537,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       el('div',{class:'block'},[
         el('div',{style:'display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center'},[el('span',{class:'tag',text:t.feature||''}),repoTag(t),state(st(t)),who(t.owner),dateChip(t),agentMark(t)]),
         el('h2',{id:'sheetTitle',text:t.title||T('untitled')}),
-        st(t)!=='done'&&u.length?el('p',{style:'color:var(--warn);font-size:13.5px',text:T('depsPending',{k:u.join(', ')})}):null
+        st(t)!=='done'&&u.length?el('p',{style:'color:var(--warn);font-size:13.5px',text:T('depsPending',{k:u.join(', ')})}):null,
+        actions(t)
       ]),
       el('div',{class:'fields'},[el('span',{class:'k',text:T('f_status')}),s,el('span',{class:'k',text:T('f_owner')}),o,
         rp?el('span',{class:'k',text:T('f_repo')}):null,rp,el('span',{class:'k',text:T('f_branch')}),br,el('span',{class:'k',text:T('f_pr')}),pr,
