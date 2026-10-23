@@ -25,6 +25,16 @@ jobs:
         run: |
           node -e "const s=require('fs').readFileSync('skills/artiboard/assets/board.html','utf8');require('fs').writeFileSync('/tmp/board.js',s.match(/<script>([\s\S]*)<\/script>/)[1])"
           node --check /tmp/board.js
+      # CONTRIBUTING.md's release rules: a pull request raises the version and the changelog names it; main takes
+      # only squash-merged pull requests
+      - name: A pull request bumps the version and its changelog entry names it
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --depth=1 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          node scripts/release-check.mjs --pr "${{ github.event.number }}" --base "origin/${{ github.base_ref }}"
+      - name: Main takes only squash-merged pull requests
+        if: github.event_name == 'push'
+        run: node scripts/release-check.mjs --subject "$(git log -1 --format=%s)"
       - name: Install
         run: |
           npm ci --no-audit --no-fund

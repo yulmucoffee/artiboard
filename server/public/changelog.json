@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.14.2",
+      "date": "2026-10-23",
+      "prs": [
+        35
+      ],
+      "lines": {
+        "en": [
+          "Nothing changes on screen: CI now refuses a pull request that keeps the version or whose changelog entry names another pull request, and flags any commit that reached main without one."
+        ],
+        "ko": [
+          "화면은 그대로예요. 이제 CI가 버전을 올리지 않았거나 changelog가 다른 PR을 가리키는 PR을 막고, PR 없이 main에 들어온 커밋을 알려요."
+        ]
+      }
+    },
+    {
       "version": "1.14.1",
       "date": "2026-10-23",
       "prs": [
