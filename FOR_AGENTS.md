@@ -62,6 +62,8 @@ mkdir -p "$HOME/.codex/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/a
 mkdir -p .agents/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .agents/skills/artiboard/
 ```
 
+An upgraded skill does not change boards that already exist. In each project with a claude.ai artifact board, ask for "upgrade the board": it republishes the page and replaces `docs/artiboard.md` with the current board rules. A self-hosted site updates when its code does (`references/hosted.md` "Upgrade").
+
 These copy the skill's files over the installed ones, so an upgrade works without deleting the folder first. In a Claude Code setup whose permissions deny `rm -rf`, the old commands stopped at that step. A file removed upstream stays behind; the skill has a handful of files, so this rarely matters.
 
 On Windows PowerShell, copy the folder's contents (`\*`), not the folder. `Copy-Item -Recurse` into a folder that already exists puts the copy inside it (`artiboard\artiboard`) and leaves the old files in place, so an upgrade silently changes nothing.
