@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.9.3",
+      "date": "2026-10-23",
+      "prs": [
+        20
+      ],
+      "lines": {
+        "en": [
+          "The setup guide says that an upgraded skill leaves existing boards as they are and how to upgrade each one; three unused page strings are gone."
+        ],
+        "ko": [
+          "설치 안내에 스킬을 올려도 기존 판은 그대로라는 점과 판마다 올리는 방법을 적었고, 안 쓰는 페이지 문구 세 개를 지웠어요."
+        ]
+      }
+    },
+    {
       "version": "1.9.2",
       "date": "2026-10-23",
       "prs": [
