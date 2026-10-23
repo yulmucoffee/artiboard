@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.14.0",
+      "date": "2026-10-23",
+      "prs": [
+        33
+      ],
+      "lines": {
+        "en": [
+          "A task's owner holds it, whether a claim or an assignment set it: handing a task to someone on the page hands it over, where before the old claim kept it and the new owner was refused.",
+          "Tasks whose claim named someone other than their owner now belong to the claimer, who held them until now, so nothing changes hands."
+        ],
+        "ko": [
+          "태스크는 담당자(owner)가 맡아요. 잡았든 배정됐든 같아요. 페이지에서 다른 사람에게 넘기면 그 사람이 맡게 되고, 예전처럼 이전 잡기가 남아 새 담당자가 막히지 않아요.",
+          "잡은 사람과 담당자가 달랐던 태스크는 지금까지 맡고 있던 잡은 사람의 것으로 정리했어요. 손이 바뀌는 태스크는 없어요."
+        ]
+      }
+    },
+    {
       "version": "1.13.5",
       "date": "2026-10-23",
       "prs": [

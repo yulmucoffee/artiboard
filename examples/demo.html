@@ -1373,8 +1373,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   function statusOf(t) { return (t && t.status) || 'todo'; }
 
-  // who has the task: whoever claimed it, else whoever it is assigned to; an assignment holds it like a claim
-  function holderOf(t) { return (t && ((t.claimedBy && t.claimedBy.who) || t.owner)) || null; }
+  // who has the task: its owner, whether a claim or an assignment set it. claimedBy only says how it was taken (an
+  // agent, which session, when); reassigning a task changes its owner and so its holder.
+  function holderOf(t) { return (t && t.owner) || null; }
 
   // the deps not done yet; isDone(key) says whether the task with that key is done
   function unmetDeps(t, isDone) {
@@ -1664,6 +1665,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function changeAt(t,patch,extra,ifVersion){
     var at=now(),bits=[],dash='—';
     if('status' in patch)patch=Object.assign({},patch,statusEffects(t,patch.status,at));
+    // the owner holds a task (holderOf): handing it to someone else drops the old claim with it
+    if('owner' in patch&&t.claimedBy&&t.claimedBy.who!==patch.owner&&!('claimedBy' in patch))patch=Object.assign({},patch,{claimedBy:null});
     function was(k,a,b,f){if(k in patch&&(a||null)!==(b||null))bits.push(T(k==='status'?'f_status':'f_'+k)+' '+(a?f(a):dash)+' → '+(b?f(b):dash))}
     was('status',st(t),patch.status,SL);was('owner',t.owner,patch.owner,pname);was('start',startOf(t),patch.start,dayLabel);was('due',dueOf(t),patch.due,dayLabel);
     was('branch',t.branch,patch.branch,String);was('pr',t.pr,patch.pr,String);was('repo',t.repo,patch.repo,String);

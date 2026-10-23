@@ -411,6 +411,37 @@ for (const backend of backends) {
       }
     });
 
+    test('a task is held by its owner: reassigning it hands it over', async () => {
+      const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `tasks/${K('o1')}`, data: { key: K('o1'), title: 'reassigned', status: 'todo', deps: [], waitingOn: [], updatedAt: at } }] });
+      await call(board, 'board_claim', { project: P, id: K('o1') });
+      // a person moves it to someone else on the page: the owner changes, whatever the claim still says
+      await call(board, 'board_batch', { project: P, override: true, writes: [{ op: 'update', path: `tasks/${K('o1')}`, data: { owner: them } }] });
+      const other = await connect(tokens.member);
+      try {
+        assert.equal((await call(other, 'board_post', { project: P, task: K('o1'), text: 'PR open', status: 'review' })).value, `ok ${K('o1')} → review`, 'the new owner holds it');
+        assert.match((await call(other, 'board_start', { project: P, ready: 0, rules: false, peek: true })).value, new RegExp(`^mine in review .*${K('o1')}`, 'm'), 'and sees it as theirs');
+      } finally {
+        await other.close();
+      }
+      assert.match((await call(board, 'board_post', { project: P, task: K('o1'), status: 'blocked' })).value, new RegExp(`^not_yours: ${K('o1')} is held by ${them}`), 'the one who claimed it first does not');
+      assert.match((await call(board, 'board_task', { project: P, id: K('o1'), thread: 0 })).value, new RegExp(`^${K('o1')} review · ${them}( · |$)`, 'm'), 'and board_task names the owner');
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `tasks/${K('o1')}` }], override: true });
+    });
+
+    test('a task whose claim names someone other than its owner belongs to the claimer once the store opens', async (t) => {
+      if (store.kind !== 'sqlite') return t.skip('the Supabase migration repairs the same once');
+      const path = `tasks/${K('legacy')}`;
+      await store.apply(null, P, [{ op: 'set', path, data: { key: K('legacy'), title: 'legacy', status: 'doing', owner: people.member.person, claimedBy: { who: people.admin.person, agent: true } } }]);
+      const again = await openSqlite({ file: join(dir, 'board.db'), boardUrl: BASE });
+      try {
+        assert.equal((await again.get(P, path)).data.owner, people.admin.person, 'the claimer held it before, so nothing changes hands');
+      } finally {
+        again.close();
+        await store.apply(null, P, [{ op: 'delete', path }]);
+      }
+    });
+
     test('a claim or a post that loses a race rereads and decides again', async () => {
       const at = new Date().toISOString(), me = people.admin, them = people.member;
       const task = (n) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `race ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at } });
