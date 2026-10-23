@@ -2,7 +2,7 @@
 
 Every change that reaches `main`, through a pull request or a direct push, comes with two things:
 
-1. **A version bump** in `package.json` (`npm version <x.y.z> --no-git-tag-version`): a new feature raises the middle number (1.3.0 → 1.4.0), a fix or a docs change the last one (1.4.0 → 1.4.1).
+1. **A version bump** in `package.json` (`npm version <x.y.z> --no-git-tag-version`): a new feature raises the middle number (1.3.0 → 1.4.0), a fix or a docs change the last one (1.4.0 → 1.4.1). The first number stays 1; the middle one keeps counting past 9 (1.9.0 → 1.10.0).
 2. **A changelog entry** at the top of `server/public/changelog.json` for that version: the date, the pull request numbers, and one to three short lines in English (`en`) and Korean (`ko`) that say what changed for the people using the board, not how. The project list shows these as "Updates".
 
 ```json

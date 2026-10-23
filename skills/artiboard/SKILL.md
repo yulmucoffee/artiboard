@@ -76,7 +76,7 @@ On a self-hosted board, "the page copy" is the project's page: change it with `b
 
 | Change with care | How |
 | --- | --- |
-| Statuses (default `todo doing review blocked done`) | Edit `STATUS`, `BAR`, a `.state.<name>` CSS rule and `st_<name>` strings in the page copy, then say in `meta/rules` when the new status is used. Keep `todo` and `done`: readiness and the graph depend on them. |
+| Statuses (default `todo doing review blocked done`) | Edit `STATUS`, its color in `BAR`, a `.state.<name>{--sc:<color>}` CSS rule and `st_<name>` strings in the page copy, then say in `meta/rules` when the new status is used. The kanban gets a column for it on its own. Keep `todo`, `review` and `done`: readiness, the reviewer's rights, the archive and the graph depend on them. |
 | A new field shown on screen, a new view | Edit the page copy. Keep rendering from the database. |
 
 | Keep | Why |
@@ -148,11 +148,11 @@ These are why the board stays cheap as people, agents and months pile up. Keep t
 
 - People, language, labels, title, milestone, repositories: update `meta/config`. No republish.
 - Wrong account on a person (someone picked the wrong name first): delete `people/<id>`, and that person's account links again on its next pick. To pin a link, copy the right `uid` from `people/<id>` into that person's `meta/config.people` entry; a `uid` there wins. Never show or guess ids.
-- New milestone: batch the new `tasks` and `details`, update `meta/config.milestone`, post one notice. Done tasks stay but no query reads them.
+- New milestone: batch the new `tasks` and `details`, update `meta/config.milestone`, post one notice. Done tasks stay but no query reads them; people clear them off the board with the kanban's Archive (it sets `archivedAt`, and they still count as done).
 - Project rule change: people edit it on the page (it saves `meta/rules` with `rev` + 1 and can post a notice). An agent does it only when its person asks: one batch with `meta/rules` (`text`, `rev` + 1, `by`, `updatedAt`) and a notice. Board rules never change per project.
 - An older board whose `meta/protocol` mixes board rules with project agreements or status: move the project's own agreements to `meta/rules`, its status to `meta/notes`, drop the board rules (artiboard has them), show the user both texts, then delete `meta/protocol` in the same batch. Replace `docs/artiboard.md` with the verbatim `references/protocol.md`.
-- Page change or upgrade: read the live artifact first with the Artifact tool's `read` action, apply the change to that version, and republish to the same URL. Never republish just to change data.
-- Long-lived boards: one artifact database holds at most 25,000 documents, and every message, notice, task and detail is one document. Moving documents to an `archive` collection does not free any. When past milestones pass a few hundred done tasks, or a write fails with `quota_exceeded`, fold each finished milestone into one `archive/<milestone>` document (key, title, owner, PR and summary per task, under 256 KiB), then delete those tasks, their details, their messages and old notices in batches. Deleting is permanent, so show the user the counts and get a yes first.
+- Page change or upgrade: read the live artifact first with the Artifact tool's `read` action, apply the change to that version, and republish to the same URL. Never republish just to change data. An upgrade also replaces the repository's `docs/artiboard.md` with the current `references/protocol.md` (replace `{{BOARD_URL}}` only), since the board rules change with the page.
+- Long-lived boards: one artifact database holds at most 25,000 documents, and every message, notice, task and detail is one document. The page's Archive only hides done tasks (`archivedAt`), and moving documents to an `archive` collection does not free any either. When past milestones pass a few hundred done tasks, or a write fails with `quota_exceeded`, fold each finished milestone into one `archive/<milestone>` document (key, title, owner, PR and summary per task, under 256 KiB), then delete those tasks, their details, their messages and old notices in batches. Deleting is permanent, so show the user the counts and get a yes first.
 
 ## Rules for you
 
