@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.11.1",
+      "date": "2026-10-23",
+      "prs": [
+        23
+      ],
+      "lines": {
+        "en": [
+          "Nothing changes on screen: two unused page strings are gone, and the repository now fails a change that leaves code or strings nothing uses."
+        ],
+        "ko": [
+          "화면은 그대로예요. 안 쓰는 페이지 문구 두 개를 지웠고, 아무도 쓰지 않는 코드나 문구를 남기는 변경은 저장소 검사에서 걸러져요."
+        ]
+      }
+    },
+    {
       "version": "1.11.0",
       "date": "2026-10-23",
       "prs": [

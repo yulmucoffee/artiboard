@@ -16,17 +16,17 @@ artiboard is read by agents on every session they spend on a board, so it has th
 | `server/public/shim.js` | The page's runtime on a self-hosted site (reads, writes, live updates). |
 | `skills/artiboard/assets/board.html` | The page. It carries a copy of `server/tasks.js` between marker lines. |
 | `skills/artiboard/` | The skill people install: `SKILL.md`, the agents' protocol, the hosted guide. |
-| `scripts/` | Levers: `check.mjs` (every gate), `inline-rules.mjs`, `stamp-version.mjs`, `readme-shape.mjs`, `bench.mjs`, `supabase-env.sh`. |
+| `scripts/` | Levers: `check.mjs` (every gate), `inline-rules.mjs`, `stamp-version.mjs`, `readme-shape.mjs`, `unused.mjs`, `bench.mjs`, `supabase-env.sh`. |
 
 ## How we work
 
 1. **Shape the data first.** Decide the document and its rules before the code that uses them. A new task rule is a case in `tests/tasks.test.js` and a branch in `server/tasks.js`, not an `if` added in a caller.
 2. **One place per decision.** When two files decide the same thing, keep one and derive the other: the page's rules come from `server/tasks.js`, the version from `package.json`, the demo from the page. Each copy has a `--check` in `npm run check`.
-3. **Take away before adding.** Remove dead code, unused strings and one-caller wrappers first, then make the smallest change that does the job. An abstraction has to delete branches, duplicated rules or invalid states to stay.
+3. **Take away before adding; build for what was observed.** Remove dead code and unused strings first (`scripts/unused.mjs` fails on them), then make the smallest change that does the job. No rule, guard or state for a case nobody has seen: one odd state found on one board got one repair statement, not a normalizer on every write. An abstraction has to delete branches, duplicated rules or invalid states to stay.
 4. **Check at the edges, trust inside.** Tool inputs are checked by their zod schemas, writes by the store's guards. Code between them does not re-check.
 5. **Make writes safe to repeat and to race.** Writes that matter carry a version condition (`if_version`; the page's claim passes the version it read), a lost race rereads and decides again, and repairs such as `waitingOn` converge however often they run. Two writers aiming at one document is the thing to design away first.
 6. **Prove it on the real thing.** A test counts only if it fails on the code before the change. Run it against the old code once. A check that passes too easily is suspect: look at how it observes before trusting it. Page changes get looked at in a browser, Supabase changes run against Supabase.
-7. **Fix where it went wrong.** Trace a symptom to the first wrong decision and fix that, then look for the same fault elsewhere. A guard is a fix only when the state it handles is legitimate.
+7. **Fix where it went wrong.** Trace a symptom to the first wrong decision and fix that, then look for the same fault elsewhere: a claim race that returned `not_yours` was the database checking the holder before the version, fixed in both databases, not in the test. A guard is a fix only when the state it handles is legitimate. When two fixes on the same belief have failed, test the belief before a third.
 8. **Explain the number.** A speed claim comes with its run count, spread and what limits it (`node scripts/bench.mjs`, `RTT_MS=40` for round trips).
 9. **Turn a repeated lesson into a check.** If you are about to write the same reminder a second time, write a script or a test instead and add it to `npm run check`.
 10. **Keep the reader's load low.** Fewer layers to trace, less hidden state to hold. Comments say why, never what.
@@ -38,6 +38,7 @@ artiboard is read by agents on every session they spend on a board, so it has th
 - **Feature.** Name the data and the rule first. Then change every surface it touches: tools (and the snapshot, on purpose), the page (rules arrive through `inline-rules.mjs`), the agents' protocol in `skills/artiboard/references/`, `SKILL.md`, and the five READMEs in the same places.
 - **Refactor.** Pin the behavior with tests before moving anything, move in small steps that each pass, and keep the change only if the code got easier to read.
 - **Performance.** Baseline with `scripts/bench.mjs` before, the same command after, and say what bounds the result.
+- **Anything bigger than one sitting.** Commit in small steps that each pass `npm run check` on their own. Keep a local decision log (`.audit/`, outside git): one row per decision with its why and its evidence. Before merging, have another model review the branch without your notes, then fix or answer each finding.
 
 ## Done means
 
