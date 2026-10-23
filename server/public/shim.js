@@ -93,7 +93,6 @@
       limitedMany: function (reads) { return call('read', { limited: reads }); },
       changed: function (collections, since) { return call('read', { collections: collections, since: since }); },
       batch: function (writes) { return call('batch', { writes: writes }); },
-      acquire: function (path, holder, ttl) { return call('acquire', { path: path, holder: holder, ttlMs: ttl }).then(function (r) { return r.acquired; }); },
       subscribe: function (onRow, onLive) {
         var es = new EventSource(base + 'events');
         es.onopen = function () { onLive(true); };
@@ -125,9 +124,6 @@
       limitedMany: function (reads) { return sb.rpc('ab_read_limited', { p_project: PROJECT, p_reads: reads }).then(rows); },
       changed: function (collections, since) { return base().in('collection', collections).gt('updated_at', since).then(rows); },
       batch: function (writes) { return sb.rpc('ab_batch', { p_project: PROJECT, p_writes: writes }).then(rows); },
-      acquire: function (path, holder, ttl) {
-        return sb.rpc('ab_acquire', { p_path: PROJECT + ':' + path, p_holder: holder, p_ttl_ms: ttl }).then(function (r) { return rows(r) === true; });
-      },
       subscribe: function (onRow, onLive) {
         function onChange(p) {
           if (p.eventType === 'DELETE') { var o = p.old || {}; if (o.project === PROJECT && o.collection) onRow({ collection: o.collection, doc_id: o.doc_id }, true); return; }
@@ -333,10 +329,9 @@
           return write(w);
         },
         delete: function () { return write({ op: 'delete', path: path }); },
-        acquire: function (o) {
-          return tr.acquire(path, String((o && o.holder) || ''), (o && o.ttlMs) || 5000)
-            .then(function (got) { return { acquired: got }; }, function (e) { throw boardError(e); });
-        },
+        // the page leases people/<id> before linking an account, for claude.ai; here the database already lets a
+        // member link only their own person, so two viewers cannot race for one
+        acquire: function () { return Promise.resolve({ acquired: true }); },
         onSnapshot: function (cb, err) { return listen({ collection: collection, docId: id, orders: [], lim: 0, cb: cb, err: err }); },
       };
     }

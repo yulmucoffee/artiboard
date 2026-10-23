@@ -36,7 +36,8 @@ create table if not exists sessions (
   hash text primary key, uid text not null references members (uid) on delete cascade, expires_at integer not null);
 create table if not exists codes (
   hash text primary key, uid text not null references members (uid) on delete cascade, expires_at integer not null);
-create table if not exists leases (path text primary key, holder text not null, expires_at integer not null);
+-- leases kept two viewers from linking one person at once; the people/ guard now lets a member link only their own
+drop table if exists leases;
 create table if not exists pages (
   project text primary key references projects (id) on delete cascade, html text not null, version integer not null,
   updated_at text not null, updated_by text);
@@ -254,20 +255,6 @@ export function openSqlite({ file, boardUrl }) {
     return out;
   }
 
-  // short leases, so two viewers linking the same person at once cannot both win
-  async function acquire(actor, project, path, holder, ttlMs) {
-    const role = roleOf(actor);
-    if (!role || role === 'viewer') throw new BoardError('permission_denied', 'this account cannot write');
-    checkProject(project);
-    if (typeof path !== 'string' || path.length > 800 || String(holder || '').length > 200) throw new BoardError('invalid_argument', 'lease path or holder too long');
-    const t = Date.now(), ttl = Math.min(Math.max(Number(ttlMs) || 5000, 100), 60000);
-    q('delete from leases where expires_at < ?').run(t - 60000);
-    const r = q(`insert into leases (path, holder, expires_at) values (?, ?, ?) on conflict (path) do update
-      set holder = excluded.holder, expires_at = excluded.expires_at where leases.expires_at < ? or leases.holder = excluded.holder`)
-      .run(`${project}:${path}`, String(holder || ''), t + ttl, t);
-    return r.changes > 0;
-  }
-
   // Writes from another process on the same file (the CLI while the site runs) reach open pages
   // through a cheap look for newer rows every two seconds, only while someone is watching.
   let seen = last, watching = 0, timer = null;
@@ -438,7 +425,7 @@ export function openSqlite({ file, boardUrl }) {
   async function endSession(sid) { if (sid) q('delete from sessions where hash = ?').run(hashToken(sid)); }
 
   return {
-    kind: 'sqlite', get, query, readMany, apply, readRows, acquire, subscribe, overview, createProject, dropProject, projectIds,
+    kind: 'sqlite', get, query, readMany, apply, readRows, subscribe, overview, createProject, dropProject, projectIds,
     getPage, setPage, resetPage, memberForToken, memberByPerson, listMembers, addMember, setRole, setMemberName, removeMember, issueToken,
     revokeTokens, loginLink, startSession, memberForSession, endSession, close: () => db.close(),
   };

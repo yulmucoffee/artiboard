@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.15.1",
+      "date": "2026-10-24",
+      "prs": [
+        38
+      ],
+      "lines": {
+        "en": [
+          "Nothing changes on screen: the leases that kept two people from linking one name at once are gone, since each member can now link only their own; one function the browser could call goes with them."
+        ],
+        "ko": [
+          "화면은 그대로예요. 두 사람이 같은 이름을 동시에 연결하지 못하게 하던 잠금을 지웠어요. 이제 각자 자기 이름만 연결할 수 있어서 필요 없어졌고, 브라우저에서 부를 수 있던 함수도 하나 줄었어요."
+        ]
+      }
+    },
+    {
       "version": "1.15.0",
       "date": "2026-10-23",
       "prs": [
