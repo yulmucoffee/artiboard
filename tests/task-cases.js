@@ -21,6 +21,7 @@ export const CHANGE_CASES = [
   [review, 'ben', { summary: 'merged, notes in the PR' }, false, true, 'and writes its summary'],
   [review, 'ben', { status: 'blocked' }, false, false, 'but not anything else'],
   [review, 'ben', { status: 'done', branch: 'x' }, false, false, 'nor the branch with it'],
+  [review, 'ben', { status: null }, false, false, 'nor clear its status'],
   [done, 'ben', { archivedAt: AT }, false, true, 'anyone archives done work'],
   [doing, 'ben', { archivedAt: AT }, false, false, 'only done work'],
   [done, 'ben', { status: 'doing' }, false, false, 'reopening is the holder\'s'],
