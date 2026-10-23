@@ -340,6 +340,30 @@ for (const backend of backends) {
       await call(board, 'board_batch', { project: P, writes: ['d1', 'd2', 'd3', 'd4', 'd5'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })) });
     });
 
+    test('the start says where someone else wrote last, and folds my work in review into one line', async () => {
+      const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
+      const task = (n) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `last ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at } });
+      await call(board, 'board_batch', { project: P, writes: [task('w1'), task('w2'), task('w3')] });
+      for (const n of ['w1', 'w2', 'w3']) await call(board, 'board_claim', { project: P, id: K(n) });
+      await call(board, 'board_post', { project: P, task: K('w2'), status: 'review', pr: 'https://example.com/pr/9' });
+      await call(board, 'board_post', { project: P, task: K('w3'), status: 'review' });
+      const other = await connect(tokens.member);
+      try {
+        await call(other, 'board_post', { project: P, task: K('w1'), text: 'which endpoint did you mean?', type: 'question' });
+        await call(other, 'board_post', { project: P, task: K('w3'), text: 'looks right; merging after the deploy' });
+      } finally {
+        await other.close();
+      }
+      const s = (await call(board, 'board_start', { project: P, ready: 0, rules: false, peek: true })).value;
+      assert.match(s, new RegExp(`^${K('w1')} doing .*last w1 · ${them} wrote last$`, 'm'), 'my task where someone asked a question says so');
+      assert.match(s, new RegExp(`^mine in review \\(\\d+\\): (.*, )?${K('w2')}(, |$)`, 'm'), 'my work waiting on review is one line of keys');
+      assert.match(s, new RegExp(`^mine in review .*${K('w3')} \\(${them} wrote last\\)`, 'm'), 'with who wrote last');
+      assert.doesNotMatch(s, new RegExp(`^${K('w2')} review`, 'm'), 'not a full line each');
+      await call(board, 'board_post', { project: P, task: K('w1'), text: 'the export one' });
+      assert.doesNotMatch((await call(board, 'board_start', { project: P, ready: 0, rules: false, peek: true })).value, new RegExp(`^${K('w1')} .*wrote last`, 'm'), 'until I answer');
+      await call(board, 'board_batch', { project: P, writes: ['w1', 'w2', 'w3'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })) });
+    });
+
     test('board_post finishes several tasks in one atomic write, with a line in each thread', async () => {
       const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
       const task = (n, data) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `bulk ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at, ...data } });

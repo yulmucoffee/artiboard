@@ -13,6 +13,7 @@ export const CHANGE_CASES = [
   [{ status: 'todo' }, 'ben', { status: 'doing' }, false, true, 'nobody holds it'],
   [doing, 'ben', { due: '2026-11-01' }, false, true, 'anyone moves the due day'],
   [doing, 'ben', { waitingOn: [], updatedAt: AT }, false, true, 'bookkeeping the board does itself'],
+  [doing, 'ben', { lastMessageAt: AT, lastMessageBy: 'ben' }, false, true, 'and a post saying who wrote last'],
   [doing, 'ben', { status: 'blocked' }, false, false, 'someone else\'s work'],
   [doing, 'ben', { status: 'blocked' }, true, true, 'unless a person says so'],
   [review, 'ben', { status: 'done', doneAt: AT }, false, true, 'a reviewer finishes it'],

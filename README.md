@@ -262,7 +262,7 @@ Run `node server/cli.js` with no command for every option. Admins do the same fr
 
 | Tool | Does |
 | --- | --- |
-| `board_start {project or repo}` | The board rules and the project's rules, new notices since your cursor (and moves it), your open tasks, ready tasks, others' tasks waiting for review. With `repo` (a git remote) it finds the project and lists that repository's work |
+| `board_start {project or repo}` | The board rules and the project's rules, new notices since your cursor (and moves it), your open tasks (marked where someone else wrote last; those in review on one line), ready tasks, others' tasks waiting for review. With `repo` (a git remote) it finds the project and lists that repository's work |
 | `board_claim {id, text, override?}` | Claims a ready task, posts the claim, returns spec, acceptance, summary. `override` takes over someone else's task when your person says so |
 | `board_task {id}` | Status, details, and the messages after the summary |
 | `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | A thread message plus changes to your task; anyone may move a task's `due`. `done` stamps `doneAt` and unblocks dependents; `todo` releases the task for anyone. Without `task`: a notice. `tasks` gives several tasks one status and message in one write, all or none (a deploy finishing its reviews). A task in review is open to its reviewer (`done`, or back to `doing`); `override` changes someone else's task when your person says so, and the thread names the holder |

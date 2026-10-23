@@ -165,10 +165,16 @@ export function makeFlow(store) {
     }
     out.push(notices.length ? `notices${since ? (notices.length === latest.length ? ' (new, the latest 20; older ones skipped)' : ' (new)') : ' (latest)'}:` : 'notices: none new');
     notices.forEach((n) => out.push(msgLine(n.data)));
-    if (mine.length) {
+    // where someone else wrote last (a question, a review, an override), so the holder opens that thread first;
+    // work in review waits on others, so it is one line of keys
+    const other = (d) => d.lastMessageBy && d.lastMessageBy !== me ? d.lastMessageBy : null;
+    const byKey = (a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id);
+    const working = mine.filter((t) => t.data.status !== 'review').sort(byKey), waiting = mine.filter((t) => t.data.status === 'review').sort(byKey);
+    if (working.length) {
       out.push('mine:');
-      mine.sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id)).forEach((t) => out.push(taskLine(t.data, t.id, true)));
+      working.forEach((t) => out.push(`${taskLine(t.data, t.id, true)}${other(t.data) ? ` · ${other(t.data)} wrote last` : ''}`));
     }
+    if (waiting.length) out.push(`mine in review (${waiting.length}): ${waiting.map((t) => `${t.data.key || t.id}${other(t.data) ? ` (${other(t.data)} wrote last)` : ''}`).join(', ')}`);
     if (ready) {
       const more = elsewhere ? `; ${elsewhere} more in other repos` : '';
       out.push(free.length ? `ready (${free.length > ready ? `${ready} of ` : ''}${free.length}${more}):` : `ready: none${more}`);
@@ -240,7 +246,7 @@ export function makeFlow(store) {
       const at = now();
       await apply(member, project, [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, ...(from && { override: true }), data: {
-          status: 'doing', owner: me, claimedBy: { who: me, agent: true, ...(session && { session }), at }, ...(!held && { waitingOn: [] }), updatedAt: at, lastMessageAt: at } },
+          status: 'doing', owner: me, claimedBy: { who: me, agent: true, ...(session && { session }), at }, ...(!held && { waitingOn: [] }), updatedAt: at, lastMessageAt: at, lastMessageBy: me } },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
           at, author: me, kind: 'agent', type: 'update', text: (text || CLAIMED[config?.data?.lang] || CLAIMED.en) + (from ? ` (taken over from ${from})` : '') } },
       ]);
@@ -288,7 +294,7 @@ export function makeFlow(store) {
         if (overriding && !override) {
           throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day${statusOf(d) === 'review' ? ', or review it (status done or doing)' : ''}; for the rest ask in its thread, or override true when your person tells you to`);
         }
-        const patch = { updatedAt: at, lastMessageAt: at };
+        const patch = { updatedAt: at, lastMessageAt: at, lastMessageBy: me };
         for (const f of ['branch', 'pr', 'start', 'due', 'repo']) if (f in change) patch[f] = change[f] || null;
         if (status !== undefined) Object.assign(patch, { status }, statusEffects(d, status, at));
         // with no text, the thread still says what changed
@@ -341,7 +347,9 @@ export function makeFlow(store) {
       const m = /^(tasks|details)\/([^/]+)$/.exec(w.path);
       if (!m) return w;
       notes.set(m[2], [...(notes.get(m[2]) || []), ...Object.keys(w.data || { [w.op]: 1 })]);
-      return { ...w, override: true };
+      // the task says who wrote last, so its holder's next start shows the change
+      const said = m[1] === 'tasks' && w.op !== 'delete' && { data: { ...w.data, lastMessageAt: at, lastMessageBy: me } };
+      return { ...w, ...said, override: true };
     });
     for (const [id, fields] of notes) {
       out.push({ op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true,

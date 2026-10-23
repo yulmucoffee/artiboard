@@ -657,10 +657,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // every field of tasks/<id>; references/protocol.md lists the same ones
   const TASK_FIELDS = ['key', 'title', 'feature', 'milestone', 'status', 'owner', 'deps', 'waitingOn', 'claimedBy', 'branch', 'pr',
-    'start', 'due', 'repo', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt'];
+    'start', 'due', 'repo', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
 
   // what anyone may write on any task: the due day, and what the board keeps up to date by itself
-  const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt'];
+  const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
 
   // The fields a write changes, with their new values: a missing field equals null, and object keys compare in any
   // order, as both databases store them.
@@ -963,7 +963,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var over=!mayChange(t,me,patch,false);
     if(over&&!extra)extra=T('saidOver',{p:pname(holderOf(t))});
     if(!bits.length&&!extra)return save(t.id,patch);
-    patch.updatedAt=patch.lastMessageAt=at;markSeen(t.id,at);
+    patch.updatedAt=patch.lastMessageAt=at;patch.lastMessageBy=me;markSeen(t.id,at);
     var o=over?{override:true}:{};if(typeof ifVersion==='number')o.ifVersion=ifVersion;
     return db.doc('tasks/'+t.id).update(patch,o)
       .then(function(){return db.doc('tasks/'+t.id+'/messages/'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:'update',text:bits.join(' · ')+(extra||'')})})
@@ -1726,7 +1726,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       send.addEventListener('click',function(){var v=ta.value.trim();if(!v)return;send.disabled=true;var at=now();
         markSeen(t.id,at);
         db.doc('tasks/'+t.id+'/messages/'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:ty.value,text:v})
-          .then(function(){ta.value='';return db.doc('tasks/'+t.id).update({lastMessageAt:at,updatedAt:at})})
+          .then(function(){ta.value='';return db.doc('tasks/'+t.id).update({lastMessageAt:at,lastMessageBy:me,updatedAt:at})})
           .catch(function(e){toast(T('postFail',{e:errText(e)}));refused(e)}).then(function(){send.disabled=false})});
       ta.addEventListener('keydown',function(e){if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();send.click()}});
       comp=el('div',{class:'composer'},[warnLine(),ta,el('div',{class:'form-row'},[ty,send,el('span',{class:'muted',style:'font-size:12px',text:T('sendHint')})])]);

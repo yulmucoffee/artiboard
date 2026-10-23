@@ -262,7 +262,7 @@ artiboard import --project ID --file FILE [--map old=new]
 
 | 工具 | 作用 |
 | --- | --- |
-| `board_start {project 或 repo}` | 看板规则和项目规则、游标之后的新公告（并移动游标）、你未完成的任务、可领取的任务、等待评审的他人任务。传入 `repo`（git remote）时会找到项目并列出该仓库的工作 |
+| `board_start {project 或 repo}` | 看板规则和项目规则、游标之后的新公告（并移动游标）、你未完成的任务（别人最后发言的会标出，评审中的合成一行）、可领取的任务、等待评审的他人任务。传入 `repo`（git remote）时会找到项目并列出该仓库的工作 |
 | `board_claim {id, text, override?}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准和摘要。`override` 在你的使用者要求时接手别人的任务 |
 | `board_task {id}` | 状态、详情，以及摘要之后的消息 |
 | `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | 一条讨论串消息，加上对你任务的修改；任何人都可以调整任务的 `due`。`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞；`todo` 会释放任务，任何人都可以再领取。不带 `task` 时：发布公告。`tasks` 在一次写入里给多个任务同一状态和消息，要么全部成功要么都不写（部署后一次完成评审中的任务）。评审中的任务对评审人开放（`done` 或退回 `doing`）；`override` 在你的使用者要求时修改别人的任务，讨论串会记下原负责人 |

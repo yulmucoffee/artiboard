@@ -6,10 +6,10 @@ export const TASK_STATUSES = ['todo', 'doing', 'review', 'blocked', 'done'];
 
 // every field of tasks/<id>; references/protocol.md lists the same ones
 export const TASK_FIELDS = ['key', 'title', 'feature', 'milestone', 'status', 'owner', 'deps', 'waitingOn', 'claimedBy', 'branch', 'pr',
-  'start', 'due', 'repo', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt'];
+  'start', 'due', 'repo', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
 
 // what anyone may write on any task: the due day, and what the board keeps up to date by itself
-const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt'];
+const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
 
 // The fields a write changes, with their new values: a missing field equals null, and object keys compare in any
 // order, as both databases store them.

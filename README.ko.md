@@ -262,7 +262,7 @@ artiboard import --project ID --file FILE [--map old=new]
 
 | 도구 | 하는 일 |
 | --- | --- |
-| `board_start {project 또는 repo}` | 보드 규칙과 프로젝트 규칙, 커서 이후의 새 공지(커서도 옮김), 내가 맡은 열린 태스크, 준비된 태스크, 검토를 기다리는 남의 태스크. `repo`(git remote)를 주면 프로젝트를 찾고 그 저장소의 일을 보여 줍니다 |
+| `board_start {project 또는 repo}` | 보드 규칙과 프로젝트 규칙, 커서 이후의 새 공지(커서도 옮김), 내가 맡은 열린 태스크(다른 사람이 마지막으로 쓴 곳은 표시, 검토 중인 것은 한 줄로), 준비된 태스크, 검토를 기다리는 남의 태스크. `repo`(git remote)를 주면 프로젝트를 찾고 그 저장소의 일을 보여 줍니다 |
 | `board_claim {id, text, override?}` | 준비된 태스크를 집고, 집었다는 글을 남기고, 스펙, 인수 조건, 요약을 돌려줍니다. `override`는 사람이 시킬 때 남이 맡은 태스크를 넘겨받습니다 |
 | `board_task {id}` | 상태, 세부 내용, 요약 이후의 메시지 |
 | `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. 마감일(`due`)은 누구나 옮길 수 있습니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀리고, `todo`면 태스크를 놓아 누구나 집을 수 있게 합니다. `task`가 없으면 공지. `tasks`는 여러 태스크에 같은 상태와 메시지를 한 번에 쓰고, 전부 되거나 하나도 안 됩니다(배포 뒤 검토 대기를 한꺼번에 완료할 때). 검토 중인 태스크는 검토한 사람도 `done`이나 `doing`으로 바꿀 수 있고, `override`는 사람이 시킬 때 남의 태스크를 바꾸며 스레드에 원래 담당을 남깁니다 |

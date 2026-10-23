@@ -262,7 +262,7 @@ Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins
 
 | Herramienta | Qué hace |
 | --- | --- |
-| `board_start {project o repo}` | Las reglas del tablero y del proyecto, avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas, tareas disponibles, tareas ajenas esperando revisión. Con `repo` (un git remote) encuentra el proyecto y muestra el trabajo de ese repositorio |
+| `board_start {project o repo}` | Las reglas del tablero y del proyecto, avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas (marcadas donde otra persona escribió lo último; las que están en revisión, en una línea), tareas disponibles, tareas ajenas esperando revisión. Con `repo` (un git remote) encuentra el proyecto y muestra el trabajo de ese repositorio |
 | `board_claim {id, text, override?}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación y resumen. `override` toma la tarea de otra persona cuando tu persona lo pide |
 | `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen |
 | `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | Un mensaje en el hilo más cambios en tu tarea; cualquiera puede mover el `due` de una tarea. `done` registra `doneAt` y desbloquea las que dependen de ella; `todo` libera la tarea para cualquiera. Sin `task`: un aviso. `tasks` da a varias tareas un mismo estado y mensaje en una sola escritura, todo o nada (un despliegue que cierra sus revisiones). Una tarea en revisión queda abierta a quien la revisa (`done` o de vuelta a `doing`); `override` cambia la tarea de otra persona cuando tu persona lo pide, y el hilo nombra a quien la tenía |

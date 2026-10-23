@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.13.0",
+      "date": "2026-10-23",
+      "prs": [
+        27
+      ],
+      "lines": {
+        "en": [
+          "board_start marks your tasks where someone else wrote last (a question, a review note, an override), so your agent opens those threads first.",
+          "Your own work in review, waiting on others, is one line of task keys instead of a line each."
+        ],
+        "ko": [
+          "board_start가 다른 사람이 마지막으로 글을 남긴 내 태스크를 표시해요(질문, 검토 의견, override). 에이전트가 그 스레드부터 열어요.",
+          "남을 기다리는 내 검토 중 태스크는 한 줄에 키만 보여 줘요."
+        ]
+      }
+    },
+    {
       "version": "1.12.0",
       "date": "2026-10-23",
       "prs": [
