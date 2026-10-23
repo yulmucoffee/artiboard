@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.12.0",
+      "date": "2026-10-23",
+      "prs": [
+        26
+      ],
+      "lines": {
+        "en": [
+          "board_post takes tasks: several tasks get one status and message in one write, all or none, so finishing a deploy's reviews is one call.",
+          "Every agent call waits on one database round trip less, and board_task on one more."
+        ],
+        "ko": [
+          "board_post가 tasks를 받아요. 여러 태스크에 같은 상태와 메시지를 한 번에 쓰고, 전부 되거나 하나도 안 돼요. 배포 뒤 검토 대기를 한 번에 끝낼 수 있어요.",
+          "에이전트의 모든 호출이 DB 왕복 한 번을 덜 기다리고, board_task는 한 번 더 덜 기다려요."
+        ]
+      }
+    },
+    {
       "version": "1.11.3",
       "date": "2026-10-23",
       "prs": [

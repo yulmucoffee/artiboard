@@ -340,6 +340,46 @@ for (const backend of backends) {
       await call(board, 'board_batch', { project: P, writes: ['d1', 'd2', 'd3', 'd4', 'd5'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })) });
     });
 
+    test('board_post finishes several tasks in one atomic write, with a line in each thread', async () => {
+      const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
+      const task = (n, data) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `bulk ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at, ...data } });
+      await call(board, 'board_batch', { project: P, writes: [
+        task('b1'), task('b2'),
+        task('b3', { deps: [K('b1'), K('b2')], waitingOn: [K('b1'), K('b2')] }),
+        task('b4', { status: 'review', owner: them, claimedBy: { who: them, agent: true, at } }), // someone else's, in review
+        task('b5', { status: 'doing', owner: them, claimedBy: { who: them, agent: true, at } }), // someone else's, at work
+      ] });
+      await call(board, 'board_claim', { project: P, id: K('b1') });
+      await call(board, 'board_claim', { project: P, id: K('b2') });
+      const post = async (args) => (await call(board, 'board_post', { project: P, ...args })).value;
+
+      assert.match(await post({ tasks: [K('b1'), K('b5')], status: 'done' }), new RegExp(`^not_yours: ${K('b5')} is held by ${them}`), 'one task not mine stops them all');
+      assert.equal((await call(board, 'board_get', { project: P, path: `tasks/${K('b1')}` })).value.data.status, 'doing', 'and nothing was written');
+      assert.match(await post({ tasks: [K('b1'), K('b2')], status: 'done', summary: 'x' }), /^invalid_argument: /, 'several at once take status and text only');
+
+      assert.equal(await post({ tasks: [K('b1'), K('b2'), K('b4')], status: 'done', text: 'deployed 10-26' }),
+        `ok ${K('b1')}, ${K('b2')}, ${K('b4')} → done · unblocked ${K('b3')}`, 'a dependent waiting on two of them is unblocked once');
+      for (const n of ['b1', 'b2', 'b4']) {
+        const t = (await call(board, 'board_get', { project: P, path: `tasks/${K(n)}`, fields: ['status', 'doneAt'] })).value.data;
+        assert.equal(t.status, 'done');
+        assert.match(t.doneAt, /^\d{4}-/);
+        const last = (await call(board, 'board_query', { project: P, collection: `tasks/${K(n)}/messages`, order_by: [{ field: 'at', dir: 'desc' }], limit: 1, fields: ['text', 'author'] })).value.docs[0].data;
+        assert.deepEqual(last, { text: 'deployed 10-26', author: me });
+      }
+      assert.deepEqual((await call(board, 'board_get', { project: P, path: `tasks/${K('b3')}` })).value.data.waitingOn, []);
+      await call(board, 'board_batch', { project: P, writes: ['b1', 'b2', 'b3', 'b4', 'b5'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })), override: true });
+    });
+
+    test('a token\'s last use is written once every few minutes, not on every call', async () => {
+      const token = await store.issueToken(people.member.uid, 'use');
+      const lastUsed = async () => (await store.listMembers()).find((m) => m.uid === people.member.uid).lastUsed;
+      assert.ok(await store.memberForToken(token));
+      const first = await lastUsed();
+      await new Promise((r) => setTimeout(r, 20));
+      assert.ok(await store.memberForToken(token), 'the token still signs in');
+      assert.equal(await lastUsed(), first, 'without a write: every tool call would otherwise wait on one more round trip');
+    });
+
     test('a new member gets their seat even when the board\'s config changes between the read and the write', async () => {
       const m = people.seated = await store.addMember({ person: `sp${R}`, role: 'member' });
       let raced = false;

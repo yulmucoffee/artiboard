@@ -255,9 +255,15 @@ export function makeFlow(store) {
   // passed when the agent's person says so, opens the rest (the thread names the holder).
   // status todo releases the task (no holder, no owner). status done stamps doneAt (leaving done clears it) and takes
   // the key out of every dependent's waitingOn.
-  async function post(member, project, { task: id, text, type, status, branch, pr, start, due, repo, summary, override }) {
+  // tasks, in place of task, gives several tasks one status and one message in one write, all or none (a deploy
+  // finishing a list of reviews).
+  async function post(member, project, { task: id, tasks, text, type, status, branch, pr, start, due, repo, summary, override }) {
     const me = member.person;
-    if (!id) {
+    if (tasks && (id || [branch, pr, start, due, repo, summary].some((v) => v !== undefined))) {
+      throw new BoardError('invalid_argument', 'tasks takes status and text only, and no task');
+    }
+    const ids = tasks ? [...new Set(tasks)] : id ? [id] : null;
+    if (!ids) {
       if (status || branch !== undefined || pr !== undefined || start !== undefined || due !== undefined || repo !== undefined || summary !== undefined) {
         throw new BoardError('invalid_argument', 'status, branch, pr, start, due, repo and summary need a task');
       }
@@ -269,51 +275,60 @@ export function makeFlow(store) {
     }
     const changes = [status, branch, pr, start, due, repo, summary].some((v) => v !== undefined);
     if (!text?.trim() && !changes) throw new BoardError('invalid_argument', 'pass text, or a change');
+    // the asked-for change, empty strings clearing a field
+    const change = Object.fromEntries(Object.entries({ status, branch, pr, start, due, repo, summary }).filter(([, v]) => v !== undefined));
     return retrying(async () => {
-      const [t, det] = await Promise.all([get(project, `tasks/${id}`), summary !== undefined ? get(project, `details/${id}`) : null]);
-      if (!t) throw new BoardError('not_found', `no task ${id}`);
-      const d = t.data, key = d.key || id, holder = holderOf(d);
-      // the asked-for change, empty strings clearing a field; the thread names the holder when it took override
-      const change = Object.fromEntries(Object.entries({ status, branch, pr, start, due, repo, summary }).filter(([, v]) => v !== undefined));
-      const overriding = !mayChange(d, me, change, false);
-      if (overriding && !override) {
-        throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day${statusOf(d) === 'review' ? ', or review it (status done or doing)' : ''}; for the rest ask in its thread, or override true when your person tells you to`);
-      }
-      const at = now();
-      const patch = { updatedAt: at, lastMessageAt: at };
-      for (const f of ['branch', 'pr', 'start', 'due', 'repo']) if (f in change) patch[f] = change[f] || null;
-      if (status !== undefined) Object.assign(patch, { status }, statusEffects(d, status, at));
-      // with no text, the thread still says what changed
-      const said = `${text?.trim() || [
-        status && `status ${status}`, branch !== undefined && `branch ${branch || 'none'}`, pr !== undefined && `pr ${pr || 'none'}`,
-        start !== undefined && `start ${start || 'none'}${day(d.start) ? ` (was ${d.start})` : ''}`,
-        due !== undefined && `due ${due || 'none'}${day(d.due) ? ` (was ${d.due})` : ''}`,
-        repo !== undefined && `repo ${repo || 'none'}`, summary !== undefined && 'summary updated',
-      ].filter(Boolean).join(' · ') || 'updated'}${overriding ? ` (override; held by ${holder})` : ''}`;
-      const writes = [
-        { op: 'update', path: `tasks/${id}`, if_version: t.version, data: patch, ...(overriding && { override: true }) },
-        { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
-          at, author: me, kind: 'agent', type: type || (status === 'blocked' ? 'blocker' : 'update'), text: said } },
-      ];
-      // the summary goes first, so the database judges it against the task as it stands, not after this status change:
-      // a reviewer finishing a task writes its summary in the same call
-      if (summary !== undefined) {
-        const s = { summary, summaryAt: at }, o = overriding && { override: true };
-        writes.unshift(det ? { op: 'update', path: `details/${id}`, if_version: det.version, data: s, ...o } : { op: 'set', path: `details/${id}`, if_absent: true, data: s, ...o });
-      }
+      const [ts, det] = await Promise.all([Promise.all(ids.map((i) => get(project, `tasks/${i}`))), summary !== undefined ? get(project, `details/${id}`) : null]);
+      const at = now(), patches = new Map(), writes = [], keys = [];
+      ts.forEach((t, n) => {
+        if (!t) throw new BoardError('not_found', `no task ${ids[n]}`);
+        const d = t.data, key = d.key || t.id, holder = holderOf(d);
+        // the thread names the holder when the change took override
+        const overriding = !mayChange(d, me, change, false);
+        if (overriding && !override) {
+          throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day${statusOf(d) === 'review' ? ', or review it (status done or doing)' : ''}; for the rest ask in its thread, or override true when your person tells you to`);
+        }
+        const patch = { updatedAt: at, lastMessageAt: at };
+        for (const f of ['branch', 'pr', 'start', 'due', 'repo']) if (f in change) patch[f] = change[f] || null;
+        if (status !== undefined) Object.assign(patch, { status }, statusEffects(d, status, at));
+        // with no text, the thread still says what changed
+        const said = `${text?.trim() || [
+          status && `status ${status}`, branch !== undefined && `branch ${branch || 'none'}`, pr !== undefined && `pr ${pr || 'none'}`,
+          start !== undefined && `start ${start || 'none'}${day(d.start) ? ` (was ${d.start})` : ''}`,
+          due !== undefined && `due ${due || 'none'}${day(d.due) ? ` (was ${d.due})` : ''}`,
+          repo !== undefined && `repo ${repo || 'none'}`, summary !== undefined && 'summary updated',
+        ].filter(Boolean).join(' · ') || 'updated'}${overriding ? ` (override; held by ${holder})` : ''}`;
+        const update = { op: 'update', path: `tasks/${t.id}`, if_version: t.version, data: patch, ...(overriding && { override: true }) };
+        patches.set(t.id, patch);
+        keys.push(key);
+        writes.push(update, { op: 'set', path: `tasks/${t.id}/messages/${stampId(at, me)}`, if_absent: true, data: {
+          at, author: me, kind: 'agent', type: type || (status === 'blocked' ? 'blocker' : 'update'), text: said } });
+        // the summary goes first, so the database judges it against the task as it stands, not after this status
+        // change: a reviewer finishing a task writes its summary in the same call
+        if (summary !== undefined) {
+          const s = { summary, summaryAt: at }, o = overriding && { override: true };
+          writes.unshift(det ? { op: 'update', path: `details/${id}`, if_version: det.version, data: s, ...o } : { op: 'set', path: `details/${id}`, if_absent: true, data: s, ...o });
+        }
+      });
       const unblocked = [];
       if (status === 'done') {
-        const after = await query(project, 'tasks', { where: [{ field: 'deps', op: 'array-contains', value: key }], limit: 200 });
-        for (const o of after) {
+        const finished = new Set(keys), seen = new Map();
+        for (const found of await Promise.all(keys.map((k) => query(project, 'tasks', { where: [{ field: 'deps', op: 'array-contains', value: k }], limit: 200 })))) {
+          for (const o of found) seen.set(o.id, o);
+        }
+        for (const o of seen.values()) {
           const waiting = Array.isArray(o.data.waitingOn) ? o.data.waitingOn : [];
-          if (!waiting.includes(key)) continue;
-          const left = waiting.filter((k) => k !== key);
+          const left = waiting.filter((k) => !finished.has(k));
+          if (left.length === waiting.length) continue;
+          // a dependent finished in the same call takes its waitingOn with its own change, one write per document
+          if (patches.has(o.id)) { patches.get(o.id).waitingOn = left; continue; }
           writes.push({ op: 'update', path: `tasks/${o.id}`, if_version: o.version, data: { waitingOn: left } });
           if (!left.length && (o.data.status || 'todo') === 'todo') unblocked.push(o.data.key || o.id);
         }
       }
+      if (writes.length > 100) throw new BoardError('invalid_argument', `${writes.length} writes is more than one call takes (100): pass fewer tasks`);
       await apply(member, project, writes);
-      return [`ok ${key}${status ? ` → ${status}` : ''}`, unblocked.length && `unblocked ${unblocked.sort(keyOrder).join(', ')}`].filter(Boolean).join(' · ');
+      return [`ok ${keys.join(', ')}${status ? ` → ${status}` : ''}`, unblocked.length && `unblocked ${unblocked.sort(keyOrder).join(', ')}`].filter(Boolean).join(' · ');
     });
   }
 
