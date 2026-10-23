@@ -198,8 +198,11 @@ for (const backend of backends) {
       assert.match(finished.doneAt, /^\d{4}-\d\d-\d\dT/, 'done stamps doneAt');
       const left = await call(board, 'board_query', { project: P, collection: 'tasks', where: [{ field: 'key', op: 'in', value: [K(2), K(3)] }], fields: ['waitingOn'] });
       assert.deepEqual(left.value.docs.map((d) => d.data.waitingOn), [[], ['X-9']]);
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'update', path: `tasks/${K(1)}`, data: { archivedAt: new Date().toISOString() } }] });
+      assert.match((await call(board, 'board_task', { project: P, id: K(1), thread: 0 })).value, /· archived \d\d-\d\d/, 'an archived task says so');
       assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'qa pass', status: 'qa' })).value, `ok ${K(1)} → qa`, 'a status the board adds');
       assert.equal((await call(board, 'board_get', { project: P, path: `tasks/${K(1)}` })).value.data.doneAt, undefined, 'leaving done clears doneAt');
+      assert.equal((await call(board, 'board_get', { project: P, path: `tasks/${K(1)}` })).value.data.archivedAt, undefined, 'and takes it out of the archive');
     });
 
     test('a reviewer finishes a task in review, and an agent changes or takes over another\'s task only with override', async () => {

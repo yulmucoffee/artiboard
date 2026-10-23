@@ -194,7 +194,7 @@ export function makeFlow(store) {
     const who = d.claimedBy?.who ? `${d.claimedBy.who}${d.claimedBy.agent ? ' (agent)' : ''}` : d.owner || 'unassigned';
     const out = [`${d.key || id} ${d.status || 'todo'} · ${who}${d.repo ? ` · repo:${d.repo}` : ''}${d.branch ? ` · ${d.branch}` : ''}${d.pr ? ` · ${d.pr}` : ''}`, d.title || ''];
     if (d.deps?.length) out.push(`deps ${d.deps.join(', ')}${d.waitingOn?.length ? ` · waiting on ${d.waitingOn.join(', ')}` : ''}`);
-    const dates = [day(d.start) && `start ${d.start}`, day(d.due) && `due ${d.due}`, d.doneAt && `done ${short(d.doneAt)}`].filter(Boolean);
+    const dates = [day(d.start) && `start ${d.start}`, day(d.due) && `due ${d.due}`, d.doneAt && `done ${short(d.doneAt)}`, d.archivedAt && `archived ${short(d.archivedAt)}`].filter(Boolean);
     if (dates.length) out.push(dates.join(' · '));
     out.push(...detailLines(det));
     if (thread) {
@@ -266,6 +266,7 @@ export function makeFlow(store) {
       if (status === 'todo') { patch.claimedBy = null; patch.owner = null; }
       if (status === 'done' && d.status !== 'done') patch.doneAt = at;
       if (status !== undefined && status !== 'done' && d.doneAt) patch.doneAt = null;
+      if (status !== undefined && status !== 'done' && d.archivedAt) patch.archivedAt = null;
       if (branch !== undefined) patch.branch = branch || null;
       if (pr !== undefined) patch.pr = pr || null;
       if (start !== undefined) patch.start = start || null;

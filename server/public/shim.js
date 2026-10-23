@@ -302,12 +302,17 @@
         emit(l);
       });
     }
-    function write(w) {
+    // shows one write at once and returns how to take it back
+    function local(w) {
       var i = w.path.lastIndexOf('/'), c = w.path.slice(0, i), id = w.path.slice(i + 1), was = known(c, id);
       var mine = w.op === 'delete' ? null : { collection: c, doc_id: id, version: was ? was.version : 0, updated_at: was ? was.updated_at : '',
         data: w.op === 'set' ? copy(w.data) : Object.assign(was ? copy(was.data) : {}, copy(w.data)) };
       if (mine || was) force(c, id, mine);
-      return tr.batch([w]).then(null, function (e) { force(c, id, was); throw boardError(e); });
+      return function () { force(c, id, was); };
+    }
+    function write(w) {
+      var undo = local(w);
+      return tr.batch([w]).then(null, function (e) { undo(); throw boardError(e); });
     }
 
     function doc(path) {
@@ -346,7 +351,13 @@
     // live: the push connection is up, so the page is current without reloading
     function onStatus(cb) { statusCbs.push(cb); cb(live); }
 
-    return { doc: doc, collection: collection, onStatus: onStatus };
+    // up to 100 writes in one request, all or none (moving many done tasks to the archive); shown at once like one write
+    function batch(writes) {
+      var undo = writes.map(local);
+      return tr.batch(writes.map(copy)).then(null, function (e) { undo.reverse().forEach(function (f) { f(); }); throw boardError(e); });
+    }
+
+    return { doc: doc, collection: collection, onStatus: onStatus, batch: batch };
   }
 
   // ---------- sign-in: each backend keeps its own session, the rest of the page does not care ----------

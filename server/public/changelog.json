@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.9.0",
+      "date": "2026-10-23",
+      "prs": [
+        17
+      ],
+      "lines": {
+        "en": [
+          "The kanban fills the window and scrolls both ways like Notion's; cards take two lines, with the owner or what to know at the top right.",
+          "Columns fold or show two card columns. Done tasks move to an archive in one go and still count as done.",
+          "The document view's \"Now\" is one line per person and one row per task that needs hands or is free to take."
+        ],
+        "ko": [
+          "칸반이 창을 가득 채우고 Notion처럼 가로·세로로 넘겨요. 카드는 두 줄이고, 담당이나 알아야 할 것이 오른쪽 위에 있어요.",
+          "칸은 접거나 2열로 볼 수 있고, 완료 태스크는 한 번에 보관함으로 옮겨요. 보관해도 완료로 쳐요.",
+          "문서 보기의 ‘지금’이 사람별 한 줄, 손이 필요한 일과 집을 수 있는 일은 한 줄씩으로 바뀌었어요."
+        ]
+      }
+    },
+    {
       "version": "1.8.0",
       "date": "2026-10-23",
       "prs": [
