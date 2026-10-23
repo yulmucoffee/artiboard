@@ -305,6 +305,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 .card .foot .date{margin-left:auto;font-size:12px}
 .card.done{box-shadow:none;background:transparent;border-color:var(--line)}
 .card.done .title{color:var(--text2);font-weight:500}
+.cards .morebtn{align-self:center;padding:4px 0}
 /* the owner as a round initial in their color; a ring when an agent has it, pulsing while it is posting */
 .av{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);min-width:0}
 .av i{flex:none;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font-style:normal;font-size:11px;font-weight:700;color:var(--pc,var(--muted));background:var(--ps,var(--sunk))}
@@ -1352,8 +1353,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function now(){return new Date().toISOString()}
   function keyNum(k){var m=/^([A-Za-z]+)(\d+)-(\d+)/.exec(k||'');return m?[m[1],+m[2],+m[3]]:[k||'',0,0]}
   function byKey(a,b){var x=keyNum(a.key),y=keyNum(b.key);return x[0]<y[0]?-1:x[0]>y[0]?1:(x[1]-y[1])||(x[2]-y[2])||((a.key||'')<(b.key||'')?-1:1)}
-  function byKeyStr(k){for(var i=0;i<tasks.length;i++)if(tasks[i].key===k)return tasks[i];return null}
-  function byId(id){for(var i=0;i<tasks.length;i++)if(tasks[i].id===id)return tasks[i];return null}
+  // tasks by key and by id, rebuilt with each snapshot: lookups sit inside every per-task loop
+  var byKeyMap={},byIdMap={};
+  function indexTasks(){byKeyMap={};byIdMap={};for(var i=0;i<tasks.length;i++){var t=tasks[i];byIdMap[t.id]=t;if(typeof t.key==='string'&&!(t.key in byKeyMap))byKeyMap[t.key]=t}}
+  function byKeyStr(k){return Object.prototype.hasOwnProperty.call(byKeyMap,k)?byKeyMap[k]:null}
+  function byId(id){return Object.prototype.hasOwnProperty.call(byIdMap,id)?byIdMap[id]:null}
   function st(t){return STATUS.indexOf(t.status)>=0?t.status:'todo'}
   function SL(s){return T('st_'+s)}
   function unmet(t){return (t.deps||[]).filter(function(k){var d=byKeyStr(k);return !d||d.status!=='done'})}
@@ -1527,7 +1531,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   }
 
   // ---------- "new" markers (this browser only) ----------
-  function persistSeen(){write('ab-seen',JSON.stringify(seen))}
+  // marks made in one go (a first visit marks every task) are saved once
+  var seenTimer=0;
+  function saveSeen(){if(seenTimer){clearTimeout(seenTimer);seenTimer=0}write('ab-seen',JSON.stringify(seen))}
+  function persistSeen(){if(!seenTimer)seenTimer=setTimeout(saveSeen,0)}
+  window.addEventListener('pagehide',function(){if(seenTimer)saveSeen()});
   function isNew(t){var lt=lastTouch(t);return !!lt&&(!seen[t.id]||lt>seen[t.id])}
   function markSeen(id,at){if(at&&(!seen[id]||at>seen[id])){seen[id]=at;persistSeen()}}
   function noticeNew(n){return !!n.at&&n.at>noticeSeen&&!(n.kind==='human'&&n.author===me)}
@@ -1923,11 +1931,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     if(ready(t))return el('span',{class:'flag ready',text:T('readyTag')});
     return due?dueChip(t):s==='todo'?startChip(t):null;
   }
+  // the done column shows the latest finished work; a long-lived board keeps the rest behind "more"
+  var KDONE=30,kDoneAll=false;
   function renderKanban(){
     var root=$('kanban');root.textContent='';order=[];
     var cols=el('div',{class:'cols'});
     STATUS.forEach(function(s){
-      var list=tasks.filter(function(t){return st(t)===s&&match(t)}).sort(byKey);
+      var all=tasks.filter(function(t){return st(t)===s&&match(t)}).sort(s==='done'?byDone:byKey);
+      var list=s==='done'&&!kDoneAll&&!filtering()?all.slice(0,KDONE):all;
       var cards=el('div',{class:'cards'});
       if(!loaded)cards.appendChild(el('p',{class:'empty',style:'padding:4px 4px 8px',text:failed||T('loading')}));
       else if(!list.length)cards.appendChild(el('p',{class:'empty',style:'padding:4px 4px 8px',text:T('empty')}));
@@ -1940,7 +1951,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           el('div',{class:'foot'},[avatar(t),cardFlag(t)])
         ]));
       });
-      cols.appendChild(el('div',{class:'col'},[el('h3',{},[state(s),el('span',{class:'n',text:String(list.length)})]),cards]));
+      if(s==='done'&&!filtering()&&all.length>KDONE)cards.appendChild(moreBtn(kDoneAll,all.length-KDONE,function(){kDoneAll=!kDoneAll;renderKanban()}));
+      cols.appendChild(el('div',{class:'col'},[el('h3',{},[state(s),el('span',{class:'n',text:String(all.length)})]),cards]));
     });
     root.appendChild(cols);
   }
@@ -1972,13 +1984,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var end=null;ts.forEach(function(t){if(st(t)!=='done'&&(!end||best[t.id]>best[end]))end=t.id});
     var chain=[];for(var x=end;x;x=prev[x])chain.unshift(x);
     var kids={};ts.forEach(function(t){(t.deps||[]).forEach(function(k){var d=byKeyStr(k);if(d)(kids[d.id]=kids[d.id]||[]).push(t.id)})});
+    // a task's ancestors and descendants, worked out when it is hovered or selected, not for every task up front
     function walk(id,next,acc){(next(id)||[]).forEach(function(n){if(!acc[n]){acc[n]=1;walk(n,next,acc)}});return acc}
-    var anc={},desc={};
-    ts.forEach(function(t){
-      anc[t.id]=walk(t.id,function(id){var o=byId(id);return o?(o.deps||[]).map(byKeyStr).filter(Boolean).map(function(d){return d.id}):[]},{});
-      desc[t.id]=walk(t.id,function(id){return kids[id]},{});
-    });
-    return {cols:cols,row:row,lvl:lvl,chain:chain.length>=2?chain:[],anc:anc,desc:desc};
+    function up(id){var o=byId(id);return o?(o.deps||[]).map(byKeyStr).filter(Boolean).map(function(d){return d.id}):[]}
+    return {cols:cols,row:row,lvl:lvl,chain:chain.length>=2?chain:[],
+      lineOf:function(id){return byId(id)?{anc:walk(id,up,{}),desc:walk(id,function(x){return kids[x]},{})}:null}};
   }
   function renderGraph(){
     var wrap=$('graphWrap');wrap.textContent='';order=[];wrap.setAttribute('aria-label',T('v_graph'));
@@ -2038,9 +2048,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   }
   function lineage(id){
     var g=document.querySelector('.graph');if(!g||!graphRel)return;
-    if(!id||!graphRel.anc[id]){g.classList.remove('focus');g.querySelectorAll('.hi').forEach(function(n){n.classList.remove('hi')});
+    var line=id?graphRel.lineOf(id):null;
+    if(!line){g.classList.remove('focus');g.querySelectorAll('.hi').forEach(function(n){n.classList.remove('hi')});
       g.querySelectorAll('path.e').forEach(function(p){var b=p.classList.contains('crit')?'crit':p.classList.contains('met')?'met':'line';p.setAttribute('marker-end','url(#m-'+b+')')});return}
-    var keep={};keep[id]=1;for(var a in graphRel.anc[id])keep[a]=1;for(var d in graphRel.desc[id])keep[d]=1;
+    var keep={};keep[id]=1;for(var a in line.anc)keep[a]=1;for(var d in line.desc)keep[d]=1;
     g.classList.add('focus');
     g.querySelectorAll('.node').forEach(function(n){n.classList.toggle('hi',!!keep[n.dataset.k])});
     g.querySelectorAll('path.e').forEach(function(p){
@@ -2061,6 +2072,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     }
     else if(view==='kanban')renderKanban();
     else renderGraph();
+    // a hidden view is drawn again when shown, so its elements need not stay around meanwhile
+    if(view!=='kanban')$('kanban').textContent='';
+    if(view!=='graph'){$('graphWrap').textContent='';graphRel=null}
     if(cursor&&order.indexOf(cursor)<0)cursor=null;
     applyCursor();
   }
@@ -2309,7 +2323,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       db.collection('tasks').onSnapshot(function(s){lastTasks=s;if(!taskFrame)taskFrame=frame(onTasks)},function(e){failed=T('loadFail',{e:errText(e)});renderAll()});
       function onTasks(){
         taskFrame=0;var s=lastTasks;
-        tasks=s.docs.map(function(x){var o=x.data();o.id=x.id;return o});loaded=true;
+        tasks=s.docs.map(function(x){var o=x.data();o.id=x.id;return o});indexTasks();loaded=true;
         if(first){first=false;
           // a browser opening the board for the first time treats the current state as seen; only later changes count as new
           if(!read('ab-seen-init')){tasks.forEach(function(t){markSeen(t.id,lastTouch(t))});write('ab-seen-init','1')}

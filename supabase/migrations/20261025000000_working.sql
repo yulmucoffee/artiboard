@@ -42,3 +42,34 @@ $$;
 create index if not exists ab_docs_status on public.ab_docs (project, collection, (data #> '{status}'::text[]));
 create index if not exists ab_docs_key on public.ab_docs (project, collection, (data #> '{key}'::text[]));
 create index if not exists ab_docs_owner on public.ab_docs (project, collection, (data #> '{owner}'::text[]));
+
+-- Several ordered, limited reads in one call, for a page that follows the latest message of each recently
+-- touched task: one round trip instead of one per task. Runs as the caller, so the members-only policy applies.
+-- Each row says which read it answers (i).
+create or replace function public.ab_read_limited(p_project text, p_reads jsonb) returns setof jsonb
+language plpgsql stable security invoker set search_path = public as $$
+declare r jsonb; o jsonb; i int := 0; ord text; lim int;
+begin
+  if jsonb_typeof(p_reads) <> 'array' or jsonb_array_length(p_reads) > 20 then
+    raise exception 'ab:invalid_argument:0:at most 20 reads';
+  end if;
+  for r in select value from jsonb_array_elements(p_reads) loop
+    ord := '';
+    for o in select value from jsonb_array_elements(coalesce(r->'order', '[]'::jsonb)) loop
+      -- checked here as ab_field does: signed-in callers may not run ab_field itself
+      if coalesce(o->>'field', '') !~ '^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$' then
+        raise exception 'ab:invalid_argument:0:bad field name: %', coalesce(o->>'field', 'null');
+      end if;
+      ord := ord || format('(data #> %L) %s nulls last, ', string_to_array(o->>'field', '.'), case when o->>'dir' = 'desc' then 'desc' else 'asc' end);
+    end loop;
+    lim := least(greatest(coalesce((r->>'limit')::int, 200), 1), 200);
+    return query execute format(
+      'select jsonb_build_object(''i'', $3, ''collection'', collection, ''doc_id'', doc_id, ''version'', version, ''updated_at'', updated_at, ''data'', data)
+       from public.ab_docs where project = $1 and collection = $2 order by %s doc_id limit %s', ord, lim)
+      using p_project, r->>'collection', i;
+    i := i + 1;
+  end loop;
+end $$;
+
+revoke all on function public.ab_read_limited(text, jsonb) from public, anon;
+grant execute on function public.ab_read_limited(text, jsonb) to authenticated;

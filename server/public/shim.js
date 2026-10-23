@@ -90,6 +90,7 @@
     return {
       plain: function (whole, docs) { return call('read', { whole: whole, docs: docs }); },
       limited: function (collection, orders, lim) { return call('read', { collection: collection, order: orders, limit: lim }); },
+      limitedMany: function (reads) { return call('read', { limited: reads }); },
       changed: function (collections, since) { return call('read', { collections: collections, since: since }); },
       batch: function (writes) { return call('batch', { writes: writes }); },
       acquire: function (path, holder, ttl) { return call('acquire', { path: path, holder: holder, ttlMs: ttl }).then(function (r) { return r.acquired; }); },
@@ -121,6 +122,7 @@
         orders.forEach(function (o) { x = x.order(jsonPath(o.field), { ascending: o.dir !== 'desc', nullsFirst: false }); });
         return x.order('doc_id', { ascending: true }).limit(lim).then(rows);
       },
+      limitedMany: function (reads) { return sb.rpc('ab_read_limited', { p_project: PROJECT, p_reads: reads }).then(rows); },
       changed: function (collections, since) { return base().in('collection', collections).gt('updated_at', since).then(rows); },
       batch: function (writes) { return sb.rpc('ab_batch', { p_project: PROJECT, p_writes: writes }).then(rows); },
       acquire: function (path, holder, ttl) {
@@ -234,9 +236,21 @@
         first(l, rows);
       }, function (e) { fail([l], e); });
     }
+    // the limited listeners that start together (recent activity: one per task) share one request
+    function fetchLimitedMany(ls) {
+      for (var k = 0; k < ls.length; k += 20) (function (part) {
+        tr.limitedMany(part.map(function (l) { return { collection: l.collection, order: l.orders, limit: l.lim }; })).then(function (rows) {
+          var by = part.map(function () { return []; });
+          rows.forEach(function (row) { stamp(row.updated_at); if (by[row.i]) by[row.i].push(row); });
+          part.forEach(function (l, i) { first(l, by[i]); });
+        }, function (e) { fail(part, e); });
+      })(ls.slice(k, k + 20));
+    }
     function load(ls) {
       fetchPlain(ls.filter(function (l) { return !l.lim; }));
-      ls.filter(function (l) { return l.lim; }).forEach(fetchLimited);
+      var lim = ls.filter(function (l) { return l.lim; });
+      if (lim.length > 1 && tr.limitedMany) fetchLimitedMany(lim);
+      else lim.forEach(fetchLimited);
     }
     function listen(l) {
       l.rows = []; l.pending = []; l.ready = false; l.last = null;
@@ -267,7 +281,34 @@
     // while the live connection is down, look for changes every minute instead
     setInterval(function () { if (!live && !document.hidden) catchUp(); }, 60000);
 
-    function write(w) { return tr.batch([w]).then(null, function (e) { throw boardError(e); }); }
+    // A write shows at once: listeners get the changed document before the server answers, keeping its old version so
+    // the server's own copy (one version up, with anything others wrote meanwhile) replaces it when it arrives.
+    // A refused write puts the document back as it was.
+    function known(c, id) {
+      for (var k = 0; k < listeners.length; k++) {
+        var l = listeners[k];
+        if (l.ready && l.collection === c) for (var j = 0; j < l.rows.length; j++) if (l.rows[j].doc_id === id) return l.rows[j];
+      }
+      return null;
+    }
+    function force(c, id, row) {
+      listeners.forEach(function (l) {
+        if (!l.ready || l.collection !== c || (l.docId != null && l.docId !== id)) return;
+        var i = l.rows.findIndex(function (r) { return r.doc_id === id; });
+        if (!row) { if (i < 0) return; l.rows.splice(i, 1); }
+        else if (i >= 0) l.rows[i] = row;
+        else l.rows.push(row);
+        l.last = null; // same versions, new data: still a change
+        emit(l);
+      });
+    }
+    function write(w) {
+      var i = w.path.lastIndexOf('/'), c = w.path.slice(0, i), id = w.path.slice(i + 1), was = known(c, id);
+      var mine = w.op === 'delete' ? null : { collection: c, doc_id: id, version: was ? was.version : 0, updated_at: was ? was.updated_at : '',
+        data: w.op === 'set' ? copy(w.data) : Object.assign(was ? copy(was.data) : {}, copy(w.data)) };
+      if (mine || was) force(c, id, mine);
+      return tr.batch([w]).then(null, function (e) { force(c, id, was); throw boardError(e); });
+    }
 
     function doc(path) {
       var i = path.lastIndexOf('/');

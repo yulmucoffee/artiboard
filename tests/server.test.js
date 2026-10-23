@@ -456,6 +456,12 @@ for (const backend of backends) {
         const rows = await (await api(`/api/p/${P}/read`, { method: 'POST', cookie, body: { whole: ['tasks'], docs: { meta: ['config'] } } })).json();
         assert.ok(rows.some((r) => r.collection === 'meta' && r.doc_id === 'config'));
         assert.ok(rows.some((r) => r.doc_id === K(1)));
+        const latest = await (await api(`/api/p/${P}/read`, { method: 'POST', cookie, body: { limited: [
+          { collection: `${C}/T-1/messages`, order: [{ field: 'at', dir: 'desc' }], limit: 1 },
+          { collection: `tasks/${K(1)}/messages`, order: [{ field: 'at', dir: 'desc' }], limit: 2 },
+        ] } })).json();
+        assert.deepEqual(latest.filter((r) => r.i === 0).map((r) => r.data.text), ['second'], 'limited reads go out together, each answered by its index');
+        assert.equal(latest.filter((r) => r.i === 1).length, 2);
 
         const events = await fetch(`${BASE}/api/p/${P}/events`, { headers: { Cookie: cookie } });
         assert.equal(events.headers.get('content-type'), 'text/event-stream');

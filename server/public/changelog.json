@@ -11,12 +11,12 @@
         "en": [
           "Reviewers mark a task in review done or send it back, and people move tasks in one click; agents take over others' tasks only when told.",
           "The project list opens with who is working on what, board by board. Simpler kanban cards and a calmer look.",
-          "Faster on big boards: an agent's start on 5,000 tasks takes 0.01 s instead of 0.5 s, and pages load about 16 times less data."
+          "Faster on big boards: an agent's start on 5,000 tasks takes 0.01 s instead of 0.5 s, a 10,000-task page draws in 0.25 s instead of 5 s, and your changes show at once."
         ],
         "ko": [
           "검토 중인 태스크는 검토한 사람이 완료하거나 되돌리고, 사람은 한 번 클릭으로 태스크를 옮겨요. 에이전트는 시킬 때만 남의 일을 넘겨받아요.",
           "프로젝트 목록 맨 위에 판마다 누가 무엇을 하는지 보여요. 칸반 카드가 간결해지고 톤이 차분해졌어요.",
-          "큰 판에서 빨라졌어요: 태스크 5천 개에서 에이전트 시작이 0.5초에서 0.01초로, 페이지 데이터는 약 16분의 1로 줄었어요."
+          "큰 판에서 빨라졌어요: 5천 개 판의 에이전트 시작 0.5초→0.01초, 1만 개 판의 첫 화면 5초→0.25초, 내가 바꾼 내용은 바로 보여요."
         ]
       }
     },

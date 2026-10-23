@@ -187,7 +187,7 @@ export function openSqlite({ file, boardUrl }) {
   // ---- pages read by the browser ----
 
   // whole collections, single documents, the first rows of one ordered collection, or rows changed after a time
-  async function readRows(project, { whole = [], docs = {}, collection, order, limit, collections, since } = {}) {
+  async function readRows(project, { whole = [], docs = {}, collection, order, limit, collections, since, limited } = {}) {
     checkProject(project);
     if (collection) {
       const rows = await query(project, collection, { order, limit: limit || 200 });
@@ -195,6 +195,17 @@ export function openSqlite({ file, boardUrl }) {
     }
     // a page asks for a handful of collections at once; anything bigger is not the page
     const many = (list) => { if (!Array.isArray(list) || list.length > 20) throw new BoardError('invalid_argument', 'at most 20 collections per read'); };
+    // several ordered, limited reads in one request (the latest message of each task in recent activity); i says which
+    if (limited) {
+      many(limited);
+      const out = [];
+      for (const [i, r] of limited.entries()) {
+        for (const d of await query(project, r?.collection, { order: r?.order, limit: r?.limit || 200 })) {
+          out.push({ i, collection: r.collection, doc_id: d.id, version: d.version, updated_at: d.updated_at, data: d.data });
+        }
+      }
+      return out;
+    }
     if (collections) {
       many(collections);
       collections.forEach(checkCollection);
