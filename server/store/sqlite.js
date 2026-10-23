@@ -8,7 +8,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import {
   BoardError, checkCollection, checkField, guardWrite, hashToken, isToken, MAX_DOC, MAX_PAGE, newToken, now, PERSON_ID, PROJECT_ID,
-  projectSeed, ROLES, splitPath,
+  projectSeed, ROLES, splitPath, TOKEN_USE_EVERY_MS,
 } from '../core.js';
 import { changedFields, holderOf, mayChange } from '../tasks.js';
 
@@ -358,9 +358,9 @@ export function openSqlite({ file, boardUrl }) {
 
   async function memberForToken(token) {
     if (!isToken(token)) return null;
-    const r = q(`select t.id tid, m.* from tokens t join members m on m.uid = t.uid where t.token_hash = ? and t.revoked_at is null`).get(hashToken(token));
+    const r = q(`select t.id tid, t.last_used_at used, m.* from tokens t join members m on m.uid = t.uid where t.token_hash = ? and t.revoked_at is null`).get(hashToken(token));
     if (!r) return null;
-    q('update tokens set last_used_at = ? where id = ?').run(now(), r.tid);
+    if (!r.used || Date.now() - Date.parse(r.used) > TOKEN_USE_EVERY_MS) q('update tokens set last_used_at = ? where id = ?').run(now(), r.tid);
     return memberOut(r);
   }
   const memberByPerson = async (person) => memberOut(q('select * from members where person = ?').get(person));

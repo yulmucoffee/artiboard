@@ -25,6 +25,8 @@ export const ROLES = ['admin', 'member', 'viewer'];
 const FIELD = /^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$/;
 export const MAX_DOC = 262144;
 export const MAX_PAGE = 1048576;
+// a token's last use is shown to admins to the minute or so; writing it on every call would add a round trip to each
+export const TOKEN_USE_EVERY_MS = 5 * 60000;
 
 // `tasks/M1-3/messages/x` -> ['tasks/M1-3/messages', 'x']; a document path has an even number of segments
 export function splitPath(path, index = 0) {

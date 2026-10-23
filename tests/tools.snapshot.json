@@ -99,7 +99,7 @@
  },
  {
   "name": "board_post",
-  "description": "Post to a task thread and/or change your task: status, branch, pr, start, due, repo, summary. status todo releases it. Without task: a notice.",
+  "description": "Post to a task thread and/or change your task: status, branch, pr, start, due, repo, summary. status todo releases it. No task: a notice.",
   "inputSchema": {
    "type": "object",
    "properties": {
@@ -110,6 +110,13 @@
     "task": {
      "type": "string",
      "description": "Task id, e.g. M1-3"
+    },
+    "tasks": {
+     "description": "Several, same status and text",
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
     },
     "text": {
      "description": "≤3 lines",
