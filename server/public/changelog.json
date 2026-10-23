@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.15.0",
+      "date": "2026-10-23",
+      "prs": [
+        37
+      ],
+      "lines": {
+        "en": [
+          "A board adds statuses in meta/config.statuses: each gets a kanban column and a place in the status menu, with no page edit.",
+          "board_post refuses a status the board does not have and lists those it does, so a guessed \"in_review\" no longer hides a task.",
+          "Boards that added statuses by editing their page add them to meta/config.statuses."
+        ],
+        "ko": [
+          "보드 상태는 meta/config.statuses에 넣으면 추가돼요. 페이지를 고치지 않아도 칸반 칸과 상태 메뉴에 생겨요.",
+          "board_post는 보드에 없는 상태를 거절하고 있는 상태를 알려 줘요. 짐작한 \"in_review\" 때문에 태스크가 사라지지 않아요.",
+          "페이지를 고쳐 상태를 추가했던 보드는 meta/config.statuses에 넣어 주세요."
+        ]
+      }
+    },
+    {
       "version": "1.14.3",
       "date": "2026-10-23",
       "prs": [

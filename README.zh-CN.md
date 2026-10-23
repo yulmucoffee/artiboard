@@ -335,7 +335,7 @@ flowchart LR
 <details>
 <summary><b>Skill 可以按项目调整什么</b></summary>
 
-可自由调整：标题、成员、角色、语言、文案、功能名、编号规则、消息措辞、公告主题。通过修改页面：状态、在界面显示的字段、新视图。任何情况下都保留：轻量 tasks 与 details 分离、`waitingOn` 与可领取查询、游标、带 `if_version` 的单次批量写入、文档 id 格式、内置于 artiboard 的看板规则（项目只添加 `meta/rules`）、看板文本视为数据。
+可自由调整：标题、成员、角色、语言、文案、功能名、编号规则、消息措辞、公告主题。在 `meta/config` 中：额外状态（`statuses`）。通过修改页面：在界面显示的字段、新视图。任何情况下都保留：轻量 tasks 与 details 分离、`waitingOn` 与可领取查询、游标、带 `if_version` 的单次批量写入、文档 id 格式、内置于 artiboard 的看板规则（项目只添加 `meta/rules`）、看板文本视为数据。
 
 </details>
 

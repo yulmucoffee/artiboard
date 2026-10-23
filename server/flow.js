@@ -2,7 +2,7 @@
 // They answer in short text lines, check versions on the server and stamp times with the server clock,
 // so an agent spends no tokens on reads before a write, on version numbers or on `date`.
 import { BOARD_RULES, BoardError, now, repoName, reposOf, stampId, toBoardError } from './core.js';
-import { holderOf, isReady, mayChange, statusEffects, statusOf, unmetDeps } from './tasks.js';
+import { TASK_STATUSES, boardStatuses, holderOf, isReady, mayChange, statusEffects, statusOf, unmetDeps } from './tasks.js';
 import { VERSION } from './version.js';
 
 // 2026-10-21T08:57:33.000Z -> 10-21 08:57Z
@@ -313,6 +313,11 @@ export function makeFlow(store) {
       return 'posted notice';
     }
     if (!text?.trim() && !asked.length) throw new BoardError('invalid_argument', 'pass text, or a change');
+    // a status outside the five is checked against the board's own list, read only on that rare path
+    if (status !== undefined && TASK_STATUSES.indexOf(status) < 0) {
+      const statuses = boardStatuses((await get(project, 'meta/config'))?.data);
+      if (statuses.indexOf(status) < 0) throw new BoardError('invalid_argument', `status ${status} is not on this board (${statuses.join(', ')}); a board adds statuses in meta/config.statuses`);
+    }
     return retrying(async () => {
       const got = await read(project, [...ids.map((i) => ({ path: `tasks/${i}` })), ...(summary !== undefined ? [{ path: `details/${id}` }] : [])]);
       const ts = got.slice(0, ids.length), det = got[ids.length] ?? null;

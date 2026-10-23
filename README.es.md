@@ -335,7 +335,7 @@ flowchart LR
 <details>
 <summary><b>Qué puede cambiar la skill en cada proyecto</b></summary>
 
-Libremente: título, personas, roles, idioma, textos, nombres de funciones, esquema de claves, redacción de mensajes, temas de avisos. Editando la página: estados, campos visibles adicionales, vistas nuevas. Se mantiene siempre: tareas ligeras más details, `waitingOn` y la consulta de disponibles, cursores, un lote por acción con `if_version`, formatos de id, reglas del tablero que vienen con artiboard (los proyectos solo añaden `meta/rules`), el texto del tablero tratado como datos.
+Libremente: título, personas, roles, idioma, textos, nombres de funciones, esquema de claves, redacción de mensajes, temas de avisos. En `meta/config`: estados adicionales (`statuses`). Editando la página: campos visibles adicionales, vistas nuevas. Se mantiene siempre: tareas ligeras más details, `waitingOn` y la consulta de disponibles, cursores, un lote por acción con `if_version`, formatos de id, reglas del tablero que vienen con artiboard (los proyectos solo añaden `meta/rules`), el texto del tablero tratado como datos.
 
 </details>
 
