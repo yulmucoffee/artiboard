@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 const steps = [
   ['READMEs share one shape', 'node', ['scripts/readme-shape.mjs']],
+  ['the page carries the current task rules', 'node', ['scripts/inline-rules.mjs', '--check']],
   ['the demo is built from the current page', 'node', ['examples/build-demo.cjs', '--check']],
   ['server, MCP and changelog tests', 'npm', ['test', '--silent']],
   ['the board page in a browser-like DOM', 'node', ['tests/smoke.cjs']],

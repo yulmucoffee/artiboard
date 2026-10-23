@@ -221,6 +221,18 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   col('To do').querySelector('.colbtn').click();await tick();
   ok(col('To do').classList.contains('two')&&JSON.parse(b.w.localStorage.getItem('ab-kcol')).todo.two,'a column takes two card columns, remembered');
 
+  console.log('# the page follows the task rules');
+  b=boot({docs:{'tasks/M1-1':{...seed()['tasks/M1-1'],owner:'ben'}}});all.push(b);await tick();await heal();b.pick('ana');await tick();
+  ok(![...b.d.querySelectorAll('.rows.ready li')].some(li=>/M1-1/.test(li.textContent)),'a task assigned to someone else is not ready to pick');
+  [...b.d.querySelectorAll('tr.item')].find(r=>/M1-1/.test(r.textContent)).click();await tick();
+  ok(/Take over from Ben/.test(b.d.querySelector('.sheet .acts').textContent)&&!/Take it/.test(b.d.querySelector('.sheet .acts').textContent),'it offers a take-over, not a claim');
+  b.key('Escape');
+  b=boot({docs:{'tasks/M1-1':{...seed()['tasks/M1-1'],status:'doing',owner:'ana',claimedBy:{who:'ana',agent:false,at:T0}}}});all.push(b);await tick();await heal();b.pick('ana');await tick();
+  [...b.d.querySelectorAll('tr.item')].find(r=>/M1-1/.test(r.textContent)).click();await tick();
+  change(b.d,'fStatus','todo');await tick();
+  ok(b.store['tasks/M1-1'].status==='todo'&&b.store['tasks/M1-1'].owner===null&&b.store['tasks/M1-1'].claimedBy===null,'back to To do releases the task, owner included');
+  b.key('Escape');
+
   console.log('# view-only viewer');
   b=boot({user:fakeUser('u_ana',false)});all.push(b);await tick();await heal();
   ok(/View only/.test(note(b.d)),'header says the board is view only');
