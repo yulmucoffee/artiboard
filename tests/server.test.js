@@ -14,6 +14,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { makeApp } from '../server/app.js';
 import { loadConfig, openStore } from '../server/config.js';
 import { toBoardError } from '../server/core.js';
+import { entryFor, setPerson } from '../server/members.js';
 import { CHANGE_CASES } from './task-cases.js';
 
 const backends = [{ name: 'sqlite', env: { ARTIBOARD_BACKEND: 'sqlite' } }];
@@ -89,6 +90,7 @@ for (const backend of backends) {
       assert.ok(!JSON.stringify(tools).includes('$schema'), 'listed schemas carry no boilerplate');
       assert.ok(!JSON.stringify(tools).includes('"pattern"'), 'nor patterns zod enforces on the call');
       assert.ok(JSON.stringify(tools).length < 7200, `every session reads the listing, so it stays small (${JSON.stringify(tools).length} chars)`);
+      assert.ok(!tools.find((t) => t.name === 'board_login_link').annotations.readOnlyHint, 'a sign-in link is minted, so clients must not auto-approve it as a read');
       // the listing is the agents' protocol: it changes only on purpose, with UPDATE_SNAPSHOTS=1 npm test and the diff in review
       const snap = new URL('./tools.snapshot.json', import.meta.url), now = JSON.stringify(tools, null, 1) + '\n';
       if (process.env.UPDATE_SNAPSHOTS === '1') writeFileSync(snap, now);
@@ -249,7 +251,9 @@ for (const backend of backends) {
         const own = (await call(board, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
         assert.doesNotMatch(own.split('\nto review')[1] || '', new RegExp(K('h1')), 'not to its own holder, who sees it under mine');
         assert.match((await call(other, 'board_post', { project: P, task: K('h1'), status: 'done', branch: 'x' })).value, /^not_yours: .*review it/, 'a reviewer changes only the status');
-        assert.equal((await call(other, 'board_post', { project: P, task: K('h1'), text: 'merged', status: 'done' })).value, `ok ${K('h1')} → done`);
+        assert.equal((await call(other, 'board_post', { project: P, task: K('h1'), text: 'merged', status: 'done', summary: 'merged, notes in the PR' })).value, `ok ${K('h1')} → done`,
+          'the reviewer finishes it and writes its summary in one call, as the rules say');
+        assert.equal((await call(other, 'board_get', { project: P, path: `details/${K('h1')}` })).value.data.summary, 'merged, notes in the PR');
         assert.match((await call(other, 'board_task', { project: P, id: K('h1'), thread: 0 })).value, new RegExp(`^${K('h1')} done · ${me} \\(agent\\)`), 'the holder keeps the credit');
         assert.match((await call(other, 'board_post', { project: P, task: K('h1'), status: 'doing' })).value, /^not_yours: .*override true/, 'out of review it is the holder\'s again');
         assert.equal((await call(other, 'board_post', { project: P, task: K('h1'), text: 'reopened for the fix', status: 'doing', override: true })).value, `ok ${K('h1')} → doing`);
@@ -334,6 +338,40 @@ for (const backend of backends) {
         await other.close();
       }
       await call(board, 'board_batch', { project: P, writes: ['d1', 'd2', 'd3', 'd4', 'd5'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })) });
+    });
+
+    test('a new member gets their seat even when the board\'s config changes between the read and the write', async () => {
+      const m = people.seated = await store.addMember({ person: `sp${R}`, role: 'member' });
+      let raced = false;
+      const racing = { ...store, apply: async (actor, project, writes) => {
+        if (!raced) { raced = true; await store.apply(null, P, [{ op: 'update', path: 'meta/config', data: { subtitle: 'saved on the page' } }]); }
+        return store.apply(actor, project, writes);
+      } };
+      await setPerson(racing, P, m, entryFor(m, 'Seated'));
+      assert.ok((await store.get(P, 'meta/config')).data.people.some((p) => p.id === m.person), 'the seat is there after one reread');
+      await setPerson(store, P, m, null);
+    });
+
+    test('a claim says what is already yours, and checks readiness against the deps themselves', async () => {
+      const at = new Date().toISOString(), me = people.admin.person;
+      const task = (n, data) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `claim ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at, ...data } });
+      await call(board, 'board_batch', { project: P, writes: [
+        task('c0', { status: 'done' }),
+        task('c1', { deps: [K('c0')], waitingOn: [K('c0')] }), // stale: c0 finished while no page was open
+        task('c2', { deps: [K('c3')], waitingOn: [K('c3')] }),
+        task('c3', {}),
+        task('c4', { status: 'blocked', owner: me }), // assigned to me and moved on the page, never claimed
+        task('c5', {}),
+      ] });
+      const claim = async (n) => (await call(board, 'board_claim', { project: P, id: K(n) })).value;
+      assert.match(await claim('c1'), /^claimed /, 'a dep that is done does not block the claim');
+      assert.deepEqual((await call(board, 'board_get', { project: P, path: `tasks/${K('c1')}` })).value.data.waitingOn, [], 'and the claim repairs waitingOn');
+      assert.match(await claim('c2'), new RegExp(`^waiting: .*${K('c3')}`), 'an unfinished dep still does');
+      assert.match(await claim('c4'), /^already yours /, 'a task assigned to me is mine without a claim');
+      await claim('c5');
+      await call(board, 'board_post', { project: P, task: K('c5'), status: 'done' });
+      assert.match(await claim('c5'), /^taken: .* is done/, 'finished work is not handed back as mine to work on');
+      await call(board, 'board_batch', { project: P, writes: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })) });
     });
 
     test('a project names its repos: agents find it from a git remote, and the start brings both rules', async () => {
@@ -432,14 +470,16 @@ for (const backend of backends) {
         await deny([{ op: 'set', path: `people/${people.admin.person}`, data: { uid: people.member.uid } }], 'no taking over a linked person');
         await deny([{ op: 'set', path: `people/ghost${R}`, data: { uid: people.admin.uid } }], 'no linking someone else\'s account');
         await deny([{ op: 'delete', path: `people/${me}` }], 'no unlinking');
-        assert.equal((await call(member, 'board_batch', { project: P, writes: [{ op: 'set', path: `people/ghost${R}`, data: { uid: people.member.uid } }] })).error, false,
-          'a member links their own account to an unlinked person, as the page does');
-        await deny([{ op: 'set', path: `people/ghost${R}`, data: { uid: people.member.uid } }], 'once linked, only admins change it');
+        await deny([{ op: 'set', path: `people/ghost${R}`, data: { uid: people.member.uid } }], 'a member\'s account is their own person, not a free seat');
+        await deny([{ op: 'set', path: `people/${me}`, data: { uid: people.member.uid } }], 'once linked, only admins change it');
+        await deny([{ op: 'set', path: `cursors/${people.admin.person}`, data: { noticesAt: '2099-01-01T00:00:00.000Z' } }], 'no moving someone else\'s notice cursor');
+        assert.equal((await call(member, 'board_batch', { project: P, writes: [{ op: 'set', path: `cursors/${me}`, data: { noticesAt: new Date().toISOString() } }] })).error, false, 'only one\'s own');
         const cfgDoc = (await call(member, 'board_get', { project: P, path: 'meta/config' })).value;
         await deny([{ op: 'update', path: 'meta/config', data: { people: [{ id: me, uid: people.member.uid }] } }], 'no rewriting meta/config.people');
         assert.equal((await call(member, 'board_batch', { project: P, writes: [{ op: 'update', path: 'meta/config', data: { subtitle: 'by a member' }, if_version: cfgDoc.version }] })).error, false, 'other config fields stay open');
         const at = new Date().toISOString();
         await deny([{ op: 'set', path: `notices/n-${R}-fake`, data: { at, author: people.admin.person, text: 'not me' } }], 'no posting as someone else');
+        await deny([{ op: 'set', path: `notices/n-${R}-anon`, data: { at, text: 'nobody' } }], 'nor as nobody');
         assert.equal((await call(member, 'board_batch', { project: P, writes: [{ op: 'set', path: `notices/n-${R}-mine`, data: { at, author: me, text: 'me' } }] })).error, false);
         const theirs = [`notices/n-${R}-theirs`, `tasks/${R}-T/messages/${R}-theirs`];
         await store.apply(null, P, theirs.map((path) => ({ op: 'set', path, data: { at, author: people.admin.person, text: 'changed status (override)' } })));

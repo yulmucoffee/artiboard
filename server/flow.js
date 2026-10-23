@@ -78,18 +78,22 @@ export function makeFlow(store) {
     return hits[0];
   }
 
+  // Which of these task keys are done, in one round trip however many there are.
+  async function doneKeys(project, keys) {
+    const all = [...new Set(keys)], done = new Set(), chunks = [];
+    for (let i = 0; i < all.length; i += 100) chunks.push(all.slice(i, i + 100));
+    for (const found of await Promise.all(chunks.map((ks) => query(project, 'tasks', { where: [{ field: 'key', op: 'in', value: ks }, { field: 'status', op: '==', value: 'done' }], limit: 200 })))) {
+      for (const d of found) done.add(d.data.key);
+    }
+    return done;
+  }
+
   // Ready work: todo tasks nobody holds whose deps are all done. waitingOn is the stored answer the page and the
   // ready query rely on; here it is checked against the dep tasks themselves and repaired in passing, so a task
   // written without it, or a dep finished while no page was open, still shows up (and a stale one stays out).
   async function readyWork(member, project, todo) {
     const free = todo.filter((t) => !holderOf(t.data));
-    const keys = [...new Set(free.flatMap((t) => unmetDeps(t.data, () => false)))];
-    const done = new Set(), chunks = [];
-    for (let i = 0; i < keys.length; i += 100) chunks.push(keys.slice(i, i + 100));
-    // one round trip for all of them, however many deps there are
-    for (const found of await Promise.all(chunks.map((ks) => query(project, 'tasks', { where: [{ field: 'key', op: 'in', value: ks }, { field: 'status', op: '==', value: 'done' }], limit: 200 })))) {
-      for (const d of found) done.add(d.data.key);
-    }
+    const done = await doneKeys(project, free.flatMap((t) => unmetDeps(t.data, () => false)));
     const repairs = [], ready = [];
     const isDone = (k) => done.has(k);
     for (const t of free) {
@@ -222,16 +226,22 @@ export function makeFlow(store) {
       const t = await get(project, `tasks/${id}`);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
       const d = t.data, status = statusOf(d), holder = holderOf(d);
-      if (d.claimedBy?.who === me && status !== 'todo') return `already yours ${id}`;
+      const taken = () => new BoardError('taken', `${d.key || id} is ${status}${holder ? `, held by ${holder}` : ''}; pick another`);
+      if (status === 'done') throw taken();
+      if (holder === me && status !== 'todo') return `already yours ${id}`;
       // started, or claimed or assigned by someone else
       const held = status !== 'todo' || (!!holder && holder !== me);
-      if (held && (!override || status === 'done')) throw new BoardError('taken', `${d.key || id} is ${status}${holder ? `, held by ${holder}` : ''}; pick another`);
-      if (!held && d.waitingOn?.length) throw new BoardError('waiting', `${d.key || id} waits on ${d.waitingOn.join(', ')}`);
+      if (held && !override) throw taken();
+      // ready as board_start sees it, from the deps themselves: a stored waitingOn may lag a dep that finished
+      if (!held) {
+        const done = await doneKeys(project, unmetDeps(d, () => false)), waiting = unmetDeps(d, (k) => done.has(k));
+        if (waiting.length) throw new BoardError('waiting', `${d.key || id} waits on ${waiting.join(', ')}`);
+      }
       const from = held && holder && holder !== me ? holder : null;
       const at = now();
       await apply(member, project, [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, ...(from && { override: true }), data: {
-          status: 'doing', owner: me, claimedBy: { who: me, agent: true, ...(session && { session }), at }, updatedAt: at, lastMessageAt: at } },
+          status: 'doing', owner: me, claimedBy: { who: me, agent: true, ...(session && { session }), at }, ...(!held && { waitingOn: [] }), updatedAt: at, lastMessageAt: at } },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
           at, author: me, kind: 'agent', type: 'update', text: (text || CLAIMED[config?.data?.lang] || CLAIMED.en) + (from ? ` (taken over from ${from})` : '') } },
       ]);
@@ -286,9 +296,11 @@ export function makeFlow(store) {
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
           at, author: me, kind: 'agent', type: type || (status === 'blocked' ? 'blocker' : 'update'), text: said } },
       ];
+      // the summary goes first, so the database judges it against the task as it stands, not after this status change:
+      // a reviewer finishing a task writes its summary in the same call
       if (summary !== undefined) {
         const s = { summary, summaryAt: at }, o = overriding && { override: true };
-        writes.push(det ? { op: 'update', path: `details/${id}`, if_version: det.version, data: s, ...o } : { op: 'set', path: `details/${id}`, if_absent: true, data: s, ...o });
+        writes.unshift(det ? { op: 'update', path: `details/${id}`, if_version: det.version, data: s, ...o } : { op: 'set', path: `details/${id}`, if_absent: true, data: s, ...o });
       }
       const unblocked = [];
       if (status === 'done') {

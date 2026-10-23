@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.11.3",
+      "date": "2026-10-23",
+      "prs": [
+        25
+      ],
+      "lines": {
+        "en": [
+          "A reviewer finishes a task and writes its summary in one call, and board_claim no longer turns away a task whose deps are done or says a task assigned to you is someone else's.",
+          "Members link their account only to their own person and move only their own notice cursor; a post needs its author.",
+          "On the projects page, the Korean line about your own work reads as a full sentence."
+        ],
+        "ko": [
+          "리뷰어가 완료와 요약을 한 번에 쓸 수 있어요. board_claim은 선행 작업이 끝난 태스크를 더는 막지 않고, 나에게 배정된 태스크를 남의 것이라고 하지 않아요.",
+          "멤버는 자기 계정을 자기 사람에게만 연결하고, 자기 공지 읽음 위치만 옮겨요. 글에는 작성자가 꼭 있어야 해요.",
+          "프로젝트 목록의 '나' 줄이 한 문장으로 끝나요."
+        ]
+      }
+    },
+    {
       "version": "1.11.2",
       "date": "2026-10-23",
       "prs": [
