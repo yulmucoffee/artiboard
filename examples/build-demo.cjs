@@ -1,4 +1,5 @@
-// Builds examples/demo.html: the real board page running on an in-page sample database.
+// Builds examples/demo.html, the file published as the public demo: the real board page running on an in-page
+// sample database. It is built for publishing, not kept in git (a copy per page change made every two page PRs clash).
 // No artifact capabilities are needed, so the demo can be shared publicly.
 // Run: node examples/build-demo.cjs
 const fs=require('fs'),path=require('path');
@@ -65,6 +66,6 @@ swap('if(window.claude&&window.claude.use)start();','if(window.DEMO)start();');
 const i=page.lastIndexOf('<script>');
 page=page.slice(0,i)+shim+page.slice(i);
 const out=path.join(__dirname,'demo.html');
-// --check: say whether the committed demo is the one this page builds, without writing it
-if(process.argv.includes('--check')){if(fs.readFileSync(out,'utf8')!==page){console.error('examples/demo.html is stale: run node examples/build-demo.cjs');process.exit(1)}}
+// --check: say whether the page still builds into a demo (every swap above found its text), without writing it
+if(process.argv.includes('--check'))console.log('the demo builds:',page.length,'bytes');
 else{fs.writeFileSync(out,page);console.log('wrote examples/demo.html',page.length,'bytes')}

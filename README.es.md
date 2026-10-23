@@ -350,7 +350,7 @@ server/                                 el sitio autoalojado: app HTTP, servidor
 api/, vercel.json                       funciones de Vercel para un sitio con Supabase
 supabase/                               el esquema de Supabase (migraciones) y la configuración local
 Dockerfile, docker-compose.yml          un sitio SQLite en un contenedor, detrás de Caddy en tu dominio
-examples/                               genera la demo pública a partir de board.html y demo-data.json: build-demo.cjs, demo-data.json, demo.html
+examples/                               genera la demo pública a partir de board.html y demo-data.json: build-demo.cjs, demo-data.json (demo.html se genera, no se guarda)
 FOR_AGENTS.md                           instalación paso a paso para agentes de IA
 .claude-plugin/                         manifiestos del plugin de Claude Code
 tests/smoke.cjs                         prueba de humo de la página con jsdom
@@ -373,7 +373,7 @@ npm install && npm test
 
 `npm test` ejecuta el sitio alojado sobre un archivo SQLite desechable. Con un Supabase local (`supabase start`), añade `AB_SUPABASE=1` y sus `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` y `SUPABASE_SECRET_KEY` para ejecutar las mismas pruebas allí.
 
-Regenera la demo después de cambiar la página:
+Genera la demo para verla o publicarla (`examples/demo.html`, no se guarda en git):
 
 ```bash
 node examples/build-demo.cjs

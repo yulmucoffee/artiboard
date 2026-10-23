@@ -350,7 +350,7 @@ server/                                 직접 호스팅 사이트: HTTP 앱, MC
 api/, vercel.json                       Supabase를 쓰는 사이트용 Vercel 함수
 supabase/                               Supabase 스키마(마이그레이션)와 로컬 설정
 Dockerfile, docker-compose.yml          컨테이너 속 SQLite 사이트, 내 도메인에서 Caddy 뒤에 둠
-examples/                               board.html과 demo-data.json으로 공개 데모를 만듦: build-demo.cjs, demo-data.json, demo.html
+examples/                               board.html과 demo-data.json으로 공개 데모를 만듦: build-demo.cjs, demo-data.json (demo.html은 만들어 쓰고 저장소에 두지 않음)
 FOR_AGENTS.md                           AI 에이전트용 설치 안내
 .claude-plugin/                         Claude Code 플러그인 정의
 tests/smoke.cjs                         보드 페이지 jsdom 시험
@@ -373,7 +373,7 @@ npm install && npm test
 
 `npm test`는 쓰고 버리는 SQLite 파일로 호스팅 사이트를 돌립니다. 로컬 Supabase(`supabase start`)가 있으면 `AB_SUPABASE=1`과 그 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`를 더해 같은 시험을 거기서 돌릴 수 있습니다.
 
-페이지를 고친 뒤 데모를 다시 만듭니다.
+데모를 보거나 게시하려면 만듭니다(`examples/demo.html`, 저장소에 두지 않음).
 
 ```bash
 node examples/build-demo.cjs

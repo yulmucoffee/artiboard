@@ -8,3 +8,4 @@ node_modules/
 supabase/.temp/
 .claude/launch.json
 .audit/
+examples/demo.html

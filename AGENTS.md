@@ -42,9 +42,9 @@ artiboard is read by agents on every session they spend on a board, so it has th
 
 ## Done means
 
-- `npm run check` passes: version stamped, READMEs in one shape, the page's rules copy current, the demo current, server and page tests green. CI also runs the server tests on Supabase.
+- `npm run check` passes: version stamped, READMEs in one shape, the page's rules copy current, the demo still building, server and page tests green. CI also runs the server tests on Supabase.
 - A version bump (`npm version <x.y.z> --no-git-tag-version`) and a changelog entry, as [CONTRIBUTING.md](CONTRIBUTING.md) says. The first number stays 1.
-- After merging, the follow-through the change calls for: refresh an installed copy of the skill, republish the demo artifact, deploy a site. Ask before the last two.
+- After merging, the follow-through the change calls for: refresh an installed copy of the skill, build the demo (`node examples/build-demo.cjs`, not kept in git) and republish it, deploy a site. Ask before the last two.
 
 ## Writing
 
