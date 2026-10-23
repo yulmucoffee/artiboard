@@ -655,6 +655,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   const TASK_STATUSES = ['todo', 'doing', 'review', 'blocked', 'done'];
 
+  // the statuses a board uses: the five the rules know, and any it adds in meta/config.statuses (lowercase ids), placed
+  // before done. board_post refuses any other, so a guessed "in_review" never hides a task from every list.
+  function boardStatuses(config) {
+    const added = (Array.isArray(config && config.statuses) ? config.statuses : [])
+      .filter((s) => typeof s === 'string' && /^[a-z][a-z0-9_]{0,23}$/.test(s) && TASK_STATUSES.indexOf(s) < 0);
+    return TASK_STATUSES.slice(0, -1).concat(added.filter((s, i) => added.indexOf(s) === i), ['done']);
+  }
+
   // every field of tasks/<id>; references/protocol.md lists the same ones
   const TASK_FIELDS = ['key', 'title', 'feature', 'milestone', 'status', 'owner', 'deps', 'waitingOn', 'claimedBy', 'branch', 'pr',
     'start', 'due', 'repo', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
@@ -715,7 +723,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   }
   // ---------- end of task rules ----------
 
-  var STATUS=TASK_STATUSES;
+  var STATUS=TASK_STATUSES; // the board's own list once meta/config arrives (boardStatuses)
   var BAR={done:'var(--s-done)',review:'var(--s-review)',doing:'var(--s-doing)',blocked:'var(--s-blocked)',todo:'var(--edge)'};
   var TYPES=['note','update','question','answer','handoff','blocker'];
   var VIEWS=['doc','kanban','graph'];
@@ -759,7 +767,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function byKeyStr(k){return Object.prototype.hasOwnProperty.call(byKeyMap,k)?byKeyMap[k]:null}
   function byId(id){return Object.prototype.hasOwnProperty.call(byIdMap,id)?byIdMap[id]:null}
   function st(t){return STATUS.indexOf(t.status)>=0?t.status:'todo'}
-  function SL(s){return T('st_'+s)}
+  function SL(s){var l=T('st_'+s);return l==='st_'+s?s:l}
   function isDoneKey(k){var d=byKeyStr(k);return !!d&&d.status==='done'}
   function unmet(t){return unmetDeps(t,isDoneKey)}
   function ready(t){return isReady(t,isDoneKey)}
@@ -877,6 +885,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var lang=(config.lang||(navigator.language||'en')).slice(0,2).toLowerCase();
     var base=I18N[lang]||I18N.en;STR={};for(var k in I18N.en)STR[k]=I18N.en[k];for(k in base)STR[k]=base[k];
     if(config.strings)for(k in config.strings)STR[k]=config.strings[k];
+    STATUS=boardStatuses(config);
     people=(Array.isArray(config.people)?config.people:[]).filter(function(p){return p&&p.id});
     if(!person(me))me=people.length?people[0].id:'';identify();
     document.documentElement.lang=lang;
@@ -1023,8 +1032,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var p=$('progress');p.textContent='';var lg=$('legend');lg.textContent='';
     if(!allTasks.length)return;
     ['done','review','doing','blocked','todo'].forEach(function(k){
-      if(c[k])p.appendChild(el('span',{style:'width:'+(c[k]/allTasks.length*100)+'%;background:'+BAR[k]}));
-      lg.appendChild(el('span',{},[el('i',{style:'background:'+BAR[k]}),SL(k)+' '+c[k]]));
+      if(c[k])p.appendChild(el('span',{style:'width:'+(c[k]/allTasks.length*100)+'%;background:'+(BAR[k]||'var(--text2)')}));
+      lg.appendChild(el('span',{},[el('i',{style:'background:'+(BAR[k]||'var(--text2)')}),SL(k)+' '+c[k]]));
     });
   }
   function renderToolbar(){

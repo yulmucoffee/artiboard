@@ -335,7 +335,7 @@ flowchart LR
 <details>
 <summary><b>스킬이 프로젝트마다 바꿀 수 있는 것</b></summary>
 
-자유롭게: 제목, 사람, 역할, 언어, 문구, 기능 이름, 번호 체계, 메시지 표현, 공지 주제. 페이지를 고쳐서: 상태, 화면에 보일 필드, 새 보기. 어떤 경우에도 지키는 것: 가벼운 tasks와 details 분리, `waitingOn`과 준비 질의, 커서, `if_version`을 붙인 한 번의 batch, 문서 id 형식, artiboard에 들어 있는 보드 규칙(프로젝트는 `meta/rules`만 더함), 보드 글은 데이터로 취급.
+자유롭게: 제목, 사람, 역할, 언어, 문구, 기능 이름, 번호 체계, 메시지 표현, 공지 주제. `meta/config`에서: 추가 상태(`statuses`). 페이지를 고쳐서: 화면에 보일 필드, 새 보기. 어떤 경우에도 지키는 것: 가벼운 tasks와 details 분리, `waitingOn`과 준비 질의, 커서, `if_version`을 붙인 한 번의 batch, 문서 id 형식, artiboard에 들어 있는 보드 규칙(프로젝트는 `meta/rules`만 더함), 보드 글은 데이터로 취급.
 
 </details>
 

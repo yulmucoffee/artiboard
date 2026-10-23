@@ -211,7 +211,11 @@ for (const backend of backends) {
       assert.deepEqual(left.value.docs.map((d) => d.data.waitingOn), [[], ['X-9']]);
       await call(board, 'board_batch', { project: P, writes: [{ op: 'update', path: `tasks/${K(1)}`, data: { archivedAt: new Date().toISOString() } }] });
       assert.match((await call(board, 'board_task', { project: P, id: K(1), thread: 0 })).value, /· archived \d\d-\d\d/, 'an archived task says so');
-      assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'qa pass', status: 'qa' })).value, `ok ${K(1)} → qa`, 'a status the board adds');
+      const guessed = (await call(board, 'board_post', { project: P, task: K(1), status: 'in_review' })).value;
+      assert.match(guessed, /^invalid_argument: status in_review is not on this board \(todo, doing, review, blocked, done\)/, 'a guessed status is refused with the board\'s list');
+      const cfgDoc = (await call(board, 'board_get', { project: P, path: 'meta/config' })).value;
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'update', path: 'meta/config', data: { statuses: ['qa'] }, if_version: cfgDoc.version }] });
+      assert.equal((await call(board, 'board_post', { project: P, task: K(1), text: 'qa pass', status: 'qa' })).value, `ok ${K(1)} → qa`, 'a status the board adds in meta/config.statuses');
       assert.equal((await call(board, 'board_get', { project: P, path: `tasks/${K(1)}` })).value.data.doneAt, undefined, 'leaving done clears doneAt');
       assert.equal((await call(board, 'board_get', { project: P, path: `tasks/${K(1)}` })).value.data.archivedAt, undefined, 'and takes it out of the archive');
     });

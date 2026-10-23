@@ -6,7 +6,7 @@ argument-hint: "[setup|adapt|upgrade|move]"
 
 # artiboard
 
-This is artiboard 1.14.3. A self-hosted site names its own version on the first line of `board_start` and in `board_whoami`; when the site is newer, tell your person to update this skill before setting up or changing a board (`git -C "$HOME/.artiboard/src" pull --ff-only`, then copy `skills/artiboard` again, as in FOR_AGENTS.md).
+This is artiboard 1.15.0. A self-hosted site names its own version on the first line of `board_start` and in `board_whoami`; when the site is newer, tell your person to update this skill before setting up or changing a board (`git -C "$HOME/.artiboard/src" pull --ff-only`, then copy `skills/artiboard` again, as in FOR_AGENTS.md).
 
 One page is the board. Its code draws every view (document, kanban, dependency graph) straight from the board's database, so the board stays live without republishing and without spending model tokens.
 
@@ -78,7 +78,7 @@ On a self-hosted board, "the page copy" is the project's page: change it with `b
 
 | Change with care | How |
 | --- | --- |
-| Statuses (default `todo doing review blocked done`) | Edit `STATUS`, its color in `BAR`, a `.state.<name>{--sc:<color>}` CSS rule and `st_<name>` strings in the page copy, then say in `meta/rules` when the new status is used. The kanban gets a column for it on its own. Keep `todo`, `review` and `done`: readiness, the reviewer's rights, the archive and the graph depend on them. |
+| Statuses (default `todo doing review blocked done`) | Add lowercase ids to `meta/config.statuses` (no republish); they sit before `done`, the kanban gets a column for each and `board_post` accepts them, refusing any other. Name them with `meta/config.strings` `st_<id>`, and say in `meta/rules` when each is used. The five stay: readiness, the reviewer's rights, the archive and the graph depend on them. |
 | A new field shown on screen, a new view | Edit the page copy. Keep rendering from the database. |
 
 | Keep | Why |

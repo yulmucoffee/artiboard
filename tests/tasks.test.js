@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { TASK_FIELDS, holderOf, isReady, mayChange, statusEffects, unmetDeps } from '../server/tasks.js';
+import { TASK_FIELDS, boardStatuses, holderOf, isReady, mayChange, statusEffects, unmetDeps } from '../server/tasks.js';
 import { CHANGE_CASES } from './task-cases.js';
 
 const AT = '2026-10-23T09:00:00.000Z';
@@ -45,4 +45,10 @@ test('the agents\' protocol lists exactly the task fields', () => {
   assert.ok(line, 'protocol.md names the task fields');
   const listed = line[1].replace(/\s*\([^)]*\)/g, '').split(/,\s*/).map((f) => f.trim());
   assert.deepEqual(listed, TASK_FIELDS);
+});
+
+test('a board uses the five statuses and any it adds in meta/config.statuses, before done', () => {
+  assert.deepEqual(boardStatuses({}), ['todo', 'doing', 'review', 'blocked', 'done']);
+  assert.deepEqual(boardStatuses({ statuses: ['qa', 'staging'] }), ['todo', 'doing', 'review', 'blocked', 'qa', 'staging', 'done']);
+  assert.deepEqual(boardStatuses({ statuses: ['qa', 'qa', 'done', 'In Review', 7] }), ['todo', 'doing', 'review', 'blocked', 'qa', 'done'], 'each once, lowercase ids only');
 });

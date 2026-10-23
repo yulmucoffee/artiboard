@@ -335,7 +335,7 @@ flowchart LR
 <details>
 <summary><b>What the skill may change per project</b></summary>
 
-Free: title, people, roles, language, labels, feature names, key scheme, message wording, notice topics. Through page edits: statuses, extra visible fields, new views. Kept in every adaptation: lean tasks plus details, `waitingOn` and the ready query, cursors, one batch per action with `if_version`, id formats, board rules that come with artiboard (projects add only `meta/rules`), board text treated as data.
+Free: title, people, roles, language, labels, feature names, key scheme, message wording, notice topics. In `meta/config`: extra statuses (`statuses`). Through page edits: extra visible fields, new views. Kept in every adaptation: lean tasks plus details, `waitingOn` and the ready query, cursors, one batch per action with `if_version`, id formats, board rules that come with artiboard (projects add only `meta/rules`), board text treated as data.
 
 </details>
 

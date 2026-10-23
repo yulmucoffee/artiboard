@@ -273,6 +273,15 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   ok(b.store['tasks/M1-1'].owner==='ben'&&b.store['tasks/M1-1'].claimedBy===null,'handing a task to someone else drops the old claim, so its owner holds it');
   b.key('Escape');
 
+  console.log('# a status the board adds');
+  b=boot({storage:{'ab-view':'kanban'},docs:{'meta/config':{...seed()['meta/config'],statuses:['qa'],strings:{st_qa:'QA'}},
+    'tasks/M1-1':{key:'M1-1',title:'Schema',feature:'Data',status:'qa',owner:'ana',deps:[],waitingOn:[],claimedBy:null,updatedAt:T0}}});
+  all.push(b);await tick();await heal();
+  ok([...b.d.querySelectorAll('.col h3')].some(h=>/QA/.test(h.textContent)),'the kanban gets a column for it, named from meta/config.strings');
+  [...b.d.querySelectorAll('.card')].find(c=>c.textContent.startsWith('M1-1')).click();await tick();
+  ok([...b.d.getElementById('fStatus').options].map(o=>o.value).join()==='todo,doing,review,blocked,qa,done'&&b.d.getElementById('fStatus').value==='qa','the status menu lists it before done, and a task in it shows as such');
+  b.key('Escape');
+
   console.log('# view-only viewer');
   b=boot({user:fakeUser('u_ana',false)});all.push(b);await tick();await heal();
   ok(/View only/.test(note(b.d)),'header says the board is view only');

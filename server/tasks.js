@@ -4,6 +4,14 @@
 
 export const TASK_STATUSES = ['todo', 'doing', 'review', 'blocked', 'done'];
 
+// the statuses a board uses: the five the rules know, and any it adds in meta/config.statuses (lowercase ids), placed
+// before done. board_post refuses any other, so a guessed "in_review" never hides a task from every list.
+export function boardStatuses(config) {
+  const added = (Array.isArray(config && config.statuses) ? config.statuses : [])
+    .filter((s) => typeof s === 'string' && /^[a-z][a-z0-9_]{0,23}$/.test(s) && TASK_STATUSES.indexOf(s) < 0);
+  return TASK_STATUSES.slice(0, -1).concat(added.filter((s, i) => added.indexOf(s) === i), ['done']);
+}
+
 // every field of tasks/<id>; references/protocol.md lists the same ones
 export const TASK_FIELDS = ['key', 'title', 'feature', 'milestone', 'status', 'owner', 'deps', 'waitingOn', 'claimedBy', 'branch', 'pr',
   'start', 'due', 'repo', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
