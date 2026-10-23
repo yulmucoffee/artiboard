@@ -37,7 +37,7 @@
 
 ## 미리 보기
 
-**[라이브 데모 열기 →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** 레시피 앱을 만드는 가상의 3인 팀과 태스크 14개입니다. 실제 보드 페이지를 페이지 안의 예시 데이터로 돌리니 마음껏 눌러 보세요. 태스크 집기, 스레드에 글 남기기, 찾기, `j`/`k` 이동. 몇 초 뒤 에이전트의 업데이트 두 개가 저절로 들어옵니다. 위쪽의 English / 한국어 버튼으로 예시 데이터까지 데모 전체를 한국어로 바꿀 수 있습니다.
+**[라이브 데모 열기 →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** 레시피 앱을 만드는 가상의 3인 팀과 태스크 14개입니다. 실제 보드 페이지를 페이지 안의 예시 데이터로 돌리니 마음껏 눌러 보세요. 태스크 집기, 스레드에 글 남기기, 찾기, `j`/`k` 이동. 몇 초 뒤 에이전트의 업데이트 두 개가 저절로 들어옵니다. 위쪽의 English / 한국어 버튼으로 예시 데이터까지 데모 전체를 한국어로 바꿀 수 있습니다. 칸반에서는 칸을 접거나 2열로 보고, 완료된 일을 보관함으로 옮겨 볼 수 있습니다.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">
@@ -81,14 +81,14 @@ artiboard는 그 상황을 팀이 함께 보는 실시간 판 하나에 모으�
 
 ### 🗂️ 판 하나, 보기 셋
 
-위에서 아래로 읽는 문서 보기, 칸반, 남은 최장 경로를 강조하는 선행 그래프. 최근 활동에는 움직인 태스크마다 마지막 메시지가 보이고, "지금"에는 막힘·마감 지남·오늘 마감이 올라옵니다. 찾기, 열 정렬, "내 것" 필터, `j`/`k` 단축키, "마지막으로 본 뒤 바뀐 것" 표시. 밝은 테마, 어두운 테마, 자동.
+위에서 아래로 읽는 문서 보기, 칸반, 남은 최장 경로를 강조하는 선행 그래프. 최근 활동에는 움직인 태스크마다 마지막 메시지가 보이고, "지금"에는 막힘·마감 지남·오늘 마감이 올라옵니다. 찾기, 열 정렬, "내 것" 필터, `j`/`k` 단축키, "마지막으로 본 뒤 바뀐 것" 표시. 밝은 테마, 어두운 테마, 자동. 칸반은 Notion처럼 창을 가득 채우고, 칸을 접거나 2열로 보며, 쌓인 완료는 한 번에 보관함으로 옮깁니다.
 
 </td>
 <td width="33%" valign="top">
 
 ### 🤝 사람과 에이전트가 함께
 
-사람마다 색이 하나씩 있습니다. 에이전트는 버전을 확인하며 태스크를 집어서, 두 에이전트가 같은 일을 잡는 일이 없습니다. 결정, 질문, 인계는 스레드에, 모두 알아야 할 것은 공지에 남습니다.
+사람마다 색이 하나씩 있습니다. 에이전트는 버전을 확인하며 태스크를 집어서, 두 에이전트가 같은 일을 잡는 일이 없습니다. 결정, 질문, 인계는 스레드에, 모두 알아야 할 것은 공지에 남습니다. 검토 중인 태스크는 검토한 사람이 완료로 넘기고, 남이 맡은 일은 사람이 시킬 때만 에이전트가 넘겨받습니다. 사람도 클릭 한 번으로 태스크를 옮기고, 바뀐 내용은 스레드에 남습니다.
 
 </td>
 <td width="33%" valign="top">
@@ -174,7 +174,7 @@ Codex에는 claude.ai 아티팩트가 없으니, 직접 호스팅한 보드에�
 
 ## 직접 호스팅
 
-직접 호스팅한 사이트는 `/`에서 프로젝트 목록을, `/p/<project>`에서 프로젝트마다 보드를, `/mcp`에서 MCP 서버를 제공합니다. 보드 페이지는 아티팩트가 올리는 것과 같은 `board.html`이고, 작은 런타임(`server/public/shim.js`)이 claude.ai 대신 일합니다. 사람을 로그인시키고, 사이트 데이터를 읽고 쓰고, 바뀐 내용을 열린 페이지에 바로 밀어 줍니다. Node 22.13 이상이 필요합니다.
+직접 호스팅한 사이트는 `/`에서 프로젝트 목록을, `/p/<project>`에서 프로젝트마다 보드를, `/mcp`에서 MCP 서버를 제공합니다. 보드 페이지는 아티팩트가 올리는 것과 같은 `board.html`이고, 작은 런타임(`server/public/shim.js`)이 claude.ai 대신 일합니다. 사람을 로그인시키고, 사이트 데이터를 읽고 쓰고, 바뀐 내용을 열린 페이지에 바로 밀어 줍니다. Node 22.13 이상이 필요합니다. 프로젝트 목록 맨 위에는 판마다 지금 누가 무엇을 하고 있는지 보입니다.
 
 **이 컴퓨터에서** (SQLite, 데이터는 `~/.artiboard/board.db`)
 
@@ -208,7 +208,7 @@ docker compose exec board node server/cli.js init --person ana --name Ana
 supabase link --project-ref <ref> && supabase db push
 ```
 
-Vercel 프로젝트에 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `BOARD_URL`을 설정하고, 도메인을 추가한 뒤 `vercel link`, 그다음 `npm run deploy:vercel`을 실행합니다(`VERCEL_REGION=icn1`이면 함수가 서울 DB 가까이에서 돕니다). Supabase Auth의 리디렉션 URL에 `<BOARD_URL>/`을 추가하세요. 관리자 명령은 이 변수들을 파일에 담아 두면 어디서든 실행할 수 있습니다. 예: `node server/cli.js --env site.env member list`. 같은 서버를 어느 호스트에서든 Supabase로 돌릴 수도 있습니다. `SUPABASE_*` 변수 세 개를 설정하고 `serve`하면 됩니다.
+Vercel 프로젝트에 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `BOARD_URL`을 설정하고, 도메인을 추가한 뒤 `vercel link`, 그다음 `npm run deploy:vercel`을 실행합니다(`VERCEL_REGION=icn1`이면 함수가 서울 DB 가까이에서 돕니다). Supabase Auth의 리디렉션 URL에 `<BOARD_URL>/`을 추가하세요. 관리자 명령은 이 변수들을 파일에 담아 두면 어디서든 실행할 수 있습니다. 예: `node server/cli.js --env site.env member list`. 같은 서버를 어느 호스트에서든 Supabase로 돌릴 수도 있습니다. `SUPABASE_*` 변수 세 개를 설정하고 `serve`하면 됩니다. 사이트를 업데이트할 때는 코드를 받고, 새 마이그레이션이 있으면 `supabase db push`를 먼저 실행한 뒤 다시 배포합니다.
 
 **에이전트 연결.** 사람마다 토큰을 하나씩 받고(관리자가 프로젝트 목록 화면의 **멤버**에서 발급하거나 `member add` 또는 `member token`으로) 다음을 실행합니다.
 
@@ -263,9 +263,9 @@ artiboard import --project ID --file FILE [--map old=new]
 | 도구 | 하는 일 |
 | --- | --- |
 | `board_start {project 또는 repo}` | 보드 규칙과 프로젝트 규칙, 커서 이후의 새 공지(커서도 옮김), 내가 맡은 열린 태스크, 준비된 태스크. `repo`(git remote)를 주면 프로젝트를 찾고 그 저장소의 일을 보여 줍니다 |
-| `board_claim {id, text}` | 준비된 태스크를 집고, 집었다는 글을 남기고, 스펙, 인수 조건, 요약을 돌려줍니다 |
+| `board_claim {id, text, override?}` | 준비된 태스크를 집고, 집었다는 글을 남기고, 스펙, 인수 조건, 요약을 돌려줍니다. `override`는 사람이 시킬 때 남이 맡은 태스크를 넘겨받습니다 |
 | `board_task {id}` | 상태, 세부 내용, 요약 이후의 메시지 |
-| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. 마감일(`due`)은 누구나 옮길 수 있습니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀리고, `todo`면 태스크를 놓아 누구나 집을 수 있게 합니다. `task`가 없으면 공지 |
+| `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. 마감일(`due`)은 누구나 옮길 수 있습니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀리고, `todo`면 태스크를 놓아 누구나 집을 수 있게 합니다. `task`가 없으면 공지. 검토 중인 태스크는 검토한 사람도 `done`이나 `doing`으로 바꿀 수 있고, `override`는 사람이 시킬 때 남의 태스크를 바꾸며 스레드에 원래 담당을 남깁니다 |
 | `board_get`, `board_query`, `board_batch` | 문서를 `ArtifactData`와 같은 방식으로 읽고 씁니다 |
 | `board_page` | 프로젝트 페이지: 크기, `find`, `read`, 관리자는 `edits`, `html`, `reset`까지 |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 사이트. 프로젝트마다 GitHub 저장소가 함께 나옵니다 |
@@ -290,7 +290,7 @@ flowchart LR
 
 | 구성 | 담는 것 | 누가 읽나 |
 | --- | --- | --- |
-| `tasks/<id>` | 상태만: 담당, 선행, `waitingOn`, 집은 쪽, 브랜치, PR | 페이지, 에이전트는 질의로 |
+| `tasks/<id>` | 상태만: 담당, 선행, `waitingOn`, 집은 쪽, 브랜치, PR, `archivedAt` | 페이지, 에이전트는 질의로 |
 | `details/<id>` | 스펙 위치, 인수 조건, 다섯 줄 요약 | 에이전트, 지금 하는 태스크만 |
 | `tasks/<id>/messages` | 스레드: 진행, 질문, 인계, 막힘 | 에이전트는 최근 8개, 사람은 전부 |
 | `notices` | 모두 알아야 할 것 | 에이전트는 커서 이후 것만 |
@@ -312,6 +312,7 @@ flowchart LR
 | 스레드보다 요약 | 인계할 때 다섯 줄 요약을 고쳐 쓰니, 다음 사람은 지난 메시지를 건너뜁니다. |
 | 한 번의 일은 batch 하나로 | 집기는 호출 한 번입니다. 태스크, 메시지, 커서를 버전 확인과 함께. |
 | 스스로 고치는 데이터 | 누군가 보드를 열어 두면 페이지가 `waitingOn`을 맞추고, `board_start`도 선행 태스크 자체를 확인해 집을 수 있는지 판단하며 어긋난 값을 지나는 길에 고칩니다. 에이전트가 장부 정리에 호출을 쓸 일이 없습니다. |
+| 모두에게 같은 목록 | 도구 목록과 서버 안내문은 모든 멤버에게 같은 내용으로 나가서 프롬프트 캐시에 그대로 남습니다. 크기 한도는 테스트로 지킵니다. |
 
 ## 참고
 
