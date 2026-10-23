@@ -1263,7 +1263,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       tallyParts:{doing:'in progress',review:'review',blocked:'blocked',done:'done'},unassigned:'Unassigned',
       needsHands:'Needs attention',why:['Blocked','Past due','In review','Due today','Start passed'],noPrShort:'no PR',blockedNote:'Blocked. See the thread for why.',reviewNote:'Waiting for PR review and merge.',noPr:' (no PR link)',openPr:'Open PR',
       ready:'Ready to pick',readyNone:'No unassigned task has all its dependencies done.',unlocks:'Unlocks {k} when done.',claim:'Claim',claimTitle:'Claim as {p}',
-      alreadyClaimed:'Someone just claimed it.',act_claim:'Take it',act_review:'Send to review',act_blocked:'Mark blocked',act_resume:'Back in progress',act_release:'Let go',act_done:'Merged: mark done',act_back:'Send back',act_reopen:'Reopen',act_take:'Take over from {p}',act_sure:'Click again to take it over',saidTake:' (taken over from {p})',claimed:'{p} claimed {k}.',claimFail:'Could not claim ({e})',saveFail:'Could not save ({e})',postFail:'Could not post ({e})',
+      alreadyClaimed:'Someone just claimed it.',act_claim:'Take it',act_review:'Send to review',act_blocked:'Mark blocked',act_resume:'Back in progress',act_release:'Let go',act_done:'Merged: mark done',act_back:'Send back',act_reopen:'Reopen',act_take:'Take over from {p}',act_sure:'Click again to take it over',saidTake:' (taken over from {p})',saidOver:' (override; held by {p})',claimed:'{p} claimed {k}.',claimFail:'Could not claim ({e})',saveFail:'Could not save ({e})',postFail:'Could not post ({e})',
       laneOpen:'{n} open',laneEmpty:'Nothing assigned. Pick from “Ready to pick” above.',laneNoMatch:'Nothing matches the filter.',laneDone:'Done {n}',waitingDeps:'waiting on {k}',
       f_due:'Due',f_doneAt:'Done',dueOn:'due {d}',dueToday:'due today',dueLate:'due {d} · late',doneOn:'done {d}',wd:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
       all:'All',filterGroup:'Filter by feature',th:['Key','Item','Depends on','Owner','Status','Dates','Updated'],doneOf:'{d}/{n} done',none:'none',noMatch:'No task matches the filter.',
@@ -1316,7 +1316,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       tallyParts:{doing:'진행',review:'검토',blocked:'막힘',done:'완료'},unassigned:'미배정',
       needsHands:'손이 필요한 것',why:['막힘','마감 지남','검토 대기','오늘 마감','착수 지남'],noPrShort:'PR 없음',blockedNote:'막혔어요. 스레드에서 이유를 확인하세요.',reviewNote:'PR 검토와 병합을 기다려요.',noPr:' (PR 주소 없음)',openPr:'PR 열기',
       ready:'바로 집을 수 있는 일',readyNone:'선행이 끝난 미배정 태스크가 없어요.',unlocks:'끝나면 {k}이(가) 풀려요.',claim:'집기',claimTitle:'{p}(으)로 집기',
-      alreadyClaimed:'방금 다른 쪽이 집었어요.',act_claim:'내가 집기',act_review:'검토로 올리기',act_blocked:'막힘으로',act_resume:'다시 진행',act_release:'내려놓기',act_done:'병합됨: 완료로',act_back:'되돌려 보내기',act_reopen:'다시 열기',act_take:'{p}에게서 넘겨받기',act_sure:'한 번 더 누르면 넘겨받아요',saidTake:' ({p}에게서 넘겨받음)',claimed:'{k}을(를) {p}(이)가 집었어요.',claimFail:'집지 못했어요 ({e})',saveFail:'저장하지 못했어요 ({e})',postFail:'남기지 못했어요 ({e})',
+      alreadyClaimed:'방금 다른 쪽이 집었어요.',act_claim:'내가 집기',act_review:'검토로 올리기',act_blocked:'막힘으로',act_resume:'다시 진행',act_release:'내려놓기',act_done:'병합됨: 완료로',act_back:'되돌려 보내기',act_reopen:'다시 열기',act_take:'{p}에게서 넘겨받기',act_sure:'한 번 더 누르면 넘겨받아요',saidTake:' ({p}에게서 넘겨받음)',saidOver:' (override, 담당 {p})',claimed:'{k}을(를) {p}(이)가 집었어요.',claimFail:'집지 못했어요 ({e})',saveFail:'저장하지 못했어요 ({e})',postFail:'남기지 못했어요 ({e})',
       laneOpen:'진행 중인 일 {n}개',laneEmpty:'맡은 일이 없어요. 위 ‘바로 집을 수 있는 일’에서 고르세요.',laneNoMatch:'찾는 조건에 맞는 일이 없어요.',laneDone:'완료 {n}개',waitingDeps:'선행 {k} 대기',
       f_due:'마감일',f_doneAt:'끝난 날',dueOn:'{d}까지',dueToday:'오늘까지',dueLate:'{d}까지 · 지남',doneOn:'{d} 완료',wd:['일','월','화','수','목','금','토'],
       all:'전체',filterGroup:'기능으로 거르기',th:['번호','항목','선행','담당','상태','날짜','최근'],doneOf:'{d}/{n} 완료',none:'없음',noMatch:'찾는 조건에 맞는 태스크가 없어요.',
@@ -1353,6 +1353,18 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // what anyone may write on any task: the due day, and what the board keeps up to date by itself
   const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt'];
 
+  // The fields a write changes, with their new values: a missing field equals null, and object keys compare in any
+  // order, as both databases store them.
+  function changedFields(before, after) {
+    const canon = (v) => (v == null ? null : Array.isArray(v) ? v.map(canon)
+      : typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+    const patch = {};
+    for (const k of new Set(Object.keys(before).concat(Object.keys(after)))) {
+      if (JSON.stringify(canon(before[k])) !== JSON.stringify(canon(after[k]))) patch[k] = after[k] == null ? null : after[k];
+    }
+    return patch;
+  }
+
   function statusOf(t) { return (t && t.status) || 'todo'; }
 
   // who has the task: whoever claimed it, else whoever it is assigned to; an assignment holds it like a claim
@@ -1366,26 +1378,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // free to pick: to do, nobody holds it, nothing it waits on is left
   function isReady(t, isDone) { return statusOf(t) === 'todo' && !holderOf(t) && !unmetDeps(t, isDone).length; }
 
-  // What else a status change sets: back to todo releases the task, done stamps when, and the rest follows from
-  // normalTask on the result (leaving done takes back the done day and the archive).
+  // What else a status change sets: back to todo releases the task, done stamps when, and leaving done takes back
+  // the done day and the archive.
   function statusEffects(t, status, at) {
     const fx = {};
     if (status === 'todo') { fx.claimedBy = null; fx.owner = null; }
     if (status === 'done' && statusOf(t) !== 'done') fx.doneAt = at;
-    return Object.assign(fx, normalTask(Object.assign({}, t, { status }, fx)));
-  }
-
-  // The fields a task needs changed to be in a state the rules allow, whoever wrote it: a todo task with a claim was
-  // assigned, not started, so the claimer keeps it as its owner; only a done task carries a done day or an archive day.
-  // Both databases apply this to every task they store.
-  function normalTask(t) {
-    const fx = {}, s = statusOf(t);
-    if (s === 'todo' && t.claimedBy) {
-      fx.claimedBy = null;
-      if (!t.owner && t.claimedBy.who) fx.owner = t.claimedBy.who;
-    }
-    if (s !== 'done' && t.doneAt) fx.doneAt = null;
-    if (s !== 'done' && t.archivedAt) fx.archivedAt = null;
+    if (status !== 'done' && t.doneAt) fx.doneAt = null;
+    if (status !== 'done' && t.archivedAt) fx.archivedAt = null;
     return fx;
   }
 
@@ -1649,9 +1649,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     if('status' in patch)patch=Object.assign({},patch,statusEffects(t,patch.status,at));
     function was(k,a,b,f){if(k in patch&&(a||null)!==(b||null))bits.push(T(k==='status'?'f_status':'f_'+k)+' '+(a?f(a):dash)+' → '+(b?f(b):dash))}
     was('status',st(t),patch.status,SL);was('owner',t.owner,patch.owner,pname);was('start',startOf(t),patch.start,dayLabel);was('due',dueOf(t),patch.due,dayLabel);
+    was('branch',t.branch,patch.branch,String);was('pr',t.pr,patch.pr,String);was('repo',t.repo,patch.repo,String);
+    // a person may change a task someone else holds; the write says so and the thread names the holder
+    var over=!mayChange(t,me,patch,false);
+    if(over&&!extra)extra=T('saidOver',{p:pname(holderOf(t))});
     if(!bits.length&&!extra)return save(t.id,patch);
     patch.updatedAt=patch.lastMessageAt=at;markSeen(t.id,at);
-    return db.doc('tasks/'+t.id).update(patch,typeof ifVersion==='number'?{ifVersion:ifVersion}:undefined)
+    var o=over?{override:true}:{};if(typeof ifVersion==='number')o.ifVersion=ifVersion;
+    return db.doc('tasks/'+t.id).update(patch,o)
       .then(function(){return db.doc('tasks/'+t.id+'/messages/'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:'update',text:bits.join(' · ')+(extra||'')})})
       .catch(function(e){if(e&&e.code==='version_conflict'&&typeof ifVersion==='number')return 'stale';toast(T('saveFail',{e:errText(e)}));refused(e);return false});
   }
@@ -2325,8 +2330,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     if(!sumEditing)return el('div',{class:'block'},[head,sum?el('div',{class:'pre',text:sum}):el('p',{class:'muted',style:'font-size:13.5px',text:T('summaryEmpty')})]);
     var ta=el('textarea',{id:'sumText','aria-label':T('summary')});ta.value=keep.sumText!=null?keep.sumText:sum;
     var ok=el('button',{type:'button',class:'btn primary small',text:T('save')});
-    ok.addEventListener('click',function(){var patch={summary:ta.value.trim(),summaryAt:now()};ok.disabled=true;
-      (det?db.doc('details/'+t.id).update(patch):db.doc('details/'+t.id).set(patch)).then(function(){sumEditing=false;renderSheet()}).catch(function(e){ok.disabled=false;toast(T('saveFail',{e:errText(e)}));refused(e)})});
+    ok.addEventListener('click',function(){var patch={summary:ta.value.trim(),summaryAt:now()},o={override:!mayChange(t,me,{summary:patch.summary},false)};ok.disabled=true;
+      (det?db.doc('details/'+t.id).update(patch,o):db.doc('details/'+t.id).set(patch,o)).then(function(){sumEditing=false;renderSheet()}).catch(function(e){ok.disabled=false;toast(T('saveFail',{e:errText(e)}));refused(e)})});
     return el('div',{class:'block'},[head,ta,el('div',{class:'form-row'},[ok,el('button',{type:'button',class:'btn small',text:T('cancel'),onclick:function(){sumEditing=false;var a=$('sumText');if(a)a.value=sum;renderSheet()}})])]);
   }
 
@@ -2348,9 +2353,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     o.value=t.owner||'';
     o.addEventListener('change',function(){change(t,{owner:o.value||null})});
     var br=el('input',{type:'text',id:'fBranch',placeholder:'feature/…','aria-label':T('f_branch')});br.value=activeId==='fBranch'?keep.fBranch:(t.branch||'');
-    br.addEventListener('change',function(){save(t.id,{branch:br.value.trim()||null})});
+    br.addEventListener('change',function(){change(t,{branch:br.value.trim()||null})});
     var pr=el('input',{type:'url',id:'fPr',placeholder:'https://github.com/…/pull/N','aria-label':T('f_pr')});pr.value=activeId==='fPr'?keep.fPr:(t.pr||'');
-    pr.addEventListener('change',function(){save(t.id,{pr:pr.value.trim()||null})});
+    pr.addEventListener('change',function(){change(t,{pr:pr.value.trim()||null})});
     var sd=el('input',{type:'date',id:'fStart','aria-label':T('f_start')});sd.value=startOf(t);
     sd.addEventListener('change',function(){change(t,{start:sd.value||null})});
     var du=el('input',{type:'date',id:'fDue','aria-label':T('f_due')});du.value=dueOf(t);
@@ -2361,7 +2366,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       rp=el('select',{id:'fRepo','aria-label':T('f_repo')});rp.appendChild(el('option',{value:'',text:T('repoNone')}));
       rs.forEach(function(r){var v=r.label||r.repo;rp.appendChild(el('option',{value:v,text:r.label?r.label+' · '+r.repo:r.repo}))});
       if(t.repo&&!rs.some(function(r){return (r.label||r.repo)===t.repo}))rp.appendChild(el('option',{value:t.repo,text:t.repo}));
-      rp.value=t.repo||'';rp.addEventListener('change',function(){save(t.id,{repo:rp.value||null})});
+      rp.value=t.repo||'';rp.addEventListener('change',function(){change(t,{repo:rp.value||null})});
     }
     s.disabled=o.disabled=br.disabled=pr.disabled=sd.disabled=du.disabled=!writable();if(rp)rp.disabled=!writable();
 

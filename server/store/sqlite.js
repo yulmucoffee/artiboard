@@ -10,6 +10,7 @@ import {
   BoardError, checkCollection, checkField, guardWrite, hashToken, isToken, MAX_DOC, MAX_PAGE, newToken, now, PERSON_ID, PROJECT_ID,
   projectSeed, ROLES, splitPath,
 } from '../core.js';
+import { changedFields, holderOf, mayChange } from '../tasks.js';
 
 const SCHEMA = `
 create table if not exists projects (
@@ -139,7 +140,21 @@ export function openSqlite({ file, boardUrl }) {
     return q(sql).all(...params).map(docOut);
   }
 
-  // Each write: {op: set|update|delete, path, data?, if_version?, if_absent?}. set replaces, update merges top-level fields.
+  // The task rules on every member's write to a task or its details (the system, actor null, is not held to them):
+  // a task someone else holds changes only as the rules open it to everyone, unless the write carries override.
+  function holdTo(project, me, w, c, d, cur, payload, i) {
+    const taskRow = c === 'tasks' ? cur : q("select data from docs where project = ? and collection = 'tasks' and doc_id = ?").get(project, d);
+    if (!taskRow) return;
+    const task = JSON.parse(taskRow.data), before = cur ? JSON.parse(cur.data) : {};
+    const patch = changedFields(before, w.op === 'delete' ? {} : w.op === 'set' ? payload : { ...before, ...payload });
+    if (c === 'details') delete patch.summaryAt;
+    if (!mayChange(task, me, patch, w.override === true)) {
+      throw new BoardError('not_yours', `${task.key || d} is held by ${holderOf(task)}; pass override true only when your person says so`, i);
+    }
+  }
+
+  // Each write: {op: set|update|delete, path, data?, if_version?, if_absent?, override?}. set replaces, update merges
+  // top-level fields.
   async function apply(actor, project, writes) {
     const member = actor == null ? null : memberOf(actor);
     const role = actor == null ? 'admin' : member?.role;
@@ -156,6 +171,7 @@ export function openSqlite({ file, boardUrl }) {
       }
       const cur = q('select * from docs where project = ? and collection = ? and doc_id = ?').get(project, c, d);
       if (role !== 'admin') guardWrite(member, w, c, d, cur && JSON.parse(cur.data), payload, i);
+      if (member && (c === 'tasks' || c === 'details')) holdTo(project, member.person, w, c, d, cur, payload, i);
       if (w.if_version != null && (!cur || cur.version !== Number(w.if_version))) {
         throw new BoardError('version_conflict', `${w.path} is at version ${cur ? cur.version : 'none (missing)'}, not ${w.if_version}`, i);
       }

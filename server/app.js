@@ -18,7 +18,7 @@ const SECURITY = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
-const STATUS = { invalid_argument: 400, permission_denied: 403, not_found: 404, version_conflict: 409, already_exists: 409 };
+const STATUS = { invalid_argument: 400, permission_denied: 403, not_yours: 403, not_found: 404, version_conflict: 409, already_exists: 409 };
 const MAX_BODY = 2 * 1048576;
 
 function send(res, status, body, headers = {}) {

@@ -11,6 +11,18 @@ export const TASK_FIELDS = ['key', 'title', 'feature', 'milestone', 'status', 'o
 // what anyone may write on any task: the due day, and what the board keeps up to date by itself
 const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt'];
 
+// The fields a write changes, with their new values: a missing field equals null, and object keys compare in any
+// order, as both databases store them.
+export function changedFields(before, after) {
+  const canon = (v) => (v == null ? null : Array.isArray(v) ? v.map(canon)
+    : typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+  const patch = {};
+  for (const k of new Set(Object.keys(before).concat(Object.keys(after)))) {
+    if (JSON.stringify(canon(before[k])) !== JSON.stringify(canon(after[k]))) patch[k] = after[k] == null ? null : after[k];
+  }
+  return patch;
+}
+
 export function statusOf(t) { return (t && t.status) || 'todo'; }
 
 // who has the task: whoever claimed it, else whoever it is assigned to; an assignment holds it like a claim
@@ -24,26 +36,14 @@ export function unmetDeps(t, isDone) {
 // free to pick: to do, nobody holds it, nothing it waits on is left
 export function isReady(t, isDone) { return statusOf(t) === 'todo' && !holderOf(t) && !unmetDeps(t, isDone).length; }
 
-// What else a status change sets: back to todo releases the task, done stamps when, and the rest follows from
-// normalTask on the result (leaving done takes back the done day and the archive).
+// What else a status change sets: back to todo releases the task, done stamps when, and leaving done takes back
+// the done day and the archive.
 export function statusEffects(t, status, at) {
   const fx = {};
   if (status === 'todo') { fx.claimedBy = null; fx.owner = null; }
   if (status === 'done' && statusOf(t) !== 'done') fx.doneAt = at;
-  return Object.assign(fx, normalTask(Object.assign({}, t, { status }, fx)));
-}
-
-// The fields a task needs changed to be in a state the rules allow, whoever wrote it: a todo task with a claim was
-// assigned, not started, so the claimer keeps it as its owner; only a done task carries a done day or an archive day.
-// Both databases apply this to every task they store.
-export function normalTask(t) {
-  const fx = {}, s = statusOf(t);
-  if (s === 'todo' && t.claimedBy) {
-    fx.claimedBy = null;
-    if (!t.owner && t.claimedBy.who) fx.owner = t.claimedBy.who;
-  }
-  if (s !== 'done' && t.doneAt) fx.doneAt = null;
-  if (s !== 'done' && t.archivedAt) fx.archivedAt = null;
+  if (status !== 'done' && t.doneAt) fx.doneAt = null;
+  if (status !== 'done' && t.archivedAt) fx.archivedAt = null;
   return fx;
 }
 

@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { TASK_FIELDS, holderOf, isReady, mayChange, normalTask, statusEffects, unmetDeps } from '../server/tasks.js';
-import { CHANGE_CASES, NORMAL_CASES } from './task-cases.js';
+import { TASK_FIELDS, holderOf, isReady, mayChange, statusEffects, unmetDeps } from '../server/tasks.js';
+import { CHANGE_CASES } from './task-cases.js';
 
 const AT = '2026-10-23T09:00:00.000Z';
 const doneKeys = new Set(['A-1']);
@@ -36,10 +36,6 @@ test('a status change sets what goes with it', () => {
 
 test('the holder changes anything; others what the rules open to them', () => {
   for (const [t, me, patch, override, want, why] of CHANGE_CASES) assert.equal(mayChange(t, me, patch, override), want, why);
-});
-
-test('a stored task is always in a state the rules allow', () => {
-  for (const [t, fx, why] of NORMAL_CASES) assert.deepEqual(normalTask(t), fx, why);
 });
 
 test('the agents\' protocol lists exactly the task fields', () => {

@@ -1,6 +1,6 @@
-// Cases for the task rules, written from the board rules. tests/tasks.test.js runs them against server/tasks.js, and
-// tests/server.test.js runs them through each database's write path, so the rules in JavaScript and in SQL can't
-// drift apart. People are 'ana' and 'ben'; a database run maps them to two real members.
+// Cases for who may change a task, written from the board rules. tests/tasks.test.js runs them against
+// server/tasks.js, and tests/server.test.js runs them through each database's write path, so the rules in JavaScript
+// and in SQL can't drift apart. People are 'ana' and 'ben'; a database run maps them to two real members.
 
 const AT = '2026-10-23T09:00:00.000Z';
 const doing = { status: 'doing', claimedBy: { who: 'ana' } };
@@ -27,11 +27,3 @@ export const CHANGE_CASES = [
   [doing, 'ben', { spec: 'docs/other.md' }, false, false, 'its details are the holder\'s'],
 ];
 
-// [stored task, what the database keeps changed, why]
-export const NORMAL_CASES = [
-  [{ status: 'todo', owner: 'ana', claimedBy: { who: 'ana' } }, { claimedBy: null }, 'a todo task with a claim is assigned, not started'],
-  [{ status: 'todo', claimedBy: { who: 'ana' } }, { claimedBy: null, owner: 'ana' }, 'and the claimer becomes its owner'],
-  [{ status: 'doing', doneAt: AT, archivedAt: AT }, { doneAt: null, archivedAt: null }, 'only done work has a done or archive day'],
-  [{ status: 'done', doneAt: AT, archivedAt: AT }, {}, 'done work keeps both'],
-  [{ status: 'doing', owner: 'ana', claimedBy: { who: 'ana' } }, {}, 'a started claim stays'],
-];

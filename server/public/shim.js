@@ -324,10 +324,11 @@
         id: id,
         path: path,
         get: function () { return tr.plain([], one).then(function (rows) { return docSnap(rows[0] || null); }, function (e) { throw boardError(e); }); },
-        set: function (data) { return write({ op: 'set', path: path, data: copy(data) }); },
+        // { override: true }: a person's deliberate change to a task someone else holds (the database checks the rest)
+        set: function (data, o) { return write({ op: 'set', path: path, data: copy(data), override: !!(o && o.override) }); },
         // { ifVersion }: write only if the document is still the version read (a claim two people make at once)
         update: function (patch, o) {
-          var w = { op: 'update', path: path, data: copy(patch) };
+          var w = { op: 'update', path: path, data: copy(patch), override: !!(o && o.override) };
           if (o && typeof o.ifVersion === 'number') w.if_version = o.ifVersion;
           return write(w);
         },
