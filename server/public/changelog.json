@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.14.1",
+      "date": "2026-10-23",
+      "prs": [
+        34
+      ],
+      "lines": {
+        "en": [
+          "board_start's \"to review\" lines name who to ask and leave out what the header and the PR already say, and board_claim on finished work says it is done without naming a holder."
+        ],
+        "ko": [
+          "board_start의 \"to review\" 줄이 누구에게 물어볼지 알려 주고, 머리말과 PR에 이미 있는 것은 빼요. 끝난 태스크를 board_claim하면 맡은 사람 없이 끝났다고만 말해요."
+        ]
+      }
+    },
+    {
       "version": "1.14.0",
       "date": "2026-10-23",
       "prs": [
