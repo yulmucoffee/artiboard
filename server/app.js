@@ -133,7 +133,6 @@ export function makeApp({ store, cfg }) {
     const b = (await body(req)) || {};
     if (action === 'read') return send(res, 200, await store.readRows(project, b));
     if (action === 'batch') return send(res, 200, await store.apply(member.uid, project, b.writes));
-    if (action === 'acquire') return send(res, 200, { acquired: await store.acquire(member.uid, project, b.path, b.holder, b.ttlMs) });
     send(res, 404, { error: 'not_found' });
   }
 
@@ -229,7 +228,7 @@ export function makeApp({ store, cfg }) {
         }
         return send(res, 200, await store.overview());
       }
-      const m = /^p\/([a-z0-9][a-z0-9-]{0,39})\/(read|batch|acquire|events)$/.exec(name);
+      const m = /^p\/([a-z0-9][a-z0-9-]{0,39})\/(read|batch|events)$/.exec(name);
       if (m && store.readRows) return await docs(req, res, member, m[1], m[2]);
       send(res, 404, { error: 'not_found' });
     } catch (e) {

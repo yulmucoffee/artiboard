@@ -831,8 +831,6 @@ for (const backend of backends) {
         const since = rows.map((r) => r.updated_at).sort().pop();
         const changed = await (await api(`/api/p/${P}/read`, { method: 'POST', cookie, body: { collections: [C], since } })).json();
         assert.deepEqual(changed.map((r) => r.doc_id), ['live']);
-        assert.deepEqual(await (await api(`/api/p/${P}/acquire`, { method: 'POST', cookie, body: { path: 'people/x', holder: 'a', ttlMs: 2000 } })).json(), { acquired: true });
-        assert.deepEqual(await (await api(`/api/p/${P}/acquire`, { method: 'POST', cookie, body: { path: 'people/x', holder: 'b', ttlMs: 2000 } })).json(), { acquired: false });
 
         const cross = await api(`/api/p/${P}/batch`, { method: 'POST', cookie, headers: { Origin: 'https://evil.example' }, body: { writes: [{ op: 'delete', path: `${C}/live` }] } });
         assert.equal(cross.status, 403, 'other sites cannot write with the cookie');
@@ -846,7 +844,7 @@ for (const backend of backends) {
         assert.equal((await api('/api/login', { method: 'POST', body: { code } })).status, 401, 'a link works once');
       });
 
-      test('revoking a token signs the member out; leases and logout are guarded', async () => {
+      test('revoking a token signs the member out; page writes and logout are guarded', async () => {
         const extra = await store.addMember({ person: `rev${R}`, role: 'member' });
         people.revoked = extra;
         const token = await store.issueToken(extra.uid, 'test');
@@ -858,10 +856,9 @@ for (const backend of backends) {
         assert.equal((await api('/api/login', { method: 'POST', body: { code: /#ab-code=(.+)$/.exec(url)[1] } })).status, 401, 'unused links die too');
 
         const viewer = (await api('/api/login', { method: 'POST', body: { token: tokens.viewer } })).headers.get('set-cookie').split(';')[0];
-        assert.equal((await api(`/api/p/${P}/acquire`, { method: 'POST', cookie: viewer, body: { path: 'people/x', holder: 'v' } })).status, 403);
+        assert.equal((await api(`/api/p/${P}/batch`, { method: 'POST', cookie: viewer, headers: { Origin: BASE }, body: { writes: [{ op: 'set', path: `${C}/v`, data: {} }] } })).status, 403);
         const admin = (await api('/api/login', { method: 'POST', body: { token: tokens.admin } })).headers.get('set-cookie').split(';')[0];
-        assert.equal((await api('/api/p/no-such-project/acquire', { method: 'POST', cookie: admin, body: { path: 'people/x', holder: 'a' } })).status, 404);
-        assert.equal((await api(`/api/p/${P}/acquire`, { method: 'POST', cookie: admin, body: { path: 'x'.repeat(900), holder: 'a' } })).status, 400);
+        assert.equal((await api('/api/p/no-such-project/batch', { method: 'POST', cookie: admin, headers: { Origin: BASE }, body: { writes: [{ op: 'set', path: `${C}/a`, data: {} }] } })).status, 404);
         assert.equal((await api(`/api/p/${P}/read`, { method: 'POST', cookie: admin, body: { whole: Array.from({ length: 30 }, (_, i) => `c${i}`) } })).status, 400);
         assert.equal((await api('/api/logout', { cookie: admin })).status, 405, 'no logging people out with a link');
       });
