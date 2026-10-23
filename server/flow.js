@@ -63,6 +63,9 @@ function detailLines(det) {
   ].filter(Boolean);
 }
 
+// how much of a person's own work board_start prints: lines for work at hand, keys for work in review
+const MINE_LINES = 20, MINE_KEYS = 30;
+
 export function makeFlow(store) {
   const get = (project, path) => store.get(project, path);
   const query = (project, collection, opts) => store.query(project, collection, opts);
@@ -82,6 +85,17 @@ export function makeFlow(store) {
     if (!hits.length) throw new BoardError('not_found', `no project lists ${want}; board_projects shows each project's repos`);
     if (hits.length > 1) throw new BoardError('invalid_argument', `${want} is on ${hits.join(', ')}; pass project`);
     return hits[0];
+  }
+
+  // The rest of a query whose first page came back full (200, a page's most), page by page: a list cut short would drop
+  // someone's work without saying so. Boards smaller than a page pay nothing.
+  async function rest(project, first, { collection, where }) {
+    const all = first.slice();
+    for (let page = first; page.length === 200 && all.length < 5000;) {
+      page = await query(project, collection, { where, limit: 200, after: page[page.length - 1].id });
+      all.push(...page);
+    }
+    return all;
   }
 
   // Which of these task keys are done, in one round trip however many there are.
@@ -127,15 +141,17 @@ export function makeFlow(store) {
     const reads = [
       { path: 'meta/config' },
       { path: `cursors/${me}` },
-      { collection: 'tasks', where: [{ field: 'owner', op: '==', value: me }], limit: 50 },
+      { collection: 'tasks', where: [{ field: 'owner', op: '==', value: me }], limit: 200 },
       ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'todo' }], limit: 200 },
       rules && { path: 'meta/rules' },
       rules && { path: 'meta/notes' },
       { collection: 'notices', order: [{ field: 'at', dir: 'desc' }], limit: 20 },
-      ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'review' }], limit: 50 },
+      ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'review' }], limit: 200 },
     ];
     const got = await read(project, reads.filter(Boolean));
-    const [config, cursor, owned, todo = [], own = null, notes = null, latest, inReview = []] = reads.map((r) => (r ? got.shift() : undefined));
+    const [config, cursor, firstOwned, firstTodo = [], own = null, notes = null, latest, firstReview = []] = reads.map((r) => (r ? got.shift() : undefined));
+    const [owned, todo, inReview] = await Promise.all([[firstOwned, reads[2]], [firstTodo, reads[3]], [firstReview, reads[7]]]
+      .map(([first, r]) => (r ? rest(project, first, r) : first)));
     // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
     const mine = owned.filter((t) => (t.data.status || 'todo') !== 'done');
     // the 20 latest notices: those after the cursor are new (all 20 new: older ones went unread); no cursor yet, the latest 5
@@ -173,16 +189,22 @@ export function makeFlow(store) {
     }
     out.push(notices.length ? `notices${since ? (notices.length === latest.length ? ' (new, the latest 20; older ones skipped)' : ' (new)') : ' (latest)'}:` : 'notices: none new');
     notices.forEach((n) => out.push(msgLine(n.data)));
-    // where someone else wrote last (a question, a review, an override), so the holder opens that thread first;
-    // work in review waits on others, so it is one line of keys
+    // where someone else wrote last (a question, a review, an override) first, so the holder opens that thread first,
+    // then work under way before work not started; work in review waits on others, so it is one line of keys. A person
+    // holding a great many sees the first ones and how many more, not a page per session.
     const other = (d) => d.lastMessageBy && d.lastMessageBy !== me ? d.lastMessageBy : null;
+    const rank = (d) => (other(d) ? 0 : 1) * 10 + ({ doing: 0, blocked: 1, todo: 3 }[statusOf(d)] ?? 2);
     const byKey = (a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id);
-    const working = mine.filter((t) => t.data.status !== 'review').sort(byKey), waiting = mine.filter((t) => t.data.status === 'review').sort(byKey);
+    const working = mine.filter((t) => t.data.status !== 'review').sort((a, b) => rank(a.data) - rank(b.data) || byKey(a, b));
+    const waiting = mine.filter((t) => t.data.status === 'review').sort((a, b) => (other(a.data) ? 0 : 1) - (other(b.data) ? 0 : 1) || byKey(a, b));
     if (working.length) {
-      out.push('mine:');
-      working.forEach((t) => out.push(`${taskLine(t.data, t.id, true)}${other(t.data) ? ` · ${other(t.data)} wrote last` : ''}`));
+      out.push(working.length > MINE_LINES ? `mine (${MINE_LINES} of ${working.length}):` : 'mine:');
+      working.slice(0, MINE_LINES).forEach((t) => out.push(`${taskLine(t.data, t.id, true)}${other(t.data) ? ` · ${other(t.data)} wrote last` : ''}`));
     }
-    if (waiting.length) out.push(`mine in review (${waiting.length}): ${waiting.map((t) => `${t.data.key || t.id}${other(t.data) ? ` (${other(t.data)} wrote last)` : ''}`).join(', ')}`);
+    if (waiting.length) {
+      const keys = waiting.slice(0, MINE_KEYS).map((t) => `${t.data.key || t.id}${other(t.data) ? ` (${other(t.data)} wrote last)` : ''}`);
+      out.push(`mine in review (${waiting.length}): ${keys.join(', ')}${waiting.length > MINE_KEYS ? `, and ${waiting.length - MINE_KEYS} more` : ''}`);
+    }
     if (ready) {
       const more = elsewhere ? `; ${elsewhere} more in other repos` : '';
       out.push(free.length ? `ready (${free.length > ready ? `${ready} of ` : ''}${free.length}${more}):` : `ready: none${more}`);
