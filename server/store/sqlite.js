@@ -201,8 +201,9 @@ export function openSqlite({ file, boardUrl }) {
       touched.push({ collection: c, doc_id: d, data: text, version, updated_at: at });
       return { path: w.path, version };
     }));
+    // the poll still looks from where it was: moving it past this write would skip another process's rows written just
+    // before; it re-announces this process's own, which pages drop by version
     for (const t of touched) changes.emit(project, t.gone ? t : rowOut(t));
-    seen = last;
     return out;
   }
 

@@ -4,7 +4,7 @@
 // (`supabase start` gives a local one); it adds a smoke-<random> project and members, and removes them afterwards.
 // Run: npm test
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
+import { createServer, request } from 'node:http';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +14,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { makeApp } from '../server/app.js';
 import { loadConfig, openStore } from '../server/config.js';
 import { toBoardError } from '../server/core.js';
+import { openSqlite } from '../server/store/sqlite.js';
 import { entryFor, setPerson } from '../server/members.js';
 import { CHANGE_CASES } from './task-cases.js';
 
@@ -358,6 +359,54 @@ for (const backend of backends) {
         assert.match(s, /^mine \(20 of \d+\):$/m, 'a person holding many sees the first 20 and how many'); 
       } finally {
         for (let i = 0; i < writes.length; i += 100) await store.apply(null, P, writes.slice(i, i + 100).map((w) => ({ op: 'delete', path: w.path })));
+      }
+    });
+
+    test('a request body split inside a character arrives whole, and one that is not JSON is refused', async (t) => {
+      if (store.kind !== 'sqlite') return t.skip('the page API signs in with a cookie on SQLite sites; the body reader is the same on both');
+      const cookie = (await api('/api/login', { method: 'POST', body: { token: tokens.member } })).headers.get('set-cookie').split(';')[0];
+      const text = '한글 메모', path = `${C}/utf-${R}`;
+      const payload = Buffer.from(JSON.stringify({ writes: [{ op: 'set', path, data: { text } }] }));
+      const cut = payload.indexOf(Buffer.from('글')) + 1;
+      const status = await new Promise((resolve, reject) => {
+        const req = request(`${BASE}/api/p/${P}/batch`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': payload.length, Cookie: cookie, Origin: BASE } },
+          (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+        req.on('error', reject);
+        req.write(payload.subarray(0, cut));
+        setTimeout(() => req.end(payload.subarray(cut)), 20);
+      });
+      assert.equal(status, 200);
+      assert.equal((await store.get(P, path)).data.text, text, 'a character split across two chunks');
+      const bad = await fetch(`${BASE}/api/p/${P}/batch`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie, Origin: BASE }, body: '{"writes": [' });
+      assert.equal(bad.status, 400, 'a body that is not JSON is refused, not read as {}');
+    });
+
+    test('nothing is lost on the way out: the message posted with a summary, and paging an ordered list', async () => {
+      const at = new Date().toISOString();
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `tasks/${K('sm')}`, data: { key: K('sm'), title: 'summary', status: 'todo', deps: [], waitingOn: [], updatedAt: at } }] });
+      await call(board, 'board_claim', { project: P, id: K('sm') });
+      await call(board, 'board_post', { project: P, task: K('sm'), text: 'fix: the expired token returns 500', status: 'review', summary: 'state: almost' });
+      assert.match((await call(board, 'board_task', { project: P, id: K('sm') })).value, /fix: the expired token returns 500$/m, 'the message posted with the summary shows');
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `tasks/${K('sm')}` }] });
+
+      // paging an ordered list is refused instead of returning page 1 again
+      const paged = await call(board, 'board_query', { project: P, collection: 'notices', order_by: [{ field: 'at' }], limit: 1, after: 'x' });
+      assert.equal(paged.value.code, 'invalid_argument');
+    });
+
+    test('a write from another process reaches open pages even when this one writes right after', async (t) => {
+      if (store.kind !== 'sqlite') return t.skip('SQLite only: two processes on one file');
+      const other = await openSqlite({ file: join(dir, 'board.db'), boardUrl: BASE });
+      const seen = [];
+      const stop = store.subscribe(P, (row) => seen.push(`${row.collection}/${row.doc_id}`));
+      try {
+        await other.apply(null, P, [{ op: 'set', path: `${C}/cli-${R}`, data: { from: 'cli' } }]);
+        await store.apply(null, P, [{ op: 'set', path: `${C}/site-${R}`, data: { from: 'site' } }]);
+        await new Promise((r) => setTimeout(r, 2600));
+        assert.ok(seen.includes(`${C}/cli-${R}`), `the other process's write was announced (${seen.join(', ')})`);
+      } finally {
+        stop?.();
+        other.close();
       }
     });
 

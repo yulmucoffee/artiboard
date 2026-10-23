@@ -22,7 +22,7 @@ Read only what the job needs. Never list `tasks` or a whole thread.
 
 - **On start:** `get meta/rules`, `get cursors/<person>`, then `query notices` where `at > noticesAt`, `order_by at asc`, `limit 20`. With no cursor, `order_by at desc`, `limit 10`.
 - **Finding work:** `query tasks` where `status == "todo"` and `waitingOn == []`, `limit 20`, and skip tasks with an `owner` other than you (an assignment holds a task like a claim); prefer the tasks of the repository you are in. After choosing, `get details/<id>`.
-- **Continuing a task:** `get tasks/<id>` and `get details/<id>` (read the summary first). For the thread, `query tasks/<id>/messages` with `order_by at desc`, `limit 8`. Only messages after `summaryAt` are new to you.
+- **Continuing a task:** `get tasks/<id>` and `get details/<id>` (read the summary first). For the thread, `query tasks/<id>/messages` with `order_by at desc`, `limit 8`. Messages at or after `summaryAt` are new to you (one posted with the summary carries its time).
 
 ## Writing
 

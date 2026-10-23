@@ -40,15 +40,21 @@ function fail(res, e) {
   send(res, STATUS[err.code] || 503, { code: err.code, index: err.index, message: err.message });
 }
 
+// The request's JSON. The bytes are decoded once, whole: a character split across two chunks would otherwise be
+// stored as U+FFFD. A body that is not JSON is refused rather than read as nothing.
 async function body(req) {
-  if (req.body !== undefined) return typeof req.body === 'string' ? JSON.parse(req.body || 'null') : req.body;
-  let raw = '', size = 0;
+  const parse = (raw) => {
+    try { return raw ? JSON.parse(raw) : undefined; } catch { throw new BoardError('invalid_argument', 'the request body is not JSON'); }
+  };
+  if (req.body !== undefined) return typeof req.body === 'string' ? parse(req.body) : req.body;
+  const chunks = [];
+  let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
     if (size > MAX_BODY) throw new BoardError('invalid_argument', 'request too large');
-    raw += chunk;
+    chunks.push(chunk);
   }
-  try { return raw ? JSON.parse(raw) : undefined; } catch { return undefined; }
+  return parse(Buffer.concat(chunks).toString('utf8'));
 }
 
 const bearer = (req) => /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '')?.[1] || null;

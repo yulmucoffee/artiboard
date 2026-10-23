@@ -1,6 +1,6 @@
 {
   "name": "artiboard",
-  "version": "1.13.3",
+  "version": "1.13.4",
   "description": "A shared task board for people and their coding agents: a claude.ai artifact, or self-hosted on SQLite or Supabase with an MCP server for Claude Code and Codex.",
   "license": "MIT",
   "type": "module",
