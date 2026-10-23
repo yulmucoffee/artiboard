@@ -123,7 +123,7 @@ end $$;
 
 
 -- a todo task with a claim was assigned, not started: the rules already treat its claimer as the holder, and this
--- states it the way the page and the tools write it (found on one board, 21 tasks, each claimed by its owner)
+-- states it the way the page and the tools write it (seen on a real board, each such task claimed by its owner)
 update public.ab_docs
 set data = data || jsonb_build_object('claimedBy', null, 'owner', coalesce(nullif(data->>'owner', ''), data->'claimedBy'->>'who')),
     version = version + 1, updated_at = now()
