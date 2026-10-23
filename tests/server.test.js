@@ -87,6 +87,13 @@ for (const backend of backends) {
       assert.ok(!JSON.stringify(tools).includes('$schema'), 'listed schemas carry no boilerplate');
       assert.ok(!JSON.stringify(tools).includes('"pattern"'), 'nor patterns zod enforces on the call');
       assert.ok(JSON.stringify(tools).length < 7200, `every session reads the listing, so it stays small (${JSON.stringify(tools).length} chars)`);
+      const other = await connect(tokens.member);
+      try {
+        assert.deepEqual((await other.listTools()).tools, tools, 'the listing is the same for every member, so a prompt cache keeps it');
+        assert.equal(other.getInstructions(), board.getInstructions(), 'and so are the instructions');
+      } finally {
+        await other.close();
+      }
       const me = (await call(board, 'board_whoami')).value;
       assert.equal(me.person, people.admin.person);
       assert.equal(me.backend, backend.name);
@@ -195,6 +202,35 @@ for (const backend of backends) {
       assert.equal((await call(board, 'board_get', { project: P, path: `tasks/${K(1)}` })).value.data.doneAt, undefined, 'leaving done clears doneAt');
     });
 
+    test('a reviewer finishes a task in review, and an agent changes or takes over another\'s task only with override', async () => {
+      const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
+      const task = (n) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `held ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at } });
+      await call(board, 'board_batch', { project: P, writes: [task('h1'), task('h2')] });
+      await call(board, 'board_claim', { project: P, id: K('h1') });
+      await call(board, 'board_claim', { project: P, id: K('h2') });
+      await call(board, 'board_post', { project: P, task: K('h1'), status: 'review', pr: 'https://example.com/pr/2' });
+      const last = async (n) => (await call(board, 'board_query', { project: P, collection: `tasks/${K(n)}/messages`, order_by: [{ field: 'at', dir: 'desc' }], limit: 1, fields: ['text', 'author'] })).value.docs[0].data;
+
+      const other = await connect(tokens.member);
+      try {
+        assert.match((await call(other, 'board_post', { project: P, task: K('h1'), status: 'done', branch: 'x' })).value, /^not_yours: .*review it/, 'a reviewer changes only the status');
+        assert.equal((await call(other, 'board_post', { project: P, task: K('h1'), text: 'merged', status: 'done' })).value, `ok ${K('h1')} → done`);
+        assert.match((await call(other, 'board_task', { project: P, id: K('h1'), thread: 0 })).value, new RegExp(`^${K('h1')} done · ${me} \\(agent\\)`), 'the holder keeps the credit');
+        assert.match((await call(other, 'board_post', { project: P, task: K('h1'), status: 'doing' })).value, /^not_yours: .*override true/, 'out of review it is the holder\'s again');
+        assert.equal((await call(other, 'board_post', { project: P, task: K('h1'), text: 'reopened for the fix', status: 'doing', override: true })).value, `ok ${K('h1')} → doing`);
+        assert.deepEqual(await last('h1'), { text: `reopened for the fix (override; held by ${me})`, author: them }, 'the thread names the holder');
+
+        assert.match((await call(other, 'board_claim', { project: P, id: K('h2') })).value, /^taken: /);
+        assert.equal((await call(other, 'board_claim', { project: P, id: K('h2'), text: 'taking this', override: true })).value, `took over ${K('h2')} from ${me}`);
+        assert.match((await call(other, 'board_task', { project: P, id: K('h2'), thread: 0 })).value, new RegExp(`^${K('h2')} doing · ${them} \\(agent\\)`));
+        assert.equal((await last('h2')).text, `taking this (taken over from ${me})`);
+        await call(board, 'board_post', { project: P, task: K('h1'), status: 'done' });
+        assert.match((await call(other, 'board_claim', { project: P, id: K('h1'), override: true })).value, /^taken: /, 'a done task is not taken over');
+      } finally {
+        await other.close();
+      }
+    });
+
     test('the start lists what was assigned to you and repairs readiness from the deps themselves', async () => {
       const at = new Date().toISOString(), me = people.admin.person;
       const task = (n, data) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `drift ${n}`, status: 'todo', deps: [], updatedAt: at, ...data } });
@@ -245,6 +281,8 @@ for (const backend of backends) {
       assert.match(s, new RegExp(`^${people.admin.person} · ${P}`), 'the remote finds the project');
       assert.match(s, new RegExp(`^repos: ${api} \\(api\\) · ${web}$`, 'm'));
       assert.match(s, /^board rules \(every board\):$/m);
+      const rules = /^board rules \(every board\):\n(?:- .*\n)+/m.exec(s)[0];
+      assert.ok(rules.length < 1800, `every session that does board work reads the board rules once, so they stay short (${rules.length} chars)`);
       assert.match(s, new RegExp(`^project rules \\(rev 2 · ${people.admin.person} \\d\\d-\\d\\d\\):\n1\\. Roles\n- the api is ours$`, 'm'));
       assert.match(s, new RegExp(`^${K('r1')} \\[?.*repo:api.* repo 1$`, 'm'));
       assert.match(s, new RegExp(`^${K('r3')} repo 3$`, 'm'), 'tasks that name no repo are anyone\'s');

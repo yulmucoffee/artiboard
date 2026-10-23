@@ -198,33 +198,38 @@ export function makeFlow(store) {
   }
 
   // Claim a ready task and post the claim, then hand back its details so work can start at once.
-  async function claim(member, project, id, { text, session } = {}) {
+  // override takes over a task someone else holds (not a done one), when the agent's person says so.
+  async function claim(member, project, id, { text, session, override } = {}) {
     const me = member.person;
     const [det, config] = await Promise.all([get(project, `details/${id}`), get(project, 'meta/config')]);
     const result = await retrying(async () => {
       const t = await get(project, `tasks/${id}`);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
       const d = t.data, status = d.status || 'todo', holder = holderOf(d);
-      if (d.claimedBy?.who === me && status !== 'todo') return 'already yours';
-      if (status !== 'todo' || d.claimedBy) throw new BoardError('taken', `${d.key || id} is ${status}${holder ? `, held by ${holder}` : ''}; pick another`);
-      if (d.waitingOn?.length) throw new BoardError('waiting', `${d.key || id} waits on ${d.waitingOn.join(', ')}`);
+      if (d.claimedBy?.who === me && status !== 'todo') return `already yours ${id}`;
+      const held = status !== 'todo' || !!d.claimedBy;
+      if (held && (!override || status === 'done')) throw new BoardError('taken', `${d.key || id} is ${status}${holder ? `, held by ${holder}` : ''}; pick another`);
+      if (!held && d.waitingOn?.length) throw new BoardError('waiting', `${d.key || id} waits on ${d.waitingOn.join(', ')}`);
+      const from = held && holder && holder !== me ? holder : null;
       const at = now();
       await apply(member, project, [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: {
           status: 'doing', owner: me, claimedBy: { who: me, agent: true, ...(session && { session }), at }, updatedAt: at, lastMessageAt: at } },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
-          at, author: me, kind: 'agent', type: 'update', text: text || CLAIMED[config?.data?.lang] || CLAIMED.en } },
+          at, author: me, kind: 'agent', type: 'update', text: (text || CLAIMED[config?.data?.lang] || CLAIMED.en) + (from ? ` (taken over from ${from})` : '') } },
       ]);
-      return 'claimed';
+      return from ? `took over ${id} from ${from}` : `claimed ${id}`;
     });
-    return [`${result} ${id}`, ...detailLines(det)].join('\n');
+    return [result, ...detailLines(det)].join('\n');
   }
 
   // A thread message, optionally with a status, branch, PR, start or due day, repo or summary change; without a task, a notice.
-  // Only the task's holder changes it, except its due day, which anyone may move (the thread records who and from what).
+  // Only the task's holder changes it, except: anyone moves its due day (the thread records who and from what), anyone
+  // reviews a task in review (status done after the merge, or doing to send it back, with a summary), and override,
+  // passed when the agent's person says so, opens the rest (the thread names the holder).
   // status todo releases the task (no holder, no owner). status done stamps doneAt (leaving done clears it) and takes
   // the key out of every dependent's waitingOn.
-  async function post(member, project, { task: id, text, type, status, branch, pr, start, due, repo, summary }) {
+  async function post(member, project, { task: id, text, type, status, branch, pr, start, due, repo, summary, override }) {
     const me = member.person;
     if (!id) {
       if (status || branch !== undefined || pr !== undefined || start !== undefined || due !== undefined || repo !== undefined || summary !== undefined) {
@@ -242,8 +247,11 @@ export function makeFlow(store) {
       const [t, det] = await Promise.all([get(project, `tasks/${id}`), summary !== undefined ? get(project, `details/${id}`) : null]);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
       const d = t.data, key = d.key || id, holder = holderOf(d);
-      if (holderOnly && holder && holder !== me) {
-        throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day; ask in its thread or your person for the rest`);
+      const theirs = holderOnly && holder && holder !== me;
+      const review = d.status === 'review' && (status === 'done' || status === 'doing')
+        && branch === undefined && pr === undefined && start === undefined && repo === undefined;
+      if (theirs && !override && !review) {
+        throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day${d.status === 'review' ? ', or review it (status done or doing)' : ''}; for the rest ask in its thread, or override true when your person tells you to`);
       }
       const at = now();
       const patch = { updatedAt: at, lastMessageAt: at };
@@ -257,12 +265,12 @@ export function makeFlow(store) {
       if (due !== undefined) patch.due = due || null;
       if (repo !== undefined) patch.repo = repo || null;
       // with no text, the thread still says what changed
-      const said = text?.trim() || [
+      const said = `${text?.trim() || [
         status && `status ${status}`, branch !== undefined && `branch ${branch || 'none'}`, pr !== undefined && `pr ${pr || 'none'}`,
         start !== undefined && `start ${start || 'none'}${day(d.start) ? ` (was ${d.start})` : ''}`,
         due !== undefined && `due ${due || 'none'}${day(d.due) ? ` (was ${d.due})` : ''}`,
         repo !== undefined && `repo ${repo || 'none'}`, summary !== undefined && 'summary updated',
-      ].filter(Boolean).join(' · ') || 'updated';
+      ].filter(Boolean).join(' · ') || 'updated'}${theirs && !review ? ` (override; held by ${holder})` : ''}`;
       const writes = [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: patch },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
