@@ -48,14 +48,15 @@ export function checkField(field) {
 }
 
 // What a member who is not an admin may not write, whatever the path to the store:
-// who is who (people/, meta/config.people) beyond linking their own account once, posts under another name, and
-// someone else's posts.
+// who is who (people/, meta/config.people) beyond linking their own account to their own person once, someone
+// else's notice cursor, posts under another name or none, and someone else's posts.
 // Supabase's ab_apply (supabase/migrations) enforces the same.
 export function guardWrite(actor, w, collection, docId, cur, payload, index) {
   const deny = (why) => { throw new BoardError('permission_denied', why, index); };
-  if (collection === 'people' && (w.op !== 'set' || payload.uid !== actor.uid || cur?.uid)) {
-    deny('only admins change people/; a member links only their own account to an unlinked person');
+  if (collection === 'people' && (w.op !== 'set' || docId !== actor.person || payload.uid !== actor.uid || cur?.uid)) {
+    deny('only admins change people/; a member links only their own account to their own person, once');
   }
+  if (collection === 'cursors' && docId !== actor.person) deny(`a member moves only their own cursor (cursors/${actor.person})`);
   const samePeople = (v) => JSON.stringify(v) === JSON.stringify(cur?.people);
   if (collection === 'meta' && docId === 'config' && (w.op === 'delete' || !cur
       || (w.op === 'set' && !samePeople(payload.people)) || (w.op === 'update' && 'people' in payload && !samePeople(payload.people)))) {
@@ -64,7 +65,7 @@ export function guardWrite(actor, w, collection, docId, cur, payload, index) {
   if (collection === 'notices' || /^tasks\/[^/]+\/messages$/.test(collection)) {
     // a post is its author's: the thread is the record of who did what, overrides included
     if (cur && cur.author !== actor.person) deny(`only ${cur.author || 'its author'} changes or deletes this post`);
-    if (w.op !== 'delete' && 'author' in payload && payload.author !== actor.person) deny(`author must be your own person (${actor.person})`);
+    if ((w.op === 'set' || 'author' in payload) && payload.author !== actor.person) deny(`author must be your own person (${actor.person})`);
   }
 }
 

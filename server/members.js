@@ -5,15 +5,20 @@ import { BoardError, now, toBoardError } from './core.js';
 
 // Put a person on a project's board or take them off. An existing entry keeps its name and role unless new ones are given.
 export async function setPerson(store, project, m, entry) {
-  const cfg = await store.get(project, 'meta/config');
-  const people = Array.isArray(cfg?.data.people) ? cfg.data.people : [];
-  const old = people.find((p) => p && p.id === m.person);
-  const next = people.filter((p) => !p || p.id !== m.person);
-  if (entry) next.push({ ...old, ...entry });
-  await store.apply(null, project, [
-    cfg ? { op: 'update', path: 'meta/config', data: { people: next }, if_version: cfg.version } : { op: 'set', path: 'meta/config', data: { people: next } },
-    entry ? { op: 'set', path: `people/${m.person}`, data: { uid: m.uid, at: now() } } : { op: 'delete', path: `people/${m.person}` },
-  ]);
+  // a board may be saved on its page between the read and the write: read again once
+  for (let attempt = 0; ; attempt++) {
+    const cfg = await store.get(project, 'meta/config');
+    const people = Array.isArray(cfg?.data.people) ? cfg.data.people : [];
+    const old = people.find((p) => p && p.id === m.person);
+    const next = people.filter((p) => !p || p.id !== m.person);
+    if (entry) next.push({ ...old, ...entry });
+    try {
+      return await store.apply(null, project, [
+        cfg ? { op: 'update', path: 'meta/config', data: { people: next }, if_version: cfg.version } : { op: 'set', path: 'meta/config', data: { people: next } },
+        entry ? { op: 'set', path: `people/${m.person}`, data: { uid: m.uid, at: now() } } : { op: 'delete', path: `people/${m.person}` },
+      ]);
+    } catch (e) { if (attempt || toBoardError(e).code !== 'version_conflict') throw e; }
+  }
 }
 export const entryFor = (m, name) => ({ id: m.person, uid: m.uid, ...(name && { name }) });
 
