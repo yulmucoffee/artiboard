@@ -195,15 +195,14 @@ export function makeFlow(store) {
 
   // One task with what an agent needs to continue it: status, details, and the messages after the summary.
   async function task(project, id, { thread = 8 } = {}) {
-    const [t, det] = await Promise.all([get(project, `tasks/${id}`), get(project, `details/${id}`)]);
+    // the latest messages come in the same round trip, then those before the summary drop out: the same messages a
+    // query after the summary time would give, one round trip sooner
+    const [t, det, latest] = await Promise.all([get(project, `tasks/${id}`), get(project, `details/${id}`),
+      thread ? query(project, `tasks/${id}/messages`, { order: [{ field: 'at', dir: 'desc' }], limit: thread }) : []]);
     if (!t) throw new BoardError('not_found', `no task ${id}`);
     const d = t.data;
     const since = det?.data?.summaryAt;
-    const msgs = thread
-      ? (await query(project, `tasks/${id}/messages`, {
-          where: since ? [{ field: 'at', op: '>', value: since }] : [], order: [{ field: 'at', dir: 'desc' }], limit: thread,
-        })).reverse()
-      : [];
+    const msgs = latest.filter((m) => !since || (typeof m.data.at === 'string' && m.data.at > since)).reverse();
     const who = d.claimedBy?.who ? `${d.claimedBy.who}${d.claimedBy.agent ? ' (agent)' : ''}` : d.owner || 'unassigned';
     const out = [`${d.key || id} ${d.status || 'todo'} · ${who}${d.repo ? ` · repo:${d.repo}` : ''}${d.branch ? ` · ${d.branch}` : ''}${d.pr ? ` · ${d.pr}` : ''}`, d.title || ''];
     if (d.deps?.length) out.push(`deps ${d.deps.join(', ')}${d.waitingOn?.length ? ` · waiting on ${d.waitingOn.join(', ')}` : ''}`);

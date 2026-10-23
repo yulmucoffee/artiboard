@@ -2,7 +2,7 @@
 // and Realtime keeps open pages current. The server talks to it with the service key, so every
 // function here is called only after the caller's token or session was checked.
 import { createClient } from '@supabase/supabase-js';
-import { BoardError, hashToken, isToken, newToken, now, PERSON_ID, PROJECT_ID, projectSeed, ROLES, toBoardError } from '../core.js';
+import { BoardError, hashToken, isToken, newToken, now, PERSON_ID, PROJECT_ID, projectSeed, ROLES, toBoardError, TOKEN_USE_EVERY_MS } from '../core.js';
 
 const memberOut = (r) => r && { uid: r.user_id, person: r.person, name: r.name, email: r.email, role: r.role };
 
@@ -58,10 +58,10 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
 
   async function memberForToken(token) {
     if (!isToken(token)) return null;
-    const r = check(await sb.from('ab_tokens').select('id, revoked_at, member:ab_members(user_id, email, person, name, role)')
+    const r = check(await sb.from('ab_tokens').select('id, revoked_at, last_used_at, member:ab_members(user_id, email, person, name, role)')
       .eq('token_hash', hashToken(token)).maybeSingle());
     if (!r || r.revoked_at || !r.member) return null;
-    await sb.from('ab_tokens').update({ last_used_at: now() }).eq('id', r.id);
+    if (!r.last_used_at || Date.now() - Date.parse(r.last_used_at) > TOKEN_USE_EVERY_MS) await sb.from('ab_tokens').update({ last_used_at: now() }).eq('id', r.id);
     return memberOut(r.member);
   }
   // the page's Supabase session, sent along when it calls the server
