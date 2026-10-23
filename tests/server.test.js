@@ -250,6 +250,7 @@ for (const backend of backends) {
         task('d3', { deps: [K('d1')], waitingOn: [K('d1')] }), // stale: d1 finished while no page was open
         task('d4', { deps: [K('d2')], waitingOn: [] }), // wrong the other way
         task('d5', { owner: me }), // assigned to me on the page, not started
+        task('d6', { owner: people.member.person }), // assigned to someone else
       ] })).error, false);
       const s = (await call(board, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
       assert.match(s, new RegExp(`^${K('d2')} drift d2$`, 'm'), 'ready without a waitingOn field');
@@ -257,6 +258,8 @@ for (const backend of backends) {
       assert.doesNotMatch(s, new RegExp(`^${K('d4')} `, 'm'), 'not ready although waitingOn is empty');
       assert.match(s, new RegExp(`^${K('d5')} todo drift d5$`, 'm'), 'an assigned task is listed as yours, with its status');
       assert.doesNotMatch(s, new RegExp(`^${K('d5')} drift d5$`, 'm'), 'and not as anyone\'s ready work');
+      assert.doesNotMatch(s, new RegExp(`^${K('d6')} `, 'm'), 'a task assigned to someone else is theirs, not ready work');
+      assert.match((await call(board, 'board_claim', { project: P, id: K('d6') })).value, /^taken: .*held by/, 'and is not claimed out from under them');
       const fixed = (await call(board, 'board_query', { project: P, collection: 'tasks', where: [{ field: 'key', op: 'in', value: [K('d2'), K('d3'), K('d4')] }], fields: ['waitingOn'] })).value.docs;
       assert.deepEqual(fixed.map((d) => d.data.waitingOn), [[], [], [K('d2')]], 'the start wrote the repairs');
 
