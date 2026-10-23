@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.11.2",
+      "date": "2026-10-23",
+      "prs": [
+        24
+      ],
+      "lines": {
+        "en": [
+          "A notice or a thread message stays its author's: other members can no longer change or delete it, so the record of who did what, overrides included, holds."
+        ],
+        "ko": [
+          "공지와 스레드 메시지는 쓴 사람만 고치거나 지울 수 있어요. 누가 무엇을 했는지, override 기록까지 그대로 남아요."
+        ]
+      }
+    },
+    {
       "version": "1.11.1",
       "date": "2026-10-23",
       "prs": [

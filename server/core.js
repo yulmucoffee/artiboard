@@ -48,8 +48,9 @@ export function checkField(field) {
 }
 
 // What a member who is not an admin may not write, whatever the path to the store:
-// who is who (people/, meta/config.people) beyond linking their own account once, and posts under another name.
-// The Supabase migration 20261023000000_guards.sql enforces the same in ab_apply.
+// who is who (people/, meta/config.people) beyond linking their own account once, posts under another name, and
+// someone else's posts.
+// Supabase's ab_apply (supabase/migrations) enforces the same.
 export function guardWrite(actor, w, collection, docId, cur, payload, index) {
   const deny = (why) => { throw new BoardError('permission_denied', why, index); };
   if (collection === 'people' && (w.op !== 'set' || payload.uid !== actor.uid || cur?.uid)) {
@@ -60,8 +61,10 @@ export function guardWrite(actor, w, collection, docId, cur, payload, index) {
       || (w.op === 'set' && !samePeople(payload.people)) || (w.op === 'update' && 'people' in payload && !samePeople(payload.people)))) {
     deny('only admins change meta/config.people');
   }
-  if ((collection === 'notices' || /^tasks\/[^/]+\/messages$/.test(collection)) && w.op !== 'delete' && 'author' in payload && payload.author !== actor.person) {
-    deny(`author must be your own person (${actor.person})`);
+  if (collection === 'notices' || /^tasks\/[^/]+\/messages$/.test(collection)) {
+    // a post is its author's: the thread is the record of who did what, overrides included
+    if (cur && cur.author !== actor.person) deny(`only ${cur.author || 'its author'} changes or deletes this post`);
+    if (w.op !== 'delete' && 'author' in payload && payload.author !== actor.person) deny(`author must be your own person (${actor.person})`);
   }
 }
 
