@@ -7,3 +7,4 @@ node_modules/
 *.db-wal
 supabase/.temp/
 .claude/launch.json
+.audit/

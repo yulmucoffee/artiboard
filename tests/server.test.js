@@ -5,7 +5,7 @@
 // Run: npm test
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
@@ -87,6 +87,10 @@ for (const backend of backends) {
       assert.ok(!JSON.stringify(tools).includes('$schema'), 'listed schemas carry no boilerplate');
       assert.ok(!JSON.stringify(tools).includes('"pattern"'), 'nor patterns zod enforces on the call');
       assert.ok(JSON.stringify(tools).length < 7200, `every session reads the listing, so it stays small (${JSON.stringify(tools).length} chars)`);
+      // the listing is the agents' protocol: it changes only on purpose, with UPDATE_SNAPSHOTS=1 npm test and the diff in review
+      const snap = new URL('./tools.snapshot.json', import.meta.url), now = JSON.stringify(tools, null, 1) + '\n';
+      if (process.env.UPDATE_SNAPSHOTS === '1') writeFileSync(snap, now);
+      assert.equal(now, readFileSync(snap, 'utf8'), 'the tool listing differs from tests/tools.snapshot.json; rerun with UPDATE_SNAPSHOTS=1 if the change is meant');
       const other = await connect(tokens.member);
       try {
         assert.deepEqual((await other.listTools()).tools, tools, 'the listing is the same for every member, so a prompt cache keeps it');

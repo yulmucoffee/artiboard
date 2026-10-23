@@ -81,7 +81,7 @@ function condition(w, params) {
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const docOut = (r) => ({ id: r.doc_id, path: `${r.collection}/${r.doc_id}`, version: r.version, updated_at: r.updated_at, data: JSON.parse(r.data) });
-export const rowOut = (r) => ({ collection: r.collection, doc_id: r.doc_id, version: r.version, updated_at: r.updated_at, data: JSON.parse(r.data) });
+const rowOut = (r) => ({ collection: r.collection, doc_id: r.doc_id, version: r.version, updated_at: r.updated_at, data: JSON.parse(r.data) });
 const memberOut = (r) => r && { uid: r.uid, person: r.person, name: r.name, email: r.email, role: r.role };
 
 export function openSqlite({ file, boardUrl }) {
