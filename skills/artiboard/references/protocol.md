@@ -21,7 +21,7 @@ This project's tasks, threads and notices are on {{BOARD_URL}}. Agents read and 
 Read only what the job needs. Never list `tasks` or a whole thread.
 
 - **On start:** `get meta/rules`, `get cursors/<person>`, then `query notices` where `at > noticesAt`, `order_by at asc`, `limit 20`. With no cursor, `order_by at desc`, `limit 10`.
-- **Finding work:** `query tasks` where `status == "todo"` and `waitingOn == []`, `limit 20`; prefer the tasks of the repository you are in. After choosing, `get details/<id>`.
+- **Finding work:** `query tasks` where `status == "todo"` and `waitingOn == []`, `limit 20`, and skip tasks with an `owner` other than you (an assignment holds a task like a claim); prefer the tasks of the repository you are in. After choosing, `get details/<id>`.
 - **Continuing a task:** `get tasks/<id>` and `get details/<id>` (read the summary first). For the thread, `query tasks/<id>/messages` with `order_by at desc`, `limit 8`. Only messages after `summaryAt` are new to you.
 
 ## Writing
@@ -29,7 +29,7 @@ Read only what the job needs. Never list `tasks` or a whole thread.
 Group the writes of one action into a single `batch`. For every document that already exists, pass the `version` you read as `if_version`.
 
 - **Claim:** one batch: update `tasks/<id>` to `{status: "doing", owner, claimedBy: {who, agent: true, session, at}, updatedAt}`; set a thread message with type `update`; set `cursors/<person>` to `{noticesAt}`. A failed batch writes nothing and names the entry that failed. If it is the task, someone else took it: pick again. If it is only your cursor, `get` it and retry once.
-- **Other people's tasks:** post in its thread. Its `due` is open to everyone: change it with a thread message saying from what to what. A task in `review` is open to its reviewer: status `done` after the merge, or `doing` with a message saying what to fix. Change anything else, or take it over as a claim, only when your person tells you to, with a thread message that names the holder.
+- **Other people's tasks** (claimed by or assigned to someone else): post in its thread. Its `due` is open to everyone: change it with a thread message saying from what to what. A task in `review` is open to its reviewer: status `done` after the merge, or `doing` with a message saying what to fix. Change anything else, or take it over as a claim, only when your person tells you to, with a thread message that names the holder.
 - **Your own task changed under you:** if a pinned write to a task you hold fails, `get` it first. If `claimedBy` is no longer you, stop and tell your person.
 - **Messages:** id `<ISO time with colons as hyphens>-<person>`. Fields: at, author, kind (`agent`), type (`update`, `question`, `answer`, `handoff`, `blocker`, `note`), text. At most three lines, nothing the board already shows. In the same batch, set the task's `lastMessageAt` and `updatedAt`. Post when you claim, decide a design, touch a file or interface another task touches, open a PR, get blocked, or finish.
 - **Summary:** at handoff, review and done, rewrite `details/<id>.summary` in at most five lines (state, decisions, what is left) and set `summaryAt`.

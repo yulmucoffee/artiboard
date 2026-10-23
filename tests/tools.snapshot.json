@@ -1,0 +1,494 @@
+[
+ {
+  "name": "board_start",
+  "description": "Start board work: board and project rules, new notices (marks them read), your tasks, ready tasks. repo finds the project and lists that repository's ready work.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "Project id"
+    },
+    "repo": {
+     "description": "owner/name or git remote URL",
+     "type": "string"
+    },
+    "ready": {
+     "description": "Ready tasks to list, default 8",
+     "type": "integer"
+    },
+    "rules": {
+     "description": "false once read this session",
+     "type": "boolean"
+    },
+    "peek": {
+     "description": "Keep notices unread",
+     "type": "boolean"
+    }
+   }
+  },
+  "annotations": {
+   "destructiveHint": false,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_task",
+  "description": "One task: status, spec, acceptance, summary and the messages after the summary.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "Project id"
+    },
+    "id": {
+     "type": "string",
+     "description": "Task id, e.g. M1-3"
+    },
+    "thread": {
+     "description": "Messages to show, default 8",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "project",
+    "id"
+   ]
+  },
+  "annotations": {
+   "readOnlyHint": true,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_claim",
+  "description": "Claim a ready task (doing, you as holder) and post the claim; returns spec, acceptance, summary. taken: someone has it.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "Project id"
+    },
+    "id": {
+     "type": "string",
+     "description": "Task id, e.g. M1-3"
+    },
+    "text": {
+     "description": "≤3 lines",
+     "type": "string"
+    },
+    "session": {
+     "type": "string"
+    },
+    "override": {
+     "description": "Only when your person says so",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "project",
+    "id"
+   ]
+  },
+  "annotations": {
+   "destructiveHint": false,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_post",
+  "description": "Post to a task thread and/or change your task: status, branch, pr, start, due, repo, summary. status todo releases it. Without task: a notice.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "Project id"
+    },
+    "task": {
+     "type": "string",
+     "description": "Task id, e.g. M1-3"
+    },
+    "text": {
+     "description": "≤3 lines",
+     "type": "string"
+    },
+    "type": {
+     "type": "string",
+     "enum": [
+      "update",
+      "question",
+      "answer",
+      "handoff",
+      "blocker",
+      "note"
+     ]
+    },
+    "status": {
+     "description": "todo, doing, review, blocked, done, or one the board adds",
+     "type": "string"
+    },
+    "branch": {
+     "type": "string"
+    },
+    "pr": {
+     "type": "string"
+    },
+    "start": {
+     "type": "string",
+     "description": "YYYY-MM-DD; \"\" clears"
+    },
+    "due": {
+     "type": "string",
+     "description": "YYYY-MM-DD; \"\" clears"
+    },
+    "repo": {
+     "description": "Label or owner/name; \"\" clears",
+     "type": "string"
+    },
+    "summary": {
+     "description": "≤5 lines: state, decisions, what is left",
+     "type": "string"
+    },
+    "override": {
+     "description": "Only when your person says so",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "project"
+   ]
+  },
+  "annotations": {
+   "destructiveHint": false,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_whoami",
+  "description": "Your person id, name, access level and the site.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {}
+  },
+  "annotations": {
+   "readOnlyHint": true,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_projects",
+  "description": "Projects with their GitHub repos and task counts by status.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {}
+  },
+  "annotations": {
+   "readOnlyHint": true,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_create_project",
+  "description": "Create a project board with every member on it. Ask your person for the id and title first.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "Lowercase id for the URL"
+    },
+    "title": {
+     "type": "string"
+    },
+    "lang": {
+     "description": "Default en",
+     "type": "string"
+    },
+    "repos": {
+     "description": "\"owner/name\" or {repo, label}",
+     "type": "array",
+     "items": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "object",
+        "properties": {
+         "repo": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "repo"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "required": [
+    "id",
+    "title"
+   ]
+  },
+  "annotations": {
+   "destructiveHint": false,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_get",
+  "description": "Read one document: {id, version, data} or null. Pass version as if_version when writing it.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "Project id"
+    },
+    "path": {
+     "type": "string",
+     "description": "e.g. tasks/M1-3"
+    },
+    "fields": {
+     "description": "Only these data fields",
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   },
+   "required": [
+    "project",
+    "path"
+   ]
+  },
+  "annotations": {
+   "readOnlyHint": true,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_query",
+  "description": "Query one collection. Without where/order_by it lists by id; pass the last id as after to page.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "Project id"
+    },
+    "collection": {
+     "type": "string",
+     "description": "e.g. tasks, notices, tasks/M1-3/messages"
+    },
+    "where": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "field": {
+        "type": "string",
+        "description": "Dots reach into objects"
+       },
+       "op": {
+        "type": "string",
+        "enum": [
+         "==",
+         "!=",
+         "<",
+         "<=",
+         ">",
+         ">=",
+         "array-contains",
+         "in"
+        ]
+       },
+       "value": {}
+      },
+      "required": [
+       "field",
+       "op",
+       "value"
+      ]
+     }
+    },
+    "order_by": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "field": {
+        "type": "string"
+       },
+       "dir": {
+        "type": "string",
+        "enum": [
+         "asc",
+         "desc"
+        ]
+       }
+      },
+      "required": [
+       "field"
+      ]
+     }
+    },
+    "limit": {
+     "description": "Default 20",
+     "type": "integer"
+    },
+    "after": {
+     "type": "string"
+    },
+    "fields": {
+     "description": "Only these data fields",
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
+   },
+   "required": [
+    "project",
+    "collection"
+   ]
+  },
+  "annotations": {
+   "readOnlyHint": true,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_batch",
+  "description": "Write 1-100 documents atomically: set replaces, update merges top-level fields, delete removes. if_version on existing documents, if_absent on new ones; an error names the write index. meta/rules and meta/notes ({text, rev, updatedAt, by}) change only when your person asks.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "Project id"
+    },
+    "writes": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "op": {
+        "type": "string",
+        "enum": [
+         "set",
+         "update",
+         "delete"
+        ]
+       },
+       "path": {
+        "type": "string",
+        "description": "e.g. tasks/M1-3"
+       },
+       "data": {
+        "type": "object"
+       },
+       "if_version": {
+        "type": "integer"
+       },
+       "if_absent": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "op",
+       "path"
+      ]
+     }
+    },
+    "override": {
+     "description": "Only when your person says so",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "project",
+    "writes"
+   ]
+  },
+  "annotations": {
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_page",
+  "description": "The project's board page. No options: version and size. find: numbered lines around a text. read: the whole page. Admins, where the site allows it, change it with edits (exact unique replacements), html or reset, passing if_version.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "Project id"
+    },
+    "find": {
+     "type": "string"
+    },
+    "context": {
+     "description": "Lines around a match, default 3",
+     "type": "integer"
+    },
+    "read": {
+     "type": "boolean"
+    },
+    "edits": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "old": {
+        "type": "string"
+       },
+       "new": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "old",
+       "new"
+      ]
+     }
+    },
+    "html": {
+     "type": "string"
+    },
+    "reset": {
+     "type": "boolean"
+    },
+    "if_version": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "project"
+   ]
+  },
+  "annotations": {
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_login_link",
+  "description": "One-time browser sign-in link for your own person, valid for an hour.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {}
+  },
+  "annotations": {
+   "readOnlyHint": true,
+   "openWorldHint": false
+  }
+ }
+]

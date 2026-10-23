@@ -648,7 +648,60 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var STR=I18N.en;
   function T(k,vars){var s=STR[k]!=null?STR[k]:(I18N.en[k]!=null?I18N.en[k]:k);if(typeof s!=='string')return s;return s.replace(/\{(\w+)\}/g,function(_,v){return vars&&vars[v]!=null?vars[v]:''})}
 
-  var STATUS=['todo','doing','review','blocked','done'];
+  // ---------- task rules: a copy of server/tasks.js made by scripts/inline-rules.mjs; edit that file ----------
+  // The task document and its rules, in one place for every writer: the MCP tools, agents' batch writes and the board
+  // page, which carries a copy of this file between its task-rules markers (scripts/inline-rules.mjs keeps it current).
+  // Pure functions over plain task data; nothing here reads or writes the database.
+
+  const TASK_STATUSES = ['todo', 'doing', 'review', 'blocked', 'done'];
+
+  // every field of tasks/<id>; references/protocol.md lists the same ones
+  const TASK_FIELDS = ['key', 'title', 'feature', 'milestone', 'status', 'owner', 'deps', 'waitingOn', 'claimedBy', 'branch', 'pr',
+    'start', 'due', 'repo', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt'];
+
+  // what anyone may write on any task: the due day, and what the board keeps up to date by itself
+  const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt'];
+
+  function statusOf(t) { return (t && t.status) || 'todo'; }
+
+  // who has the task: whoever claimed it, else whoever it is assigned to; an assignment holds it like a claim
+  function holderOf(t) { return (t && ((t.claimedBy && t.claimedBy.who) || t.owner)) || null; }
+
+  // the deps not done yet; isDone(key) says whether the task with that key is done
+  function unmetDeps(t, isDone) {
+    return (Array.isArray(t.deps) ? t.deps : []).filter((k) => typeof k === 'string' && !isDone(k));
+  }
+
+  // free to pick: to do, nobody holds it, nothing it waits on is left
+  function isReady(t, isDone) { return statusOf(t) === 'todo' && !holderOf(t) && !unmetDeps(t, isDone).length; }
+
+  // What else a status change sets: back to todo releases the task, done stamps when, and leaving done takes back
+  // the done day and the archive.
+  function statusEffects(t, status, at) {
+    const fx = {};
+    if (status === 'todo') { fx.claimedBy = null; fx.owner = null; }
+    if (status === 'done' && statusOf(t) !== 'done') fx.doneAt = at;
+    if (status !== 'done' && t.doneAt) fx.doneAt = null;
+    if (status !== 'done' && t.archivedAt) fx.archivedAt = null;
+    return fx;
+  }
+
+  // Whether `me` may write `patch` (field names to values; `summary` counts as a field) on a task someone else holds.
+  // Anyone moves the due day, reviews a task in review (done after the merge, or back to doing, with a summary) and
+  // moves done work in or out of the archive. The rest needs the holder, or override when a person says so.
+  function mayChange(t, me, patch, override) {
+    const h = holderOf(t);
+    if (!h || h === me || override) return true;
+    const keys = Object.keys(patch).filter((k) => OPEN_FIELDS.indexOf(k) < 0);
+    if (!keys.length) return true;
+    const s = statusOf(t);
+    if (s === 'review' && (patch.status === 'done' || patch.status === 'doing')
+      && keys.every((k) => k === 'status' || k === 'summary' || k === 'doneAt')) return true;
+    return s === 'done' && keys.every((k) => k === 'archivedAt');
+  }
+  // ---------- end of task rules ----------
+
+  var STATUS=TASK_STATUSES;
   var BAR={done:'var(--s-done)',review:'var(--s-review)',doing:'var(--s-doing)',blocked:'var(--s-blocked)',todo:'var(--edge)'};
   var TYPES=['note','update','question','answer','handoff','blocker'];
   var VIEWS=['doc','kanban','graph'];
@@ -693,8 +746,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function byId(id){return Object.prototype.hasOwnProperty.call(byIdMap,id)?byIdMap[id]:null}
   function st(t){return STATUS.indexOf(t.status)>=0?t.status:'todo'}
   function SL(s){return T('st_'+s)}
-  function unmet(t){return (t.deps||[]).filter(function(k){var d=byKeyStr(k);return !d||d.status!=='done'})}
-  function ready(t){return st(t)==='todo'&&!t.claimedBy&&!unmet(t).length}
+  function isDoneKey(k){var d=byKeyStr(k);return !!d&&d.status==='done'}
+  function unmet(t){return unmetDeps(t,isDoneKey)}
+  function ready(t){return isReady(t,isDoneKey)}
   function pad(n){return (n<10?'0':'')+n}
   function stamp(iso){var d=new Date(iso);if(!iso||isNaN(d))return '';return (d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())}
   function ago(iso){var d=new Date(iso);if(!iso||isNaN(d))return '';var s=(Date.now()-d)/1000;if(s<60)return T('ago_now');if(s<3600)return T('ago_m',{n:Math.floor(s/60)});if(s<86400)return T('ago_h',{n:Math.floor(s/3600)});if(s<86400*7)return T('ago_d',{n:Math.floor(s/86400)});return stamp(iso)}
@@ -883,30 +937,29 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // A person's change from the page: the task, then one line in its thread saying what changed, as agents' changes do,
   // so the holder and their agents see who moved it.
-  function change(t,patch,extra){
+  // ifVersion (a runtime that reports versions): write only if the task is still the version read; 'stale' if it is
+  // not any more, false on any other failure
+  function change(t,patch,extra,ifVersion){
     if(!writable()||!me)return Promise.resolve();
     var at=now(),bits=[],dash='—';
+    if('status' in patch)patch=Object.assign({},patch,statusEffects(t,patch.status,at));
     function was(k,a,b,f){if(k in patch&&(a||null)!==(b||null))bits.push(T(k==='status'?'f_status':'f_'+k)+' '+(a?f(a):dash)+' → '+(b?f(b):dash))}
     was('status',st(t),patch.status,SL);was('owner',t.owner,patch.owner,pname);was('start',startOf(t),patch.start,dayLabel);was('due',dueOf(t),patch.due,dayLabel);
-    if(patch.status==='done'&&st(t)!=='done')patch.doneAt=at;else if('status' in patch&&patch.status!=='done'&&t.doneAt)patch.doneAt=null;
-    if('status' in patch&&patch.status!=='done'&&t.archivedAt)patch.archivedAt=null;
     if(!bits.length&&!extra)return save(t.id,patch);
     patch.updatedAt=patch.lastMessageAt=at;markSeen(t.id,at);
-    return db.doc('tasks/'+t.id).update(patch)
+    return db.doc('tasks/'+t.id).update(patch,typeof ifVersion==='number'?{ifVersion:ifVersion}:undefined)
       .then(function(){return db.doc('tasks/'+t.id+'/messages/'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:'update',text:bits.join(' · ')+(extra||'')})})
-      .catch(function(e){toast(T('saveFail',{e:errText(e)}));refused(e)});
+      .catch(function(e){if(e&&e.code==='version_conflict'&&typeof ifVersion==='number')return 'stale';toast(T('saveFail',{e:errText(e)}));refused(e);return false});
   }
-  // who has a task: its claimer, or once it left To do, its owner
-  function holder(t){return (t.claimedBy&&t.claimedBy.who)||(st(t)!=='todo'?t.owner:null)||null}
   // one-click moves for the task in the sheet: the review step is anyone's, taking over asks twice
   function actions(t){
     if(!writable()||!me)return null;
-    var s=st(t),h=holder(t),bs=[];
+    var s=st(t),h=holderOf(t),bs=[];
     function b(label,patch,primary,extra){bs.push(el('button',{type:'button',class:'btn small'+(primary?' primary':''),text:label,onclick:function(e){var x=e.currentTarget;x.disabled=true;change(t,patch,extra).then(function(){x.disabled=false})}}))}
     if(s==='review'){b(T('act_done'),{status:'done'},true);b(T('act_back'),{status:'doing'})}
     else if(s==='done'){b(T('act_reopen'),{status:'doing'});b(t.archivedAt?T('unarch'):T('archSheet'),{archivedAt:t.archivedAt?null:now()})}
-    else if(!h){if(!unmet(t).length)bs.push(el('button',{type:'button',class:'btn small primary',text:T('act_claim'),onclick:function(e){claim(t,e.currentTarget)}}))}
-    else if(h===me){b(T('act_review'),{status:'review'},true);b(s==='blocked'?T('act_resume'):T('act_blocked'),{status:s==='blocked'?'doing':'blocked'});b(T('act_release'),{status:'todo',claimedBy:null,owner:null})}
+    else if(statusOf(t)==='todo'&&!t.claimedBy&&(!h||h===me)){if(!unmet(t).length)bs.push(el('button',{type:'button',class:'btn small primary',text:T('act_claim'),onclick:function(e){claim(t,e.currentTarget)}}))}
+    else if(h===me){b(T('act_review'),{status:'review'},true);b(s==='blocked'?T('act_resume'):T('act_blocked'),{status:s==='blocked'?'doing':'blocked'});b(T('act_release'),{status:'todo'})}
     if(h&&h!==me&&s!=='done'){
       var tk=el('button',{type:'button',class:'btn small',text:T('act_take',{p:pname(h)})});
       tk.addEventListener('click',function(){
@@ -1029,13 +1082,20 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     box.appendChild(ul2);
     if(rd.length>NOW_MAX)box.appendChild(moreBtn(!!nowAll.ready,rd.length-NOW_MAX,function(){nowAll.ready=!nowAll.ready;renderNow()}));
   }
+  // read, then write only if nothing changed since; a change that left the task free (a repair, a post) gets one retry
   function claim(t,btn){
     if(!writable()||!me)return;btn.disabled=true;
-    db.doc('tasks/'+t.id).get().then(function(s){
-      var d=s.exists?s.data():null;
-      if(!d||d.claimedBy||(d.status||'todo')!=='todo'){toast(T('alreadyClaimed'));return}
-      return change(t,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}}).then(function(){toast(T('claimed',{p:pname(me),k:t.key}))});
-    }).catch(function(e){toast(T('claimFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false});
+    function attempt(left){
+      return db.doc('tasks/'+t.id).get().then(function(s){
+        var d=s.exists?s.data():null;
+        if(!d||statusOf(d)!=='todo'||(holderOf(d)&&holderOf(d)!==me)){toast(T('alreadyClaimed'));return}
+        return change(t,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}},'',s.version).then(function(r){
+          if(r==='stale')return left?attempt(left-1):toast(T('alreadyClaimed'));
+          if(r!==false)toast(T('claimed',{p:pname(me),k:t.key}));
+        });
+      });
+    }
+    attempt(1).catch(function(e){toast(T('claimFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false});
   }
 
   // The tasks touched most recently, each with its latest message: one small listener per task, dropped when the
@@ -1577,7 +1637,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     root.textContent='';
 
     var s=el('select',{id:'fStatus','aria-label':T('f_status')});STATUS.forEach(function(x){s.appendChild(el('option',{value:x,text:SL(x)}))});s.value=st(t);
-    s.addEventListener('change',function(){var p={status:s.value};if(s.value==='todo')p.claimedBy=null;change(t,p)});
+    s.addEventListener('change',function(){change(t,{status:s.value})});
     var o=el('select',{id:'fOwner','aria-label':T('f_owner')});o.appendChild(el('option',{value:'',text:T('unassigned')}));
     people.forEach(function(p){o.appendChild(el('option',{value:p.id,text:p.name||p.id}))});
     if(t.owner&&!person(t.owner))o.appendChild(el('option',{value:t.owner,text:t.owner}));

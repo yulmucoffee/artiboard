@@ -64,5 +64,7 @@ swap("claude.use('user')","DEMO.use('user')");
 swap('if(window.claude&&window.claude.use)start();','if(window.DEMO)start();');
 const i=page.lastIndexOf('<script>');
 page=page.slice(0,i)+shim+page.slice(i);
-fs.writeFileSync(path.join(__dirname,'demo.html'),page);
-console.log('wrote examples/demo.html',page.length,'bytes');
+const out=path.join(__dirname,'demo.html');
+// --check: say whether the committed demo is the one this page builds, without writing it
+if(process.argv.includes('--check')){if(fs.readFileSync(out,'utf8')!==page){console.error('examples/demo.html is stale: run node examples/build-demo.cjs');process.exit(1)}}
+else{fs.writeFileSync(out,page);console.log('wrote examples/demo.html',page.length,'bytes')}

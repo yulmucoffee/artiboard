@@ -1,6 +1,6 @@
 {
   "name": "artiboard",
-  "version": "1.9.3",
+  "version": "1.10.0",
   "description": "A shared task board for people and their coding agents: a claude.ai artifact, or self-hosted on SQLite or Supabase with an MCP server for Claude Code and Codex.",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,9 @@
   "scripts": {
     "start": "node server/cli.js serve",
     "test": "node --test \"tests/*.test.js\"",
-    "deploy:vercel": "sh scripts/deploy-vercel.sh"
+    "deploy:vercel": "sh scripts/deploy-vercel.sh",
+    "check": "node scripts/check.mjs",
+    "version": "node scripts/stamp-version.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

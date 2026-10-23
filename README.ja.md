@@ -266,7 +266,7 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_claim {id, text, override?}` | 着手できるタスクを取り、取ったことを投稿し、仕様、受け入れ条件、要約を返す。`override` は人が指示したときに他人のタスクを引き継ぎます |
 | `board_task {id}` | ステータス、詳細、要約より後のメッセージ |
 | `board_post {task, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | スレッドのメッセージと自分のタスクの変更を一度に。締め切り(`due`)は誰でも動かせる。`done` で `doneAt` が記録され、後続のタスクが着手可能になる。`todo` でタスクを手放し、誰でも取れるようになる。`task` なしならお知らせ。レビュー中のタスクはレビューした人も `done` か `doing` に変えられ、`override` は人が指示したときに他人のタスクを変更し、スレッドに元の担当を残します |
-| `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き |
+| `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き。タスクへの batch 書き込みも `board_post` と同じ担当者ルールに従う |
 | `board_page` | プロジェクトのページ: サイズ、`find`、`read`、管理者は `edits`、`html`、`reset` も |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | サイト。各プロジェクトの GitHub リポジトリも出ます |
 

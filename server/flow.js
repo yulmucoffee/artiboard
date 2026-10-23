@@ -2,6 +2,8 @@
 // They answer in short text lines, check versions on the server and stamp times with the server clock,
 // so an agent spends no tokens on reads before a write, on version numbers or on `date`.
 import { BOARD_RULES, BoardError, now, repoName, reposOf, stampId, toBoardError } from './core.js';
+import { holderOf, isReady, mayChange, statusEffects, statusOf, unmetDeps } from './tasks.js';
+import { VERSION } from './version.js';
 
 // 2026-10-21T08:57:33.000Z -> 10-21 08:57Z
 const short = (iso) => (typeof iso === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(iso) ? `${iso.slice(5, 10)} ${iso.slice(11, 16)}Z` : '');
@@ -13,7 +15,6 @@ function keyOrder(a, b) {
   const x = p(a), y = p(b);
   return x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] - y[1] || x[2] - y[2];
 }
-const holderOf = (d) => d.claimedBy?.who || d.owner || null;
 const CLAIMED = { ko: '집었어요.', en: 'Claimed.' };
 
 // a pinned write lost a race (someone wrote in between): read again and redo it once
@@ -50,6 +51,10 @@ function taskLine(d, id, withStatus) {
   bits.push(...dateBits(d));
   return `${bits.join(' ')} ${d.title || ''}`.trim();
 }
+// equal as stored data: a missing field equals null, and object keys compare in any order
+const canon = (v) => (v == null ? null : Array.isArray(v) ? v.map(canon)
+  : typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 const msgLine = (m) => `${short(m.at)} ${m.author || '?'}${m.type && m.type !== 'note' ? ` ${m.type}` : ''}: ${oneLine(m.text)}`;
 const repoList = (repos) => repos.map((r) => `${r.repo}${r.label ? ` (${r.label})` : ''}`).join(' · ');
 
@@ -81,9 +86,8 @@ export function makeFlow(store) {
   // ready query rely on; here it is checked against the dep tasks themselves and repaired in passing, so a task
   // written without it, or a dep finished while no page was open, still shows up (and a stale one stays out).
   async function readyWork(member, project, todo) {
-    const free = todo.filter((t) => !t.data.claimedBy);
-    const depsOf = (t) => (Array.isArray(t.data.deps) ? t.data.deps.filter((k) => typeof k === 'string') : []);
-    const keys = [...new Set(free.flatMap(depsOf))];
+    const free = todo.filter((t) => !holderOf(t.data));
+    const keys = [...new Set(free.flatMap((t) => unmetDeps(t.data, () => false)))];
     const done = new Set(), chunks = [];
     for (let i = 0; i < keys.length; i += 100) chunks.push(keys.slice(i, i + 100));
     // one round trip for all of them, however many deps there are
@@ -91,12 +95,13 @@ export function makeFlow(store) {
       for (const d of found) done.add(d.data.key);
     }
     const repairs = [], ready = [];
+    const isDone = (k) => done.has(k);
     for (const t of free) {
-      const want = depsOf(t).filter((k) => !done.has(k)), cur = t.data.waitingOn;
+      const want = unmetDeps(t.data, isDone), cur = t.data.waitingOn;
       if (!Array.isArray(cur) || cur.length !== want.length || cur.some((k, i) => k !== want[i])) {
         repairs.push({ op: 'update', path: `tasks/${t.id}`, if_version: t.version, data: { waitingOn: want } });
       }
-      if (!want.length) ready.push(t);
+      if (isReady(t.data, isDone)) ready.push(t);
     }
     // best effort: a conflict means someone else just wrote the task, a viewer may not write at all
     const batches = [];
@@ -137,12 +142,12 @@ export function makeFlow(store) {
       stray = `repo ${want || '(not a GitHub repository)'} is not linked to ${project}; showing all ready work (link it in meta/config.repos)`;
       want = null;
     }
-    let free = (ready ? await readyWork(member, project, todo) : []).filter((t) => t.data.owner !== me).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
+    let free = (ready ? await readyWork(member, project, todo) : []).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
     await moving;
     const elsewhere = want ? free.filter((t) => { const r = taskRepo(t.data, repos); return r && r !== want; }).length : 0;
     if (want) free = free.filter((t) => { const r = taskRepo(t.data, repos); return !r || r === want; });
 
-    const out = [`${me} · ${project}${c.milestone ? ` · ${c.milestone}` : ''}`];
+    const out = [`${me} · ${project}${c.milestone ? ` · ${c.milestone}` : ''} · artiboard ${VERSION}`];
     if (repos.length) out.push(`repos: ${repoList(repos)}`);
     if (stray) out.push(stray);
     if (rules) {
@@ -212,9 +217,10 @@ export function makeFlow(store) {
     const result = await retrying(async () => {
       const t = await get(project, `tasks/${id}`);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
-      const d = t.data, status = d.status || 'todo', holder = holderOf(d);
+      const d = t.data, status = statusOf(d), holder = holderOf(d);
       if (d.claimedBy?.who === me && status !== 'todo') return `already yours ${id}`;
-      const held = status !== 'todo' || !!d.claimedBy;
+      // started, or claimed or assigned by someone else
+      const held = status !== 'todo' || (!!holder && holder !== me);
       if (held && (!override || status === 'done')) throw new BoardError('taken', `${d.key || id} is ${status}${holder ? `, held by ${holder}` : ''}; pick another`);
       if (!held && d.waitingOn?.length) throw new BoardError('waiting', `${d.key || id} waits on ${d.waitingOn.join(', ')}`);
       const from = held && holder && holder !== me ? holder : null;
@@ -248,37 +254,29 @@ export function makeFlow(store) {
         data: { at, author: me, kind: 'agent', type: type || 'note', text } }]);
       return 'posted notice';
     }
-    const holderOnly = status !== undefined || branch !== undefined || pr !== undefined || start !== undefined || repo !== undefined || summary !== undefined;
-    if (!text?.trim() && !holderOnly && due === undefined) throw new BoardError('invalid_argument', 'pass text, or a change');
+    const changes = [status, branch, pr, start, due, repo, summary].some((v) => v !== undefined);
+    if (!text?.trim() && !changes) throw new BoardError('invalid_argument', 'pass text, or a change');
     return retrying(async () => {
       const [t, det] = await Promise.all([get(project, `tasks/${id}`), summary !== undefined ? get(project, `details/${id}`) : null]);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
       const d = t.data, key = d.key || id, holder = holderOf(d);
-      const theirs = holderOnly && holder && holder !== me;
-      const review = d.status === 'review' && (status === 'done' || status === 'doing')
-        && branch === undefined && pr === undefined && start === undefined && repo === undefined;
-      if (theirs && !override && !review) {
-        throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day${d.status === 'review' ? ', or review it (status done or doing)' : ''}; for the rest ask in its thread, or override true when your person tells you to`);
+      // the asked-for change, empty strings clearing a field; the thread names the holder when it took override
+      const change = Object.fromEntries(Object.entries({ status, branch, pr, start, due, repo, summary }).filter(([, v]) => v !== undefined));
+      const overriding = !mayChange(d, me, change, false);
+      if (overriding && !override) {
+        throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day${statusOf(d) === 'review' ? ', or review it (status done or doing)' : ''}; for the rest ask in its thread, or override true when your person tells you to`);
       }
       const at = now();
       const patch = { updatedAt: at, lastMessageAt: at };
-      if (status !== undefined) patch.status = status;
-      if (status === 'todo') { patch.claimedBy = null; patch.owner = null; }
-      if (status === 'done' && d.status !== 'done') patch.doneAt = at;
-      if (status !== undefined && status !== 'done' && d.doneAt) patch.doneAt = null;
-      if (status !== undefined && status !== 'done' && d.archivedAt) patch.archivedAt = null;
-      if (branch !== undefined) patch.branch = branch || null;
-      if (pr !== undefined) patch.pr = pr || null;
-      if (start !== undefined) patch.start = start || null;
-      if (due !== undefined) patch.due = due || null;
-      if (repo !== undefined) patch.repo = repo || null;
+      for (const f of ['branch', 'pr', 'start', 'due', 'repo']) if (f in change) patch[f] = change[f] || null;
+      if (status !== undefined) Object.assign(patch, { status }, statusEffects(d, status, at));
       // with no text, the thread still says what changed
       const said = `${text?.trim() || [
         status && `status ${status}`, branch !== undefined && `branch ${branch || 'none'}`, pr !== undefined && `pr ${pr || 'none'}`,
         start !== undefined && `start ${start || 'none'}${day(d.start) ? ` (was ${d.start})` : ''}`,
         due !== undefined && `due ${due || 'none'}${day(d.due) ? ` (was ${d.due})` : ''}`,
         repo !== undefined && `repo ${repo || 'none'}`, summary !== undefined && 'summary updated',
-      ].filter(Boolean).join(' · ') || 'updated'}${theirs && !review ? ` (override; held by ${holder})` : ''}`;
+      ].filter(Boolean).join(' · ') || 'updated'}${overriding ? ` (override; held by ${holder})` : ''}`;
       const writes = [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: patch },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
@@ -304,5 +302,42 @@ export function makeFlow(store) {
     });
   }
 
-  return { start, task, claim, post, projectFor };
+  // An agent's batch writes to a task or its details follow the same rules as board_post. Override, passed when the
+  // agent's person says so, lets a refused write through and leaves a line in that task's thread naming the holder.
+  // The first write to each existing document is pinned to the version this check read, so the check still holds
+  // when the write lands.
+  async function batch(member, project, writes, override = false) {
+    const me = member.person, target = (w) => /^(tasks|details)\/([^/]+)$/.exec(w.path);
+    const ids = [...new Set(writes.map(target).filter(Boolean).map((m) => m[2]))];
+    const paths = ids.flatMap((id) => [`tasks/${id}`, `details/${id}`]);
+    const docs = new Map(await Promise.all(paths.map(async (p) => [p, await get(project, p)])));
+    const pinned = new Set(), overridden = new Map();
+    const out = writes.map((w, i) => {
+      // a task that exists rules its own document and its details, even details not written yet
+      const m = target(w), cur = m && docs.get(w.path), task = m && docs.get(`tasks/${m[2]}`)?.data;
+      if (!task) return w;
+      const before = cur?.data || {}, after = w.op === 'delete' ? {} : w.op === 'set' ? w.data || {} : { ...before, ...w.data };
+      const patch = {};
+      for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) if (!same(before[k], after[k])) patch[k] = after[k] ?? null;
+      // a details document's text belongs to the task's holder; summaryAt only travels with the summary
+      if (m[1] === 'details') delete patch.summaryAt;
+      if (!mayChange(task, me, patch, false)) {
+        if (!override) throw new BoardError('not_yours', `${task.key || m[2]} is held by ${holderOf(task)}; pass override true only when your person says so (the thread records it)`, i);
+        const o = overridden.get(m[2]) || { holder: holderOf(task), fields: new Set() };
+        Object.keys(patch).forEach((f) => o.fields.add(f));
+        overridden.set(m[2], o);
+      }
+      if (!cur || w.if_version !== undefined || w.if_absent || pinned.has(w.path)) return w;
+      pinned.add(w.path);
+      return { ...w, if_version: cur.version };
+    });
+    const at = now();
+    for (const [id, o] of overridden) {
+      out.push({ op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true,
+        data: { at, author: me, kind: 'agent', type: 'update', text: `changed ${[...o.fields].join(', ')} (override; held by ${o.holder})` } });
+    }
+    return apply(member, project, out);
+  }
+
+  return { start, task, claim, post, batch, projectFor };
 }

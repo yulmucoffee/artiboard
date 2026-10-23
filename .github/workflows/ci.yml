@@ -8,6 +8,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,14 +26,29 @@ jobs:
           node -e "const s=require('fs').readFileSync('skills/artiboard/assets/board.html','utf8');require('fs').writeFileSync('/tmp/board.js',s.match(/<script>([\s\S]*)<\/script>/)[1])"
           node --check /tmp/board.js
       - name: Install
-        run: npm ci --no-audit --no-fund
-      - name: Board smoke test
         run: |
+          npm ci --no-audit --no-fund
           npm install --no-save --no-audit --no-fund jsdom@24.1.1
-          node tests/smoke.cjs
-      - name: Hosted site tests (SQLite)
-        run: npm test
-      - name: Demo is built from the current page
+      - name: npm run check (versions, READMEs, page rules copy, demo, tests on SQLite, page smoke test)
+        run: npm run check
+
+  # the same server tests against the second backend: a local Supabase stack with this repository's migrations
+  supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Start Supabase with the migrations
+        run: supabase start -x studio,logflare,vector,imgproxy,mailpit,edge-runtime,storage-api
+      - name: Tests on SQLite and Supabase
         run: |
-          node examples/build-demo.cjs
-          git diff --exit-code -- examples/demo.html
+          eval "$(sh scripts/supabase-env.sh)"
+          AB_SUPABASE=1 npm test
