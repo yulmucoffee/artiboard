@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { releaseProblems } from '../scripts/release-check.mjs';
 
 const read = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
 const log = read('../server/public/changelog.json');
@@ -34,4 +35,14 @@ test('each entry has one to three short lines in English and Korean', () => {
       for (const line of lines) assert.ok(typeof line === 'string' && line.trim() && line.length <= 200, `${v.version} ${lang}: ${line}`);
     }
   }
+});
+
+test('CI refuses a release that skips the bump, names another pull request, or reached main without one', () => {
+  const changelog = { versions: [{ version: '1.2.1', prs: [7] }, { version: '1.2.0', prs: [6] }] };
+  assert.deepEqual(releaseProblems({ changelog, version: '1.2.1', baseVersion: '1.2.0', pr: 7 }), []);
+  assert.match(releaseProblems({ changelog, version: '1.2.1', baseVersion: '1.2.1', pr: 7 }).join(), /bump it/, 'a pull request that keeps the version');
+  assert.match(releaseProblems({ changelog, version: '1.2.1', baseVersion: '1.2.0', pr: 8 }).join(), /not #8/, 'an entry naming another pull request');
+  assert.deepEqual(releaseProblems({ changelog, subject: 'Fix the review list (#6)' }), []);
+  assert.match(releaseProblems({ changelog, subject: 'Show who wrote last; 1.13.0' }).join(), /did not come through a pull request/, 'a commit pushed to main');
+  assert.match(releaseProblems({ changelog, subject: 'Fix x (#9)' }).join(), /#9 is in no changelog entry/);
 });

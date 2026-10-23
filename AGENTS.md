@@ -16,7 +16,7 @@ artiboard is read by agents on every session they spend on a board, so it has th
 | `server/public/shim.js` | The page's runtime on a self-hosted site (reads, writes, live updates). |
 | `skills/artiboard/assets/board.html` | The page. It carries a copy of `server/tasks.js` between marker lines. |
 | `skills/artiboard/` | The skill people install: `SKILL.md`, the agents' protocol, the hosted guide. |
-| `scripts/` | Levers: `check.mjs` (every gate), `inline-rules.mjs`, `stamp-version.mjs`, `readme-shape.mjs`, `unused.mjs`, `bench.mjs`, `supabase-env.sh`. |
+| `scripts/` | Levers: `check.mjs` (every gate), `inline-rules.mjs`, `stamp-version.mjs`, `readme-shape.mjs`, `unused.mjs`, `release-check.mjs` (CI: the bump, the PR in the changelog, squash merges only), `bench.mjs`, `supabase-env.sh`. |
 
 ## How we work
 

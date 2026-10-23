@@ -11,7 +11,7 @@ Every change that reaches `main`, through a pull request or a direct push, comes
 { "version": "1.4.1", "date": "2026-10-23", "prs": [11], "lines": { "en": ["…"], "ko": ["…"] } }
 ```
 
-`npm test` checks both: the newest entry must match the package version, versions go newest first, and each language has one to three lines. Keep entries free of any one site's names or data: this repository is public.
+`npm test` checks both: the newest entry must match the package version, versions go newest first, and each language has one to three lines. CI also checks, with `scripts/release-check.mjs`, that a pull request raises the version over its base and that the newest entry names that pull request, and that every commit on `main` is a squash merge whose subject ends in `(#N)`. Keep entries free of any one site's names or data: this repository is public.
 
 ## Tokens and prompt caching
 
