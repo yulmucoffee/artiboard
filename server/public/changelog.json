@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.13.2",
+      "date": "2026-10-23",
+      "prs": [
+        29
+      ],
+      "lines": {
+        "en": [
+          "On a board with more than 200 tasks to do, in review or held by one person, board_start no longer misses ready work or your own tasks: it reads past the first page.",
+          "Someone holding a great many tasks sees the first 20 (those where someone else wrote last first) and how many more, instead of a line for each."
+        ],
+        "ko": [
+          "할 일, 검토 중, 한 사람이 맡은 태스크가 200개를 넘는 보드에서도 board_start가 첫 페이지 너머까지 읽어서, 준비된 일이나 내 태스크를 빠뜨리지 않아요.",
+          "태스크를 아주 많이 맡은 사람은 한 줄씩 다 보는 대신 앞의 20개(다른 사람이 마지막으로 쓴 것부터)와 남은 개수를 봐요."
+        ]
+      }
+    },
+    {
       "version": "1.13.1",
       "date": "2026-10-23",
       "prs": [

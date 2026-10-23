@@ -340,6 +340,27 @@ for (const backend of backends) {
       await call(board, 'board_batch', { project: P, writes: ['d1', 'd2', 'd3', 'd4', 'd5'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })) });
     });
 
+    test('the start misses nothing on a board bigger than one page of results', async () => {
+      const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
+      const doc = (id, data) => ({ op: 'set', path: `tasks/${id}`, data: { key: id, title: id, deps: [], waitingOn: [], updatedAt: at, ...data } });
+      const held = Array.from({ length: 200 }, (_, i) => doc(`pg-${R}-${String(i).padStart(3, '0')}`, { status: 'todo', owner: them }));
+      const mineDone = Array.from({ length: 60 }, (_, i) => doc(`pm-${R}-${String(i).padStart(3, '0')}`, { status: 'done', owner: me }));
+      // stored last by id, listed first by key
+      const extra = [{ ...doc(`zz-${R}-free`, { status: 'todo' }), data: { ...doc(`zz-${R}-free`, { status: 'todo' }).data, key: `00-${R}-free`, title: 'free' } },
+        doc(`pz-${R}-open`, { status: 'doing', owner: me, claimedBy: { who: me, agent: true, at }, lastMessageBy: them })];
+      const busy = Array.from({ length: 25 }, (_, i) => doc(`pb-${R}-${String(i).padStart(2, '0')}`, { status: 'doing', owner: me }));
+      const writes = [...held, ...mineDone, ...extra, ...busy];
+      for (let i = 0; i < writes.length; i += 100) await store.apply(null, P, writes.slice(i, i + 100));
+      try {
+        const s = (await call(board, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
+        assert.match(s, new RegExp(`^00-${R}-free free$`, 'm'), 'a ready task after the first 200 to do is listed');
+        assert.match(s, new RegExp(`^pz-${R}-open doing .* wrote last$`, 'm'), 'and my open task after 60 done ones of mine, first since someone else wrote last');
+        assert.match(s, /^mine \(20 of \d+\):$/m, 'a person holding many sees the first 20 and how many'); 
+      } finally {
+        for (let i = 0; i < writes.length; i += 100) await store.apply(null, P, writes.slice(i, i + 100).map((w) => ({ op: 'delete', path: w.path })));
+      }
+    });
+
     test('several reads in one call return what each read returns', async () => {
       const reads = [{ path: 'meta/config' }, { path: `tasks/none-${R}` }, { collection: 'notices', order: [{ field: 'at', dir: 'desc' }], limit: 3 },
         { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'todo' }], limit: 5 }];
