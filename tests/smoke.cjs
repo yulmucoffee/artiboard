@@ -240,6 +240,13 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   ok(b.store['tasks/M1-1'].status==='todo'&&b.store['tasks/M1-1'].owner===null&&b.store['tasks/M1-1'].claimedBy===null,'back to To do releases the task, owner included');
   b.key('Escape');
 
+  b=boot({docs:{'tasks/M1-1':{...seed()['tasks/M1-1'],status:'doing',owner:'ben',claimedBy:{who:'ben',agent:true,at:T0}}}});all.push(b);await tick();await heal();b.pick('ana');await tick();
+  [...b.d.querySelectorAll('tr.item')].find(r=>/M1-1/.test(r.textContent)).click();await tick();
+  change(b.d,'fStatus','blocked');await tick();
+  const said=Object.keys(b.store).filter(k=>k.startsWith('tasks/M1-1/messages/')).map(k=>b.store[k].text).join(' | ');
+  ok(b.store['tasks/M1-1'].status==='blocked'&&/\(override; held by Ben\)/.test(said),'a person may change someone else\'s task, and the thread names the holder');
+  b.key('Escape');
+
   console.log('# two people claim at once');
   b=boot({race:'tasks/M1-1'});all.push(b);await tick();await heal();b.pick('ana');await tick();
   [...b.d.querySelectorAll('.rows.ready li')].find(li=>/M1-1/.test(li.textContent)).querySelector('.btn').click();await tick();await tick();

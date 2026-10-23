@@ -13,6 +13,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { makeApp } from '../server/app.js';
 import { loadConfig, openStore } from '../server/config.js';
+import { toBoardError } from '../server/core.js';
+import { CHANGE_CASES } from './task-cases.js';
 
 const backends = [{ name: 'sqlite', env: { ARTIBOARD_BACKEND: 'sqlite' } }];
 if (process.env.AB_SUPABASE === '1') backends.push({ name: 'supabase', env: { ARTIBOARD_BACKEND: 'supabase' } });
@@ -233,7 +235,7 @@ for (const backend of backends) {
         const h1 = (await call(other, 'board_get', { project: P, path: `tasks/${K('h1')}` })).value.data;
         const same = { claimedBy: Object.fromEntries(Object.entries(h1.claimedBy).reverse()), archivedAt: null, due: '2026-12-01' };
         assert.equal((await viaBatch(same)).error, false, 'a missing field equals null, and key order does not matter');
-        const details = await call(other, 'board_batch', { project: P, writes: [{ op: 'set', path: `details/${K('h1')}`, data: { summary: 'not mine to write' } }] });
+        const details = await call(other, 'board_batch', { project: P, writes: [{ op: 'set', path: `details/${K('h1')}`, data: { spec: 'not mine to write' } }] });
         assert.equal(details.value.code, 'not_yours', 'a held task\'s details are the holder\'s too');
         const fresh = await call(other, 'board_batch', { project: P, writes: [
           { op: 'set', path: `tasks/${K('new')}`, if_absent: true, data: { key: K('new'), title: 'new', status: 'todo', deps: [], waitingOn: [] } },
@@ -241,7 +243,11 @@ for (const backend of backends) {
         assert.equal(fresh.error, false, 'new tasks and their details are anyone\'s to write');
         const over = await call(other, 'board_batch', { project: P, override: true, writes: [{ op: 'update', path: `tasks/${K('h1')}`, data: { title: 'retitled', milestone: 'M2' } }] });
         assert.equal(over.error, false, 'override lets a person-approved change through');
-        assert.deepEqual(await last('h1'), { text: `changed title, milestone (override; held by ${me})`, author: them }, 'and the thread names the holder');
+        assert.deepEqual(await last('h1'), { text: 'changed title, milestone (override)', author: them }, 'and the thread says so');
+        const start = (await call(other, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
+        assert.match(start, new RegExp(`^to review \\(\\d+\\):\\n(?:.*\\n)*${K('h1')} review .*https://example.com/pr/2 `, 'm'), 'others\' work in review is listed with its PR');
+        const own = (await call(board, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
+        assert.doesNotMatch(own.split('\nto review')[1] || '', new RegExp(K('h1')), 'not to its own holder, who sees it under mine');
         assert.match((await call(other, 'board_post', { project: P, task: K('h1'), status: 'done', branch: 'x' })).value, /^not_yours: .*review it/, 'a reviewer changes only the status');
         assert.equal((await call(other, 'board_post', { project: P, task: K('h1'), text: 'merged', status: 'done' })).value, `ok ${K('h1')} → done`);
         assert.match((await call(other, 'board_task', { project: P, id: K('h1'), thread: 0 })).value, new RegExp(`^${K('h1')} done · ${me} \\(agent\\)`), 'the holder keeps the credit');
@@ -260,6 +266,21 @@ for (const backend of backends) {
           [{ who: them, n: 1, agent: true, tasks: [{ key: K('h2'), title: 'held h2', status: 'doing' }] }], 'the project list says who has what in hand');
       } finally {
         await other.close();
+      }
+    });
+
+    test('the database holds every member\'s write to the task rules', async () => {
+      const who = { ana: people.admin.person, ben: people.member.person }, uid = { ana: people.admin.uid, ben: people.member.uid };
+      const as = (v) => JSON.parse(JSON.stringify(v).replace(/"(ana|ben)"/g, (_, p) => JSON.stringify(who[p])));
+      const write = (me, w) => store.apply(uid[me], P, w).then(() => true, (e) => { if (toBoardError(e).code !== 'not_yours') throw e; return false; });
+      for (const [i, [t, me, patch, override, want, why]] of CHANGE_CASES.entries()) {
+        const id = K(`rule${i}`), o = override ? { override: true } : {};
+        await store.apply(null, P, [{ op: 'set', path: `tasks/${id}`, data: as({ key: id, title: 'rule', ...t }) }]);
+        const { summary, spec, ...onTask } = as(patch), onDetails = Object.fromEntries(Object.entries({ summary, spec }).filter(([, v]) => v !== undefined));
+        const writes = [];
+        if (Object.keys(onTask).length) writes.push({ op: 'update', path: `tasks/${id}`, data: onTask, ...o });
+        if (Object.keys(onDetails).length) writes.push({ op: 'set', path: `details/${id}`, data: onDetails, ...o });
+        assert.equal(await write(me, writes), want, `${backend.name}: ${why}`);
       }
     });
 

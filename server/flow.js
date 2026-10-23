@@ -51,10 +51,6 @@ function taskLine(d, id, withStatus) {
   bits.push(...dateBits(d));
   return `${bits.join(' ')} ${d.title || ''}`.trim();
 }
-// equal as stored data: a missing field equals null, and object keys compare in any order
-const canon = (v) => (v == null ? null : Array.isArray(v) ? v.map(canon)
-  : typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
-const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 const msgLine = (m) => `${short(m.at)} ${m.author || '?'}${m.type && m.type !== 'note' ? ` ${m.type}` : ''}: ${oneLine(m.text)}`;
 const repoList = (repos) => repos.map((r) => `${r.repo}${r.label ? ` (${r.label})` : ''}`).join(' · ');
 
@@ -118,7 +114,7 @@ export function makeFlow(store) {
     if (!project && !repo) throw new BoardError('invalid_argument', 'pass project, or repo (owner/name from git remote) to find it');
     if (!project) project = await projectFor(repo);
     const me = member.person;
-    const [config, cursor, owned, todo, own, notes, latest] = await Promise.all([
+    const [config, cursor, owned, todo, own, notes, latest, inReview] = await Promise.all([
       get(project, 'meta/config'),
       get(project, `cursors/${me}`),
       query(project, 'tasks', { where: [{ field: 'owner', op: '==', value: me }], limit: 50 }),
@@ -126,6 +122,7 @@ export function makeFlow(store) {
       rules ? get(project, 'meta/rules') : null,
       rules ? get(project, 'meta/notes') : null,
       query(project, 'notices', { order: [{ field: 'at', dir: 'desc' }], limit: 20 }),
+      ready ? query(project, 'tasks', { where: [{ field: 'status', op: '==', value: 'review' }], limit: 50 }) : [],
     ]);
     // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
     const mine = owned.filter((t) => (t.data.status || 'todo') !== 'done');
@@ -145,7 +142,10 @@ export function makeFlow(store) {
     let free = (ready ? await readyWork(member, project, todo) : []).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
     await moving;
     const elsewhere = want ? free.filter((t) => { const r = taskRepo(t.data, repos); return r && r !== want; }).length : 0;
-    if (want) free = free.filter((t) => { const r = taskRepo(t.data, repos); return !r || r === want; });
+    const here = (t) => { const r = want && taskRepo(t.data, repos); return !r || r === want; };
+    if (want) free = free.filter(here);
+    // someone else's work waiting for a review, which anyone may finish after the merge or send back
+    const toReview = inReview.filter((t) => holderOf(t.data) !== me && here(t)).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
 
     const out = [`${me} · ${project}${c.milestone ? ` · ${c.milestone}` : ''} · artiboard ${VERSION}`];
     if (repos.length) out.push(`repos: ${repoList(repos)}`);
@@ -169,6 +169,10 @@ export function makeFlow(store) {
       const more = elsewhere ? `; ${elsewhere} more in other repos` : '';
       out.push(free.length ? `ready (${free.length > ready ? `${ready} of ` : ''}${free.length}${more}):` : `ready: none${more}`);
       free.slice(0, ready).forEach((t) => out.push(taskLine(t.data, t.id)));
+      if (toReview.length) {
+        out.push(`to review (${toReview.length > ready ? `${ready} of ` : ''}${toReview.length}):`);
+        toReview.slice(0, ready).forEach((t) => out.push(taskLine(t.data, t.id, true)));
+      }
     }
     return out.join('\n');
   }
@@ -226,7 +230,7 @@ export function makeFlow(store) {
       const from = held && holder && holder !== me ? holder : null;
       const at = now();
       await apply(member, project, [
-        { op: 'update', path: `tasks/${id}`, if_version: t.version, data: {
+        { op: 'update', path: `tasks/${id}`, if_version: t.version, ...(from && { override: true }), data: {
           status: 'doing', owner: me, claimedBy: { who: me, agent: true, ...(session && { session }), at }, updatedAt: at, lastMessageAt: at } },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
           at, author: me, kind: 'agent', type: 'update', text: (text || CLAIMED[config?.data?.lang] || CLAIMED.en) + (from ? ` (taken over from ${from})` : '') } },
@@ -278,13 +282,13 @@ export function makeFlow(store) {
         repo !== undefined && `repo ${repo || 'none'}`, summary !== undefined && 'summary updated',
       ].filter(Boolean).join(' · ') || 'updated'}${overriding ? ` (override; held by ${holder})` : ''}`;
       const writes = [
-        { op: 'update', path: `tasks/${id}`, if_version: t.version, data: patch },
+        { op: 'update', path: `tasks/${id}`, if_version: t.version, data: patch, ...(overriding && { override: true }) },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
           at, author: me, kind: 'agent', type: type || (status === 'blocked' ? 'blocker' : 'update'), text: said } },
       ];
       if (summary !== undefined) {
-        const s = { summary, summaryAt: at };
-        writes.push(det ? { op: 'update', path: `details/${id}`, if_version: det.version, data: s } : { op: 'set', path: `details/${id}`, if_absent: true, data: s });
+        const s = { summary, summaryAt: at }, o = overriding && { override: true };
+        writes.push(det ? { op: 'update', path: `details/${id}`, if_version: det.version, data: s, ...o } : { op: 'set', path: `details/${id}`, if_absent: true, data: s, ...o });
       }
       const unblocked = [];
       if (status === 'done') {
@@ -302,39 +306,20 @@ export function makeFlow(store) {
     });
   }
 
-  // An agent's batch writes to a task or its details follow the same rules as board_post. Override, passed when the
-  // agent's person says so, lets a refused write through and leaves a line in that task's thread naming the holder.
-  // The first write to each existing document is pinned to the version this check read, so the check still holds
-  // when the write lands.
+  // An agent's batch writes; the database holds them to the task rules. With override (only when the agent's person
+  // says so) every task and details write carries it, and each task touched gets a thread line saying what changed.
   async function batch(member, project, writes, override = false) {
-    const me = member.person, target = (w) => /^(tasks|details)\/([^/]+)$/.exec(w.path);
-    const ids = [...new Set(writes.map(target).filter(Boolean).map((m) => m[2]))];
-    const paths = ids.flatMap((id) => [`tasks/${id}`, `details/${id}`]);
-    const docs = new Map(await Promise.all(paths.map(async (p) => [p, await get(project, p)])));
-    const pinned = new Set(), overridden = new Map();
-    const out = writes.map((w, i) => {
-      // a task that exists rules its own document and its details, even details not written yet
-      const m = target(w), cur = m && docs.get(w.path), task = m && docs.get(`tasks/${m[2]}`)?.data;
-      if (!task) return w;
-      const before = cur?.data || {}, after = w.op === 'delete' ? {} : w.op === 'set' ? w.data || {} : { ...before, ...w.data };
-      const patch = {};
-      for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) if (!same(before[k], after[k])) patch[k] = after[k] ?? null;
-      // a details document's text belongs to the task's holder; summaryAt only travels with the summary
-      if (m[1] === 'details') delete patch.summaryAt;
-      if (!mayChange(task, me, patch, false)) {
-        if (!override) throw new BoardError('not_yours', `${task.key || m[2]} is held by ${holderOf(task)}; pass override true only when your person says so (the thread records it)`, i);
-        const o = overridden.get(m[2]) || { holder: holderOf(task), fields: new Set() };
-        Object.keys(patch).forEach((f) => o.fields.add(f));
-        overridden.set(m[2], o);
-      }
-      if (!cur || w.if_version !== undefined || w.if_absent || pinned.has(w.path)) return w;
-      pinned.add(w.path);
-      return { ...w, if_version: cur.version };
+    if (!override) return apply(member, project, writes);
+    const me = member.person, at = now(), notes = new Map();
+    const out = writes.map((w) => {
+      const m = /^(tasks|details)\/([^/]+)$/.exec(w.path);
+      if (!m) return w;
+      notes.set(m[2], [...(notes.get(m[2]) || []), ...Object.keys(w.data || { [w.op]: 1 })]);
+      return { ...w, override: true };
     });
-    const at = now();
-    for (const [id, o] of overridden) {
+    for (const [id, fields] of notes) {
       out.push({ op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true,
-        data: { at, author: me, kind: 'agent', type: 'update', text: `changed ${[...o.fields].join(', ')} (override; held by ${o.holder})` } });
+        data: { at, author: me, kind: 'agent', type: 'update', text: `changed ${[...new Set(fields)].join(', ')} (override)` } });
     }
     return apply(member, project, out);
   }

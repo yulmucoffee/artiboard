@@ -11,6 +11,18 @@ export const TASK_FIELDS = ['key', 'title', 'feature', 'milestone', 'status', 'o
 // what anyone may write on any task: the due day, and what the board keeps up to date by itself
 const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt'];
 
+// The fields a write changes, with their new values: a missing field equals null, and object keys compare in any
+// order, as both databases store them.
+export function changedFields(before, after) {
+  const canon = (v) => (v == null ? null : Array.isArray(v) ? v.map(canon)
+    : typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+  const patch = {};
+  for (const k of new Set(Object.keys(before).concat(Object.keys(after)))) {
+    if (JSON.stringify(canon(before[k])) !== JSON.stringify(canon(after[k]))) patch[k] = after[k] == null ? null : after[k];
+  }
+  return patch;
+}
+
 export function statusOf(t) { return (t && t.status) || 'todo'; }
 
 // who has the task: whoever claimed it, else whoever it is assigned to; an assignment holds it like a claim
@@ -35,16 +47,17 @@ export function statusEffects(t, status, at) {
   return fx;
 }
 
-// Whether `me` may write `patch` (field names to values; `summary` counts as a field) on a task someone else holds.
-// Anyone moves the due day, reviews a task in review (done after the merge, or back to doing, with a summary) and
-// moves done work in or out of the archive. The rest needs the holder, or override when a person says so.
+// Whether `me` may write `patch` (field names to values; a details document's fields count too) on a task someone
+// else holds. Anyone moves the due day, reviews a task in review (done after the merge or back to doing, and its
+// summary) and moves done work in or out of the archive. The rest needs the holder, or override when a person
+// says so. Both databases check this on every write to a task or its details.
 export function mayChange(t, me, patch, override) {
   const h = holderOf(t);
   if (!h || h === me || override) return true;
   const keys = Object.keys(patch).filter((k) => OPEN_FIELDS.indexOf(k) < 0);
   if (!keys.length) return true;
   const s = statusOf(t);
-  if (s === 'review' && (patch.status === 'done' || patch.status === 'doing')
+  if (s === 'review' && (!('status' in patch) || patch.status === 'done' || patch.status === 'doing')
     && keys.every((k) => k === 'status' || k === 'summary' || k === 'doneAt')) return true;
   return s === 'done' && keys.every((k) => k === 'archivedAt');
 }

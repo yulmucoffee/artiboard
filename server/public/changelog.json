@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.11.0",
+      "date": "2026-10-23",
+      "prs": [
+        22
+      ],
+      "lines": {
+        "en": [
+          "board_start lists other people's tasks waiting for review, so agents find what they may finish or send back.",
+          "The database itself keeps a task someone holds theirs; a person changing it on the page is recorded in its thread.",
+          "Todo tasks that carried a claim are stored as plain assignments to the same person."
+        ],
+        "ko": [
+          "board_start가 검토를 기다리는 남의 태스크를 보여 줘서, 에이전트가 완료하거나 되돌릴 일을 찾을 수 있어요.",
+          "누가 맡은 태스크는 DB가 직접 지켜요. 사람이 페이지에서 바꾸면 그 사실이 스레드에 남아요.",
+          "집은 표시가 남아 있던 할 일은 같은 사람에게 배정된 상태로 정리했어요."
+        ]
+      }
+    },
+    {
       "version": "1.10.0",
       "date": "2026-10-23",
       "prs": [

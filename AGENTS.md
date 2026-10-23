@@ -8,7 +8,7 @@ artiboard is read by agents on every session they spend on a board, so it has th
 
 | Path | Owns |
 | --- | --- |
-| `server/tasks.js` | The task rules: holder, status side effects, who may change what, readiness. Pure functions, no I/O. |
+| `server/tasks.js` | The task rules: holder, status side effects, who may change what, readiness. Pure functions, no I/O. Both databases enforce who may change what on every member's write; `tests/task-cases.js` runs one table through JavaScript and SQL. |
 | `server/flow.js` | The everyday agent actions (`board_start`, `board_task`, `board_claim`, `board_post`, batch writes), built on the task rules. |
 | `server/mcp.js` | The tool surface agents see. Its listing is snapshotted in `tests/tools.snapshot.json`. |
 | `server/core.js` | Errors, write guards, and the board rules text every agent receives. |
