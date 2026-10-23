@@ -937,7 +937,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // A person's change from the page: the task, then one line in its thread saying what changed, as agents' changes do,
   // so the holder and their agents see who moved it.
-  function change(t,patch,extra){
+  // ifVersion (a runtime that reports versions): write only if the task is still the version read; false if not
+  function change(t,patch,extra,ifVersion){
     if(!writable()||!me)return Promise.resolve();
     var at=now(),bits=[],dash='—';
     if('status' in patch)patch=Object.assign({},patch,statusEffects(t,patch.status,at));
@@ -945,9 +946,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     was('status',st(t),patch.status,SL);was('owner',t.owner,patch.owner,pname);was('start',startOf(t),patch.start,dayLabel);was('due',dueOf(t),patch.due,dayLabel);
     if(!bits.length&&!extra)return save(t.id,patch);
     patch.updatedAt=patch.lastMessageAt=at;markSeen(t.id,at);
-    return db.doc('tasks/'+t.id).update(patch)
+    return db.doc('tasks/'+t.id).update(patch,typeof ifVersion==='number'?{ifVersion:ifVersion}:undefined)
       .then(function(){return db.doc('tasks/'+t.id+'/messages/'+at.replace(/:/g,'-')+'-'+me).set({at:at,author:me,kind:'human',type:'update',text:bits.join(' · ')+(extra||'')})})
-      .catch(function(e){toast(T('saveFail',{e:errText(e)}));refused(e)});
+      .catch(function(e){if(e&&e.code==='version_conflict'&&typeof ifVersion==='number'){toast(T('alreadyClaimed'));return false}toast(T('saveFail',{e:errText(e)}));refused(e);return false});
   }
   // one-click moves for the task in the sheet: the review step is anyone's, taking over asks twice
   function actions(t){
@@ -1085,7 +1086,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     db.doc('tasks/'+t.id).get().then(function(s){
       var d=s.exists?s.data():null;
       if(!d||statusOf(d)!=='todo'||(holderOf(d)&&holderOf(d)!==me)){toast(T('alreadyClaimed'));return}
-      return change(t,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}}).then(function(){toast(T('claimed',{p:pname(me),k:t.key}))});
+      return change(t,{status:'doing',owner:me,claimedBy:{who:me,agent:false,at:now()}},'',s.version).then(function(ok){if(ok!==false)toast(T('claimed',{p:pname(me),k:t.key}))});
     }).catch(function(e){toast(T('claimFail',{e:errText(e)}));refused(e)}).then(function(){btn.disabled=false});
   }
 

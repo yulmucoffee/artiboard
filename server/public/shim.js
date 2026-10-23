@@ -67,7 +67,7 @@
 
   function copy(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
   function docSnap(row) {
-    return { exists: !!row, id: row ? row.doc_id : undefined, data: function () { return row ? copy(row.data) : undefined; } };
+    return { exists: !!row, id: row ? row.doc_id : undefined, version: row ? row.version : undefined, data: function () { return row ? copy(row.data) : undefined; } };
   }
   function snap(rows) {
     var docs = rows.map(function (row) { return { id: row.doc_id, data: function () { return copy(row.data); } }; });
@@ -324,7 +324,12 @@
         path: path,
         get: function () { return tr.plain([], one).then(function (rows) { return docSnap(rows[0] || null); }, function (e) { throw boardError(e); }); },
         set: function (data) { return write({ op: 'set', path: path, data: copy(data) }); },
-        update: function (patch) { return write({ op: 'update', path: path, data: copy(patch) }); },
+        // { ifVersion }: write only if the document is still the version read (a claim two people make at once)
+        update: function (patch, o) {
+          var w = { op: 'update', path: path, data: copy(patch) };
+          if (o && typeof o.ifVersion === 'number') w.if_version = o.ifVersion;
+          return write(w);
+        },
         delete: function () { return write({ op: 'delete', path: path }); },
         acquire: function (o) {
           return tr.acquire(path, String((o && o.holder) || ''), (o && o.ttlMs) || 5000)

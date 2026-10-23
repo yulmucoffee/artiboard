@@ -247,6 +247,22 @@ for (const backend of backends) {
       }
     });
 
+    test('two agents claiming one task at once: exactly one gets it', async () => {
+      const at = new Date().toISOString();
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `tasks/${K('race')}`, data: { key: K('race'), title: 'race', status: 'todo', deps: [], waitingOn: [], updatedAt: at } }] });
+      const other = await connect(tokens.member);
+      try {
+        const results = (await Promise.all([board, other, board, other].map((c) => call(c, 'board_claim', { project: P, id: K('race') })))).map((r) => r.value.split(' ')[0]);
+        assert.equal(results.filter((r) => r === 'claimed').length, 1, `one claim wins (${results.join(', ')})`);
+        const held = (await call(board, 'board_get', { project: P, path: `tasks/${K('race')}` })).value.data.claimedBy.who;
+        assert.ok(results.every((r) => r === 'claimed' || r === 'taken:' || r === 'already'), results.join(', '));
+        const msgs = (await call(board, 'board_query', { project: P, collection: `tasks/${K('race')}/messages`, limit: 10 })).value.docs;
+        assert.deepEqual(msgs.map((m) => m.data.author), [held], 'and only the winner posted a claim');
+      } finally {
+        await other.close();
+      }
+    });
+
     test('the start lists what was assigned to you and repairs readiness from the deps themselves', async () => {
       const at = new Date().toISOString(), me = people.admin.person;
       const task = (n, data) => ({ op: 'set', path: `tasks/${K(n)}`, data: { key: K(n), title: `drift ${n}`, status: 'todo', deps: [], updatedAt: at, ...data } });

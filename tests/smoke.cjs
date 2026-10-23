@@ -15,15 +15,19 @@ const seed=()=>({
   'tasks/M1-4/messages/2026-01-05T09-00-00.000Z-cy':{at:T0,author:'cy',kind:'agent',type:'update',text:'Docs done\nsee the PR'}
 });
 // user: the namespace claude.use('user') resolves (null = no identity, today's picker); deny: every write rejects like a view-only viewer's
-function boot({user=null,docs={},me=null,deny=false,storage={}}={}){
-  const store={...seed(),...docs},subs=[],writes=[],errors=[];
+// race: a path someone else claims right after the page reads it (the store keeps versions, like a hosted site's)
+function boot({user=null,docs={},me=null,deny=false,storage={},race=null}={}){
+  const store={...seed(),...docs},subs=[],writes=[],errors=[],vers={};
   const notify=()=>subs.slice().forEach(s=>s());
-  const put=(p,f)=>{if(deny)return Promise.reject({code:'invalid_argument'});writes.push(p);store[p]=f(store[p]);setTimeout(notify,0);return Promise.resolve()};
+  const put=(p,f,o)=>{if(deny)return Promise.reject({code:'invalid_argument'});
+    if(o&&typeof o.ifVersion==='number'&&o.ifVersion!==(vers[p]||0))return Promise.reject({code:'version_conflict'});
+    writes.push(p);store[p]=f(store[p]);vers[p]=(vers[p]||0)+1;setTimeout(notify,0);return Promise.resolve()};
   function snapColl(p,o){let docs=Object.keys(store).filter(k=>k.startsWith(p+'/')&&!k.slice(p.length+1).includes('/')).map(k=>({id:k.slice(p.length+1),data:()=>store[k]}));
     if(o.order)docs.sort((a,b)=>(a.data()[o.order]>b.data()[o.order]?1:-1)*(o.dir==='desc'?-1:1));return {docs:o.limit?docs.slice(0,o.limit):docs}}
   function coll(p,o={}){return {orderBy:(f,d)=>coll(p,{...o,order:f,dir:d}),limit:n=>coll(p,{...o,limit:n}),onSnapshot(cb){const run=()=>cb(snapColl(p,o));subs.push(run);run();return()=>subs.splice(subs.indexOf(run),1)}}}
-  function doc(p){return {get:async()=>({exists:!!store[p],data:()=>store[p]}),onSnapshot(cb){const run=()=>cb({exists:!!store[p],data:()=>store[p]});subs.push(run);run();return()=>subs.splice(subs.indexOf(run),1)},
-    acquire:async()=>({acquired:true}),update:o=>put(p,c=>({...c,...o})),set:o=>put(p,()=>o)}}
+  function doc(p){return {get:async()=>{const seen=store[p],r={exists:!!seen,version:race?vers[p]||0:undefined,data:()=>seen};
+      if(race===p){race=null;await put(p,c=>({...c,status:'doing',owner:'ben',claimedBy:{who:'ben',agent:true,at:T0}}))}return r},onSnapshot(cb){const run=()=>cb({exists:!!store[p],data:()=>store[p]});subs.push(run);run();return()=>subs.splice(subs.indexOf(run),1)},
+    acquire:async()=>({acquired:true}),update:(o,opt)=>put(p,c=>({...c,...o}),opt),set:o=>put(p,()=>o)}}
   const dom=new JSDOM('<!doctype html><body>'+html+'</body>',{runScripts:'dangerously',url:'https://board.test/',pretendToBeVisual:true,
     beforeParse(w){w.Math.random=()=>0;if(me)w.localStorage.setItem('ab-me',me);for(const k in storage)w.localStorage.setItem(k,storage[k]);
       w.claude={use:n=>Promise.resolve(n==='db'?{collection:coll,doc}:n==='user'?user:null)};w.HTMLElement.prototype.scrollIntoView=()=>{}}});
@@ -232,6 +236,12 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   change(b.d,'fStatus','todo');await tick();
   ok(b.store['tasks/M1-1'].status==='todo'&&b.store['tasks/M1-1'].owner===null&&b.store['tasks/M1-1'].claimedBy===null,'back to To do releases the task, owner included');
   b.key('Escape');
+
+  console.log('# two people claim at once');
+  b=boot({race:'tasks/M1-1'});all.push(b);await tick();await heal();b.pick('ana');await tick();
+  [...b.d.querySelectorAll('.rows.ready li')].find(li=>/M1-1/.test(li.textContent)).querySelector('.btn').click();await tick();await tick();
+  ok(b.store['tasks/M1-1'].claimedBy.who==='ben'&&b.store['tasks/M1-1'].owner==='ben','the one who wrote first keeps it');
+  ok(!Object.keys(b.store).some(k=>k.startsWith('tasks/M1-1/messages/')&&k.endsWith('-ana'))&&/Someone just claimed it/.test(b.d.getElementById('toastRoot').textContent),'the late claim writes nothing and says so');
 
   console.log('# view-only viewer');
   b=boot({user:fakeUser('u_ana',false)});all.push(b);await tick();await heal();
