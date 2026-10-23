@@ -350,7 +350,7 @@ server/                                 セルフホストのサイト: HTTP ア
 api/, vercel.json                       Supabase を使うサイト向けの Vercel 関数
 supabase/                               Supabase のスキーマ(マイグレーション)とローカル設定
 Dockerfile, docker-compose.yml          コンテナで動く SQLite のサイト。自分のドメインで Caddy の背後に置く
-examples/                               board.html と demo-data.json から公開デモを生成: build-demo.cjs, demo-data.json, demo.html
+examples/                               board.html と demo-data.json から公開デモを生成: build-demo.cjs, demo-data.json (demo.html は生成物でリポジトリに置かない)
 FOR_AGENTS.md                           AI エージェント向けのインストール手順
 .claude-plugin/                         Claude Code プラグインの定義
 tests/smoke.cjs                         ボードページの jsdom テスト
@@ -373,7 +373,7 @@ npm install && npm test
 
 `npm test` は使い捨ての SQLite ファイルでホストしたサイトを動かします。ローカルの Supabase(`supabase start`)があれば、`AB_SUPABASE=1` とその `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY` を加えると、同じテストをそちらで実行できます。
 
-ページを変えたらデモを作り直します。
+デモを見る・公開するときに生成します(`examples/demo.html`、リポジトリには置きません)。
 
 ```bash
 node examples/build-demo.cjs

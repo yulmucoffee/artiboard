@@ -350,7 +350,7 @@ server/                                 自托管站点：HTTP 应用、MCP 服�
 api/, vercel.json                       基于 Supabase 的站点所用的 Vercel 函数
 supabase/                               Supabase schema（迁移）和本地配置
 Dockerfile, docker-compose.yml          容器中的 SQLite 站点，在你的域名上位于 Caddy 之后
-examples/                               用 board.html 和 demo-data.json 生成公开演示: build-demo.cjs, demo-data.json, demo.html
+examples/                               用 board.html 和 demo-data.json 生成公开演示: build-demo.cjs, demo-data.json（demo.html 只生成，不入库）
 FOR_AGENTS.md                           给 AI agent 的分步安装说明
 .claude-plugin/                         Claude Code 插件清单
 tests/smoke.cjs                         看板页面的 jsdom 冒烟测试
@@ -373,7 +373,7 @@ npm install && npm test
 
 `npm test` 会用一个临时 SQLite 文件运行托管站点。如果有本地 Supabase（`supabase start`），加上 `AB_SUPABASE=1` 以及它的 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY` 和 `SUPABASE_SECRET_KEY`，即可在上面运行同样的测试。
 
-修改页面后重新生成演示：
+要查看或发布演示时生成（`examples/demo.html`，不入库）：
 
 ```bash
 node examples/build-demo.cjs

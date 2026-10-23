@@ -350,7 +350,7 @@ server/                                 the self-hosted site: HTTP app, MCP serv
 api/, vercel.json                       Vercel functions for a Supabase-backed site
 supabase/                               the Supabase schema (migrations) and local config
 Dockerfile, docker-compose.yml          a SQLite site in a container, behind Caddy on your domain
-examples/                               builds the public demo from board.html and demo-data.json: build-demo.cjs, demo-data.json, demo.html
+examples/                               builds the public demo from board.html and demo-data.json: build-demo.cjs, demo-data.json (demo.html is built, not kept)
 FOR_AGENTS.md                           step-by-step install for AI agents
 .claude-plugin/                         Claude Code plugin manifests
 tests/smoke.cjs                         jsdom smoke test of the board page
@@ -373,7 +373,7 @@ npm install && npm test
 
 `npm test` runs the hosted site on a throwaway SQLite file. With a local Supabase (`supabase start`), add `AB_SUPABASE=1` and its `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY` to run the same tests there.
 
-Rebuild the demo after changing the page:
+Build the demo to look at it or publish it (`examples/demo.html`, not kept in git):
 
 ```bash
 node examples/build-demo.cjs

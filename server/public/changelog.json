@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.14.3",
+      "date": "2026-10-23",
+      "prs": [
+        36
+      ],
+      "lines": {
+        "en": [
+          "Nothing changes on screen: the public demo is built when it is published instead of kept in the repository, so two changes to the page no longer clash over a 2,500-line generated file."
+        ],
+        "ko": [
+          "화면은 그대로예요. 공개 데모는 게시할 때 만들고 저장소에 두지 않아서, 페이지를 고친 두 변경이 2,500줄짜리 생성 파일로 부딪치지 않아요."
+        ]
+      }
+    },
+    {
       "version": "1.14.2",
       "date": "2026-10-23",
       "prs": [
