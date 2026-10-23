@@ -297,5 +297,25 @@ export function makeFlow(store) {
     });
   }
 
-  return { start, task, claim, post, projectFor };
+  // An agent's batch writes to tasks follow the same rules as board_post: a task someone else holds changes only
+  // in the ways the rules open to everyone. Override lives on board_post alone, where the thread records it.
+  async function batch(member, project, writes) {
+    const onTasks = writes.map((w, i) => [w, i]).filter(([w]) => /^tasks\/[^/]+$/.test(w.path));
+    const current = await Promise.all(onTasks.map(([w]) => get(project, w.path)));
+    onTasks.forEach(([w, i], j) => {
+      const before = current[j]?.data;
+      if (!before) return;
+      const after = w.op === 'delete' ? {} : w.op === 'set' ? w.data || {} : { ...before, ...w.data };
+      const patch = {};
+      for (const k of new Set([...Object.keys(before), ...Object.keys(after)])) {
+        if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) patch[k] = after[k] ?? null;
+      }
+      if (!mayChange(before, member.person, patch, false)) {
+        throw new BoardError('not_yours', `${before.key || w.path} is held by ${holderOf(before)}; change it with board_post (override true only when your person says so)`, i);
+      }
+    });
+    return apply(member, project, writes);
+  }
+
+  return { start, task, claim, post, batch, projectFor };
 }
