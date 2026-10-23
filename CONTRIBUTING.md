@@ -1,5 +1,7 @@
 # Contributing
 
+How we work on this repository (principles, recipes, what done means) is in [AGENTS.md](AGENTS.md); this file holds the release rules.
+
 Every change that reaches `main`, through a pull request or a direct push, comes with two things:
 
 1. **A version bump** in `package.json` (`npm version <x.y.z> --no-git-tag-version`, which also stamps the version into `server/version.js` and the skill's `SKILL.md`): a new feature raises the middle number (1.3.0 → 1.4.0), a fix or a docs change the last one (1.4.0 → 1.4.1). The first number stays 1; the middle one keeps counting past 9 (1.9.0 → 1.10.0).
