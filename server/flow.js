@@ -118,7 +118,7 @@ export function makeFlow(store) {
     if (!project && !repo) throw new BoardError('invalid_argument', 'pass project, or repo (owner/name from git remote) to find it');
     if (!project) project = await projectFor(repo);
     const me = member.person;
-    const [config, cursor, owned, todo, own, notes, latest] = await Promise.all([
+    const [config, cursor, owned, todo, own, notes, latest, inReview] = await Promise.all([
       get(project, 'meta/config'),
       get(project, `cursors/${me}`),
       query(project, 'tasks', { where: [{ field: 'owner', op: '==', value: me }], limit: 50 }),
@@ -126,6 +126,7 @@ export function makeFlow(store) {
       rules ? get(project, 'meta/rules') : null,
       rules ? get(project, 'meta/notes') : null,
       query(project, 'notices', { order: [{ field: 'at', dir: 'desc' }], limit: 20 }),
+      ready ? query(project, 'tasks', { where: [{ field: 'status', op: '==', value: 'review' }], limit: 50 }) : [],
     ]);
     // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
     const mine = owned.filter((t) => (t.data.status || 'todo') !== 'done');
@@ -145,7 +146,10 @@ export function makeFlow(store) {
     let free = (ready ? await readyWork(member, project, todo) : []).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
     await moving;
     const elsewhere = want ? free.filter((t) => { const r = taskRepo(t.data, repos); return r && r !== want; }).length : 0;
-    if (want) free = free.filter((t) => { const r = taskRepo(t.data, repos); return !r || r === want; });
+    const here = (t) => { const r = want && taskRepo(t.data, repos); return !r || r === want; };
+    if (want) free = free.filter(here);
+    // someone else's work waiting for a review, which anyone may finish after the merge or send back
+    const toReview = inReview.filter((t) => holderOf(t.data) !== me && here(t)).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
 
     const out = [`${me} · ${project}${c.milestone ? ` · ${c.milestone}` : ''} · artiboard ${VERSION}`];
     if (repos.length) out.push(`repos: ${repoList(repos)}`);
@@ -169,6 +173,10 @@ export function makeFlow(store) {
       const more = elsewhere ? `; ${elsewhere} more in other repos` : '';
       out.push(free.length ? `ready (${free.length > ready ? `${ready} of ` : ''}${free.length}${more}):` : `ready: none${more}`);
       free.slice(0, ready).forEach((t) => out.push(taskLine(t.data, t.id)));
+      if (toReview.length) {
+        out.push(`to review (${toReview.length > ready ? `${ready} of ` : ''}${toReview.length}):`);
+        toReview.slice(0, ready).forEach((t) => out.push(taskLine(t.data, t.id, true)));
+      }
     }
     return out.join('\n');
   }

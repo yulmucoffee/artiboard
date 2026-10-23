@@ -24,27 +24,40 @@ export function unmetDeps(t, isDone) {
 // free to pick: to do, nobody holds it, nothing it waits on is left
 export function isReady(t, isDone) { return statusOf(t) === 'todo' && !holderOf(t) && !unmetDeps(t, isDone).length; }
 
-// What else a status change sets: back to todo releases the task, done stamps when, and leaving done takes back
-// the done day and the archive.
+// What else a status change sets: back to todo releases the task, done stamps when, and the rest follows from
+// normalTask on the result (leaving done takes back the done day and the archive).
 export function statusEffects(t, status, at) {
   const fx = {};
   if (status === 'todo') { fx.claimedBy = null; fx.owner = null; }
   if (status === 'done' && statusOf(t) !== 'done') fx.doneAt = at;
-  if (status !== 'done' && t.doneAt) fx.doneAt = null;
-  if (status !== 'done' && t.archivedAt) fx.archivedAt = null;
+  return Object.assign(fx, normalTask(Object.assign({}, t, { status }, fx)));
+}
+
+// The fields a task needs changed to be in a state the rules allow, whoever wrote it: a todo task with a claim was
+// assigned, not started, so the claimer keeps it as its owner; only a done task carries a done day or an archive day.
+// Both databases apply this to every task they store.
+export function normalTask(t) {
+  const fx = {}, s = statusOf(t);
+  if (s === 'todo' && t.claimedBy) {
+    fx.claimedBy = null;
+    if (!t.owner && t.claimedBy.who) fx.owner = t.claimedBy.who;
+  }
+  if (s !== 'done' && t.doneAt) fx.doneAt = null;
+  if (s !== 'done' && t.archivedAt) fx.archivedAt = null;
   return fx;
 }
 
-// Whether `me` may write `patch` (field names to values; `summary` counts as a field) on a task someone else holds.
-// Anyone moves the due day, reviews a task in review (done after the merge, or back to doing, with a summary) and
-// moves done work in or out of the archive. The rest needs the holder, or override when a person says so.
+// Whether `me` may write `patch` (field names to values; a details document's fields count too) on a task someone
+// else holds. Anyone moves the due day, reviews a task in review (done after the merge or back to doing, and its
+// summary) and moves done work in or out of the archive. The rest needs the holder, or override when a person
+// says so. Both databases check this on every write to a task or its details.
 export function mayChange(t, me, patch, override) {
   const h = holderOf(t);
   if (!h || h === me || override) return true;
   const keys = Object.keys(patch).filter((k) => OPEN_FIELDS.indexOf(k) < 0);
   if (!keys.length) return true;
   const s = statusOf(t);
-  if (s === 'review' && (patch.status === 'done' || patch.status === 'doing')
+  if (s === 'review' && (!('status' in patch) || patch.status === 'done' || patch.status === 'doing')
     && keys.every((k) => k === 'status' || k === 'summary' || k === 'doneAt')) return true;
   return s === 'done' && keys.every((k) => k === 'archivedAt');
 }

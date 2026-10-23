@@ -233,7 +233,7 @@ for (const backend of backends) {
         const h1 = (await call(other, 'board_get', { project: P, path: `tasks/${K('h1')}` })).value.data;
         const same = { claimedBy: Object.fromEntries(Object.entries(h1.claimedBy).reverse()), archivedAt: null, due: '2026-12-01' };
         assert.equal((await viaBatch(same)).error, false, 'a missing field equals null, and key order does not matter');
-        const details = await call(other, 'board_batch', { project: P, writes: [{ op: 'set', path: `details/${K('h1')}`, data: { summary: 'not mine to write' } }] });
+        const details = await call(other, 'board_batch', { project: P, writes: [{ op: 'set', path: `details/${K('h1')}`, data: { spec: 'not mine to write' } }] });
         assert.equal(details.value.code, 'not_yours', 'a held task\'s details are the holder\'s too');
         const fresh = await call(other, 'board_batch', { project: P, writes: [
           { op: 'set', path: `tasks/${K('new')}`, if_absent: true, data: { key: K('new'), title: 'new', status: 'todo', deps: [], waitingOn: [] } },
@@ -242,6 +242,10 @@ for (const backend of backends) {
         const over = await call(other, 'board_batch', { project: P, override: true, writes: [{ op: 'update', path: `tasks/${K('h1')}`, data: { title: 'retitled', milestone: 'M2' } }] });
         assert.equal(over.error, false, 'override lets a person-approved change through');
         assert.deepEqual(await last('h1'), { text: `changed title, milestone (override; held by ${me})`, author: them }, 'and the thread names the holder');
+        const start = (await call(other, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
+        assert.match(start, new RegExp(`^to review \\(\\d+\\):\\n(?:.*\\n)*${K('h1')} review .*https://example.com/pr/2 `, 'm'), 'others\' work in review is listed with its PR');
+        const own = (await call(board, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
+        assert.doesNotMatch(own.split('\nto review')[1] || '', new RegExp(K('h1')), 'not to its own holder, who sees it under mine');
         assert.match((await call(other, 'board_post', { project: P, task: K('h1'), status: 'done', branch: 'x' })).value, /^not_yours: .*review it/, 'a reviewer changes only the status');
         assert.equal((await call(other, 'board_post', { project: P, task: K('h1'), text: 'merged', status: 'done' })).value, `ok ${K('h1')} → done`);
         assert.match((await call(other, 'board_task', { project: P, id: K('h1'), thread: 0 })).value, new RegExp(`^${K('h1')} done · ${me} \\(agent\\)`), 'the holder keeps the credit');
