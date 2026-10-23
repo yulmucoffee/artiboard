@@ -21,6 +21,10 @@ create table if not exists docs (
   primary key (project, collection, doc_id));
 create index if not exists docs_changed on docs (project, updated_at);
 create index if not exists docs_updated on docs (updated_at);
+-- the fields the everyday tools filter tasks on; the query text below spells them the same way so these indexes apply
+create index if not exists docs_status on docs (project, collection, json_extract(data, '$."status"'));
+create index if not exists docs_key on docs (project, collection, json_extract(data, '$."key"'));
+create index if not exists docs_owner on docs (project, collection, json_extract(data, '$."owner"'));
 create table if not exists members (
   uid text primary key, person text not null unique, name text, email text unique,
   role text not null default 'member', created_at text not null);
@@ -49,8 +53,13 @@ const jpath = (field) => `'$.${checkField(field).map((k) => `"${k}"`).join('.')}
 function condition(w, params) {
   const p = jpath(w.field), ex = `json_extract(data, ${p})`, ty = `json_type(data, ${p})`, v = w.value;
   const equal = () => { params.push(JSON.stringify([v])); return `exists (select 1 from json_each(?) r where ${same(ex, ty, 'r.value', 'r.type')})`; };
+  // a string or a number compares directly, so an index on the field applies and nothing is scanned per row
+  const scalar = (x) => typeof x === 'string' || (typeof x === 'number' && Number.isFinite(x));
+  const typed = (x) => (typeof x === 'string' ? `${ty} = 'text'` : `${ty} in ('integer','real')`);
   switch (w.op) {
-    case '==': return equal();
+    case '==':
+      if (scalar(v)) { params.push(v); return `(${typed(v)} and ${ex} = ?)`; }
+      return equal();
     case '!=': return `not ${equal()}`;
     case '<': case '<=': case '>': case '>=': {
       if (typeof v === 'number') { params.push(v); return `(${ty} in ('integer','real') and ${ex} ${w.op} ?)`; }
@@ -60,9 +69,12 @@ function condition(w, params) {
     case 'array-contains':
       params.push(JSON.stringify([v]));
       return `(${ty} = 'array' and exists (select 1 from json_each(data, ${p}) l, json_each(?) r where ${same('l.value', 'l.type', 'r.value', 'r.type')}))`;
-    case 'in':
-      params.push(JSON.stringify(Array.isArray(v) ? v : [v]));
+    case 'in': {
+      const vs = Array.isArray(v) ? v : [v];
+      if (vs.length && vs.every((x) => typeof x === 'string')) { params.push(JSON.stringify(vs)); return `(${typed('')} and ${ex} in (select value from json_each(?)))`; }
+      params.push(JSON.stringify(vs));
       return `exists (select 1 from json_each(?) r where ${same(ex, ty, 'r.value', 'r.type')})`;
+    }
     default: throw new BoardError('invalid_argument', `unknown op: ${w.op}`);
   }
 }
@@ -175,7 +187,7 @@ export function openSqlite({ file, boardUrl }) {
   // ---- pages read by the browser ----
 
   // whole collections, single documents, the first rows of one ordered collection, or rows changed after a time
-  async function readRows(project, { whole = [], docs = {}, collection, order, limit, collections, since } = {}) {
+  async function readRows(project, { whole = [], docs = {}, collection, order, limit, collections, since, limited } = {}) {
     checkProject(project);
     if (collection) {
       const rows = await query(project, collection, { order, limit: limit || 200 });
@@ -183,6 +195,17 @@ export function openSqlite({ file, boardUrl }) {
     }
     // a page asks for a handful of collections at once; anything bigger is not the page
     const many = (list) => { if (!Array.isArray(list) || list.length > 20) throw new BoardError('invalid_argument', 'at most 20 collections per read'); };
+    // several ordered, limited reads in one request (the latest message of each task in recent activity); i says which
+    if (limited) {
+      many(limited);
+      const out = [];
+      for (const [i, r] of limited.entries()) {
+        for (const d of await query(project, r?.collection, { order: r?.order, limit: r?.limit || 200 })) {
+          out.push({ i, collection: r.collection, doc_id: d.id, version: d.version, updated_at: d.updated_at, data: d.data });
+        }
+      }
+      return out;
+    }
     if (collections) {
       many(collections);
       collections.forEach(checkCollection);
@@ -236,6 +259,7 @@ export function openSqlite({ file, boardUrl }) {
   // ---- projects ----
 
   async function overview() {
+    const names = new Map(q('select person, name from members').all().map((m) => [m.person, m.name || null]));
     return q('select * from projects order by created_at').all().map((p) => {
       const c = q(`select data from docs where project = ? and collection = 'meta' and doc_id = 'config'`).get(p.id);
       const cfg = c ? JSON.parse(c.data) : {};
@@ -246,7 +270,21 @@ export function openSqlite({ file, boardUrl }) {
       // the latest time written on a task or notice, so imported history keeps its own dates
       const last = q(`select max(max(coalesce(json_extract(data, '$.updatedAt'), ''), coalesce(json_extract(data, '$.lastMessageAt'), ''),
           coalesce(json_extract(data, '$.at'), ''))) t from docs where project = ? and collection in ('tasks', 'notices')`).get(p.id).t;
-      return { id: p.id, title: cfg.title || p.title, subtitle: cfg.subtitle || null, repos: Array.isArray(cfg.repos) ? cfg.repos : [], created_at: p.created_at, tasks, total, last: /^\d{4}-/.test(last || '') ? last : null };
+      // who has work in hand (doing, review, blocked) on this board, most first, with their latest three tasks
+      const held = new Map();
+      for (const r of q(`select doc_id, data from docs where project = ? and collection = 'tasks'
+          and json_extract(data, '$."status"') in ('doing', 'review', 'blocked')`).all(p.id)) {
+        const d = JSON.parse(r.data), who = d.claimedBy?.who || d.owner;
+        if (typeof who !== 'string' || !who) continue;
+        const w = held.get(who) || { who, name: names.get(who) || null, n: 0, agent: false, tasks: [] };
+        w.n++;
+        w.agent ||= d.claimedBy?.agent === true;
+        w.tasks.push({ key: d.key || r.doc_id, title: d.title || '', status: d.status, at: String(d.updatedAt || '') });
+        held.set(who, w);
+      }
+      const working = [...held.values()].sort((a, b) => b.n - a.n || a.who.localeCompare(b.who))
+        .map((w) => ({ ...w, tasks: w.tasks.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 3).map(({ at, ...t }) => t) }));
+      return { id: p.id, title: cfg.title || p.title, subtitle: cfg.subtitle || null, repos: Array.isArray(cfg.repos) ? cfg.repos : [], created_at: p.created_at, tasks, total, working, last: /^\d{4}-/.test(last || '') ? last : null };
     }).sort((a, b) => (b.last || '').localeCompare(a.last || '') || a.created_at.localeCompare(b.created_at));
   }
 

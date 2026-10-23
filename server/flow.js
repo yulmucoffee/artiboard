@@ -84,9 +84,11 @@ export function makeFlow(store) {
     const free = todo.filter((t) => !t.data.claimedBy);
     const depsOf = (t) => (Array.isArray(t.data.deps) ? t.data.deps.filter((k) => typeof k === 'string') : []);
     const keys = [...new Set(free.flatMap(depsOf))];
-    const done = new Set();
-    for (let i = 0; i < keys.length; i += 100) {
-      for (const d of await query(project, 'tasks', { where: [{ field: 'key', op: 'in', value: keys.slice(i, i + 100) }, { field: 'status', op: '==', value: 'done' }], limit: 200 })) done.add(d.data.key);
+    const done = new Set(), chunks = [];
+    for (let i = 0; i < keys.length; i += 100) chunks.push(keys.slice(i, i + 100));
+    // one round trip for all of them, however many deps there are
+    for (const found of await Promise.all(chunks.map((ks) => query(project, 'tasks', { where: [{ field: 'key', op: 'in', value: ks }, { field: 'status', op: '==', value: 'done' }], limit: 200 })))) {
+      for (const d of found) done.add(d.data.key);
     }
     const repairs = [], ready = [];
     for (const t of free) {
@@ -97,32 +99,36 @@ export function makeFlow(store) {
       if (!want.length) ready.push(t);
     }
     // best effort: a conflict means someone else just wrote the task, a viewer may not write at all
-    for (let i = 0; i < repairs.length; i += 100) await apply(member, project, repairs.slice(i, i + 100)).catch(() => {});
+    const batches = [];
+    for (let i = 0; i < repairs.length; i += 100) batches.push(repairs.slice(i, i + 100));
+    await Promise.all(batches.map((b) => apply(member, project, b).catch(() => {})));
     return ready;
   }
 
   // Session start: the rules, notices after this person's cursor (and move the cursor), their tasks, and ready work.
   // With a repo, ready work is the tasks of that repository and the tasks that name none.
+  // On a remote database every read is a round trip, so they go out together: the reads, then the dependency
+  // check, then the writes (cursor and readiness repairs) side by side.
   async function start(member, { project, repo, ready = 8, peek = false, rules = true } = {}) {
     if (!project && !repo) throw new BoardError('invalid_argument', 'pass project, or repo (owner/name from git remote) to find it');
     if (!project) project = await projectFor(repo);
     const me = member.person;
-    const [config, cursor, owned, todo, own, notes] = await Promise.all([
+    const [config, cursor, owned, todo, own, notes, latest] = await Promise.all([
       get(project, 'meta/config'),
       get(project, `cursors/${me}`),
       query(project, 'tasks', { where: [{ field: 'owner', op: '==', value: me }], limit: 50 }),
       ready ? query(project, 'tasks', { where: [{ field: 'status', op: '==', value: 'todo' }], limit: 200 }) : [],
       rules ? get(project, 'meta/rules') : null,
       rules ? get(project, 'meta/notes') : null,
+      query(project, 'notices', { order: [{ field: 'at', dir: 'desc' }], limit: 20 }),
     ]);
     // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
     const mine = owned.filter((t) => (t.data.status || 'todo') !== 'done');
+    // the 20 latest notices: those after the cursor are new (all 20 new: older ones went unread); no cursor yet, the latest 5
     const since = cursor?.data?.noticesAt || null;
-    const notices = since
-      ? await query(project, 'notices', { where: [{ field: 'at', op: '>', value: since }], order: [{ field: 'at' }], limit: 20 })
-      : (await query(project, 'notices', { order: [{ field: 'at', dir: 'desc' }], limit: 5 })).reverse();
+    const notices = (since ? latest.filter((n) => typeof n.data.at === 'string' && n.data.at > since) : latest.slice(0, 5)).reverse();
     const newest = notices.map((n) => n.data.at).filter((a) => typeof a === 'string').sort().pop();
-    if (!peek && newest && (!since || newest > since)) await moveCursor(member, project, cursor, newest).catch(() => {});
+    const moving = !peek && newest && (!since || newest > since) ? moveCursor(member, project, cursor, newest).catch(() => {}) : null;
 
     // repo, given with a project, may also be one of its labels; one the project does not list turns the filter off
     const c = config?.data || {}, repos = reposOf(c);
@@ -132,6 +138,7 @@ export function makeFlow(store) {
       want = null;
     }
     let free = (ready ? await readyWork(member, project, todo) : []).filter((t) => t.data.owner !== me).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
+    await moving;
     const elsewhere = want ? free.filter((t) => { const r = taskRepo(t.data, repos); return r && r !== want; }).length : 0;
     if (want) free = free.filter((t) => { const r = taskRepo(t.data, repos); return !r || r === want; });
 
@@ -147,7 +154,7 @@ export function makeFlow(store) {
       const n = notes?.data;
       if (typeof n?.text === 'string' && n.text.trim()) out.push(`project notes: meta/notes (rev ${n.rev || 1}${n.updatedAt ? ` ${short(n.updatedAt).slice(0, 5)}` : ''}); board_get it when you need the schedule or status`);
     }
-    out.push(notices.length ? `notices${since ? ' (new)' : ' (latest)'}:` : 'notices: none new');
+    out.push(notices.length ? `notices${since ? (notices.length === latest.length ? ' (new, the latest 20; older ones skipped)' : ' (new)') : ' (latest)'}:` : 'notices: none new');
     notices.forEach((n) => out.push(msgLine(n.data)));
     if (mine.length) {
       out.push('mine:');
@@ -198,33 +205,38 @@ export function makeFlow(store) {
   }
 
   // Claim a ready task and post the claim, then hand back its details so work can start at once.
-  async function claim(member, project, id, { text, session } = {}) {
+  // override takes over a task someone else holds (not a done one), when the agent's person says so.
+  async function claim(member, project, id, { text, session, override } = {}) {
     const me = member.person;
     const [det, config] = await Promise.all([get(project, `details/${id}`), get(project, 'meta/config')]);
     const result = await retrying(async () => {
       const t = await get(project, `tasks/${id}`);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
       const d = t.data, status = d.status || 'todo', holder = holderOf(d);
-      if (d.claimedBy?.who === me && status !== 'todo') return 'already yours';
-      if (status !== 'todo' || d.claimedBy) throw new BoardError('taken', `${d.key || id} is ${status}${holder ? `, held by ${holder}` : ''}; pick another`);
-      if (d.waitingOn?.length) throw new BoardError('waiting', `${d.key || id} waits on ${d.waitingOn.join(', ')}`);
+      if (d.claimedBy?.who === me && status !== 'todo') return `already yours ${id}`;
+      const held = status !== 'todo' || !!d.claimedBy;
+      if (held && (!override || status === 'done')) throw new BoardError('taken', `${d.key || id} is ${status}${holder ? `, held by ${holder}` : ''}; pick another`);
+      if (!held && d.waitingOn?.length) throw new BoardError('waiting', `${d.key || id} waits on ${d.waitingOn.join(', ')}`);
+      const from = held && holder && holder !== me ? holder : null;
       const at = now();
       await apply(member, project, [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: {
           status: 'doing', owner: me, claimedBy: { who: me, agent: true, ...(session && { session }), at }, updatedAt: at, lastMessageAt: at } },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {
-          at, author: me, kind: 'agent', type: 'update', text: text || CLAIMED[config?.data?.lang] || CLAIMED.en } },
+          at, author: me, kind: 'agent', type: 'update', text: (text || CLAIMED[config?.data?.lang] || CLAIMED.en) + (from ? ` (taken over from ${from})` : '') } },
       ]);
-      return 'claimed';
+      return from ? `took over ${id} from ${from}` : `claimed ${id}`;
     });
-    return [`${result} ${id}`, ...detailLines(det)].join('\n');
+    return [result, ...detailLines(det)].join('\n');
   }
 
   // A thread message, optionally with a status, branch, PR, start or due day, repo or summary change; without a task, a notice.
-  // Only the task's holder changes it, except its due day, which anyone may move (the thread records who and from what).
+  // Only the task's holder changes it, except: anyone moves its due day (the thread records who and from what), anyone
+  // reviews a task in review (status done after the merge, or doing to send it back, with a summary), and override,
+  // passed when the agent's person says so, opens the rest (the thread names the holder).
   // status todo releases the task (no holder, no owner). status done stamps doneAt (leaving done clears it) and takes
   // the key out of every dependent's waitingOn.
-  async function post(member, project, { task: id, text, type, status, branch, pr, start, due, repo, summary }) {
+  async function post(member, project, { task: id, text, type, status, branch, pr, start, due, repo, summary, override }) {
     const me = member.person;
     if (!id) {
       if (status || branch !== undefined || pr !== undefined || start !== undefined || due !== undefined || repo !== undefined || summary !== undefined) {
@@ -242,8 +254,11 @@ export function makeFlow(store) {
       const [t, det] = await Promise.all([get(project, `tasks/${id}`), summary !== undefined ? get(project, `details/${id}`) : null]);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
       const d = t.data, key = d.key || id, holder = holderOf(d);
-      if (holderOnly && holder && holder !== me) {
-        throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day; ask in its thread or your person for the rest`);
+      const theirs = holderOnly && holder && holder !== me;
+      const review = d.status === 'review' && (status === 'done' || status === 'doing')
+        && branch === undefined && pr === undefined && start === undefined && repo === undefined;
+      if (theirs && !override && !review) {
+        throw new BoardError('not_yours', `${key} is held by ${holder}; you may post text or move its due day${d.status === 'review' ? ', or review it (status done or doing)' : ''}; for the rest ask in its thread, or override true when your person tells you to`);
       }
       const at = now();
       const patch = { updatedAt: at, lastMessageAt: at };
@@ -257,12 +272,12 @@ export function makeFlow(store) {
       if (due !== undefined) patch.due = due || null;
       if (repo !== undefined) patch.repo = repo || null;
       // with no text, the thread still says what changed
-      const said = text?.trim() || [
+      const said = `${text?.trim() || [
         status && `status ${status}`, branch !== undefined && `branch ${branch || 'none'}`, pr !== undefined && `pr ${pr || 'none'}`,
         start !== undefined && `start ${start || 'none'}${day(d.start) ? ` (was ${d.start})` : ''}`,
         due !== undefined && `due ${due || 'none'}${day(d.due) ? ` (was ${d.due})` : ''}`,
         repo !== undefined && `repo ${repo || 'none'}`, summary !== undefined && 'summary updated',
-      ].filter(Boolean).join(' · ') || 'updated';
+      ].filter(Boolean).join(' · ') || 'updated'}${theirs && !review ? ` (override; held by ${holder})` : ''}`;
       const writes = [
         { op: 'update', path: `tasks/${id}`, if_version: t.version, data: patch },
         { op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true, data: {

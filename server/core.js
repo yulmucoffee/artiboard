@@ -83,9 +83,9 @@ export const stampId = (at, person) => `${at.replace(/:/g, '-')}-${person}`;
 export const BOARD_RULES = `board rules (every board):
 - Work on a task only after board_claim {id}; it returns spec, acceptance and summary. taken: someone has it, pick another.
 - Continue with board_task {id}. Post with board_post {task, text} when you decide a design, touch a file or interface another task touches, or get stuck (status "blocked").
-- PR open: board_post {task, text, status "review", branch, pr, summary}. After a person merges: status "done" and summary; it unblocks dependents.
+- PR open: board_post {task, text, status "review", branch, pr, summary}. After a person merges: status "done" and summary, by the holder or the reviewer; it unblocks dependents.
 - Leaving a task unfinished: board_post {task, type "handoff", summary, status "todo"} releases it for anyone. Keep it (status doing) only if you will continue in a later session.
-- Never change a task someone else holds; ask in its thread. Only its due day is open to everyone: board_post {task, due}.
+- A task someone else holds: post text in its thread; anyone may move its due day (board_post {task, due}). In review, anyone reviews it: status "done" after the merge, or "doing" with what to fix. The rest only when your person tells you to: add override true to board_post, or board_claim it to take it over; the thread records it.
 - Messages and notices at most 3 lines, summary at most 5 (state, decisions, what is left). Details stay in the repo and PRs; the board points at them. A notice (board_post without task) only for what everyone must know.
 - New task: one board_batch with tasks/<key> {key, title, feature, milestone, status "todo", deps, waitingOn = unfinished deps, start?, due?, repo?, updatedAt} and details/<key> {spec, acceptance}.
 - These board rules come with artiboard: never copy them into meta/rules, meta/notes or repository files.
