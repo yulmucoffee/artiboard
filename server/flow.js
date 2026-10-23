@@ -51,6 +51,8 @@ function taskLine(d, id, withStatus) {
   bits.push(...dateBits(d));
   return `${bits.join(' ')} ${d.title || ''}`.trim();
 }
+const reviewLine = (d, id) => [d.key || id, d.feature && `[${d.feature}]`, d.repo && `repo:${d.repo}`, d.pr, ...dateBits(d), d.title]
+  .filter(Boolean).join(' ') + (holderOf(d) ? ` · ${holderOf(d)}` : '');
 const msgLine = (m) => `${short(m.at)} ${m.author || '?'}${m.type && m.type !== 'note' ? ` ${m.type}` : ''}: ${oneLine(m.text)}`;
 const repoList = (repos) => repos.map((r) => `${r.repo}${r.label ? ` (${r.label})` : ''}`).join(' · ');
 
@@ -211,7 +213,8 @@ export function makeFlow(store) {
       free.slice(0, ready).forEach((t) => out.push(taskLine(t.data, t.id)));
       if (toReview.length) {
         out.push(`to review (${toReview.length > ready ? `${ready} of ` : ''}${toReview.length}):`);
-        toReview.slice(0, ready).forEach((t) => out.push(taskLine(t.data, t.id, true)));
+        // the header says review and the PR stands for the branch; who to ask is what a reviewer needs
+        toReview.slice(0, ready).forEach((t) => out.push(reviewLine(t.data, t.id)));
       }
     }
     return out.join('\n');
@@ -261,7 +264,8 @@ export function makeFlow(store) {
       const t = await get(project, `tasks/${id}`);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
       const d = t.data, status = statusOf(d), holder = holderOf(d);
-      const taken = () => new BoardError('taken', `${d.key || id} is ${status}${holder ? `, held by ${holder}` : ''}; pick another`);
+      // done work is nobody's to take, so it names no holder
+      const taken = () => new BoardError('taken', `${d.key || id} is ${status}${holder && status !== 'done' ? `, held by ${holder}` : ''}; pick another`);
       if (status === 'done') throw taken();
       if (holder === me && status !== 'todo') return `already yours ${id}`;
       // started, or claimed or assigned by someone else
@@ -295,24 +299,20 @@ export function makeFlow(store) {
   // finishing a list of reviews).
   async function post(member, project, { task: id, tasks, text, type, status, branch, pr, start, due, repo, summary, override }) {
     const me = member.person;
-    if (tasks && (id || [branch, pr, start, due, repo, summary].some((v) => v !== undefined))) {
-      throw new BoardError('invalid_argument', 'tasks takes status and text only, and no task');
-    }
+    // the asked-for change, empty strings clearing a field
+    const change = Object.fromEntries(Object.entries({ status, branch, pr, start, due, repo, summary }).filter(([, v]) => v !== undefined));
+    const asked = Object.keys(change);
+    if (tasks && (id || asked.some((k) => k !== 'status'))) throw new BoardError('invalid_argument', 'tasks takes status and text only, and no task');
     const ids = tasks ? [...new Set(tasks)] : id ? [id] : null;
     if (!ids) {
-      if (status || branch !== undefined || pr !== undefined || start !== undefined || due !== undefined || repo !== undefined || summary !== undefined) {
-        throw new BoardError('invalid_argument', 'status, branch, pr, start, due, repo and summary need a task');
-      }
+      if (asked.length) throw new BoardError('invalid_argument', 'status, branch, pr, start, due, repo and summary need a task');
       if (!text?.trim()) throw new BoardError('invalid_argument', 'a notice needs text');
       const at = now();
       await apply(member, project, [{ op: 'set', path: `notices/n-${stampId(at, me)}`, if_absent: true,
         data: { at, author: me, kind: 'agent', type: type || 'note', text } }]);
       return 'posted notice';
     }
-    const changes = [status, branch, pr, start, due, repo, summary].some((v) => v !== undefined);
-    if (!text?.trim() && !changes) throw new BoardError('invalid_argument', 'pass text, or a change');
-    // the asked-for change, empty strings clearing a field
-    const change = Object.fromEntries(Object.entries({ status, branch, pr, start, due, repo, summary }).filter(([, v]) => v !== undefined));
+    if (!text?.trim() && !asked.length) throw new BoardError('invalid_argument', 'pass text, or a change');
     return retrying(async () => {
       const got = await read(project, [...ids.map((i) => ({ path: `tasks/${i}` })), ...(summary !== undefined ? [{ path: `details/${id}` }] : [])]);
       const ts = got.slice(0, ids.length), det = got[ids.length] ?? null;

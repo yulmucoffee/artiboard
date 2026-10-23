@@ -249,7 +249,7 @@ for (const backend of backends) {
         assert.equal(over.error, false, 'override lets a person-approved change through');
         assert.deepEqual(await last('h1'), { text: 'changed title, milestone (override)', author: them }, 'and the thread says so');
         const start = (await call(other, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
-        assert.match(start, new RegExp(`^to review \\(\\d+\\):\\n(?:.*\\n)*${K('h1')} review .*https://example.com/pr/2 `, 'm'), 'others\' work in review is listed with its PR');
+        assert.match(start, new RegExp(`^to review \\(\\d+\\):\\n(?:.*\\n)*${K('h1')} https://example.com/pr/2 (due \\S+ )?retitled · ${me}$`, 'm'), 'others\' work in review is listed with its PR and who to ask');
         const own = (await call(board, 'board_start', { project: P, ready: 50, rules: false, peek: true })).value;
         assert.doesNotMatch(own.split('\nto review')[1] || '', new RegExp(K('h1')), 'not to its own holder, who sees it under mine');
         assert.match((await call(other, 'board_post', { project: P, task: K('h1'), status: 'done', branch: 'x' })).value, /^not_yours: .*review it/, 'a reviewer changes only the status');
@@ -591,7 +591,7 @@ for (const backend of backends) {
       assert.match(await claim('c4'), /^already yours /, 'a task assigned to me is mine without a claim');
       await claim('c5');
       await call(board, 'board_post', { project: P, task: K('c5'), status: 'done' });
-      assert.match(await claim('c5'), /^taken: .* is done/, 'finished work is not handed back as mine to work on');
+      assert.match(await claim('c5'), /^taken: \S+ is done; pick another$/, 'finished work is not handed back as mine to work on, nor said to be held');
       await call(board, 'board_batch', { project: P, writes: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5'].map((n) => ({ op: 'delete', path: `tasks/${K(n)}` })) });
     });
 
