@@ -77,7 +77,7 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   d.querySelector('thead th button').click();await tick();
   writeNotice(d).click();await tick();
   ok(!!d.getElementById('noticeText'),'the notice form opens on demand');
-  d.querySelector('.pick .btn').click();await tick();await tick();
+  d.querySelector('.rows.ready .btn').click();await tick();await tick();
   ok(store['tasks/M1-1'].owner==='ana'&&store['tasks/M1-1'].status==='doing','claim button claims for the selected person');
   key('m');await tick();
   ok(d.getElementById('mineBtn').getAttribute('aria-pressed')==='true'&&[...d.querySelectorAll('tr.item .key')].map(x=>x.textContent).join()==='M1-1','the mine filter keeps only my tasks');
@@ -115,8 +115,8 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
     'tasks/M1-2':{...seed()['tasks/M1-2'],status:'review',owner:'ana',repo:'backend',pr:'backend#12 https://github.com/acme/web/pull/3'}}});all.push(b);await tick();await tick();
   const links=[...b.d.querySelectorAll('#repos .repo')];
   ok(links.length===2&&links[0].href==='https://github.com/acme/api'&&links[1].href==='https://github.com/acme/web'&&/backend/.test(links[0].textContent),'the header links each repo in any form agents write, and skips what is not one');
-  const pick=b.d.querySelector('.pick.review');
-  ok(!!pick.querySelector('.repotag')&&[...pick.querySelectorAll('a')].map(a=>a.href).join()==='https://github.com/acme/api/pull/12,https://github.com/acme/web/pull/3','PR references resolve through the repo labels');
+  const pick=b.d.querySelector('.rows .why.review').closest('li');
+  ok([...pick.querySelectorAll('a')].map(a=>a.href).join()==='https://github.com/acme/api/pull/12,https://github.com/acme/web/pull/3','PR references resolve through the repo labels');
   const ben=[...b.d.querySelectorAll('.lane')][1];
   ok(ben.querySelectorAll('.todo li').length===5&&/2 more/.test(ben.querySelector('.morebtn').textContent),'a long lane shows five and offers the rest');
   ben.querySelector('.morebtn').click();await tick();
@@ -147,7 +147,7 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   console.log('# linked viewer');
   b=boot({user:fakeUser('u_ben',true),docs:{'people/ben':{uid:'u_ben',at:T0}},me:'ana'});all.push(b);await tick();await tick();
   ok(meLane(b.d)==='Ben'&&!note(b.d),'a linked account is its person, whatever this browser remembered');
-  ok(/Claim as Ben/.test(b.d.querySelector('.pick .btn').title),'claims go to the linked person');
+  ok(/Claim as Ben/.test(b.d.querySelector('.rows.ready .btn').title),'claims go to the linked person');
   ok(!b.d.querySelector('#meSel button')&&b.d.querySelector('#meSel .me-fixed').textContent==='Ben','a linked account sees its own name and nothing to pick');
   ok(!b.pick('ana')&&!b.store['people/ana']&&meLane(b.d)==='Ben','there is no way to act as someone else');
   b.store['meta/config']={...b.store['meta/config'],people:[{id:'ana',uid:'u_ana'},{id:'ben',name:'Ben'},{id:'cy'}]};b.notify();await tick();
@@ -162,7 +162,7 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   ok(!b.pick('ben')&&!b.store['people/ben']&&b.d.querySelector('#meSel .me-fixed').textContent==='cy','once linked, the choice is fixed');
   b=boot({user:fakeUser('u_cy',true),docs:{'people/ben':{uid:'u_ben',at:T0}},me:'ben'});all.push(b);await tick();await tick();
   ok([...b.d.querySelectorAll('#meSel button')].map(x=>x.dataset.me).join()==='ana,cy','an unlinked account chooses only among people no account holds');
-  ok(!b.d.querySelector('.pick .btn')&&/Pick yourself/.test(note(b.d)),'it acts as nobody until it chooses, even if this browser remembered someone else');
+  ok(!b.d.querySelector('.rows.ready .btn')&&/Pick yourself/.test(note(b.d)),'it acts as nobody until it chooses, even if this browser remembered someone else');
 
   b=boot({user:fakeUser('u_ana',true),docs:{'meta/config':{...seed()['meta/config'],people:[{id:'ana'}]}}});all.push(b);await tick();await tick();await tick();
   ok(b.store['people/ana']&&b.store['people/ana'].uid==='u_ana'&&!note(b.d),'a board of one links its only person at once');
@@ -171,7 +171,7 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   const day=(n)=>{const d=new Date(Date.now()+n*864e5);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
   b=boot({docs:{'tasks/M1-1':{...seed()['tasks/M1-1'],owner:'ana',status:'doing',due:day(-1)},'tasks/M1-4':{...seed()['tasks/M1-4'],doneAt:'2026-01-04T10:00:00.000Z'}}});all.push(b);await tick();await heal();
   ok(!!b.d.querySelector('.lane .date.late'),'a due day in the past shows as late');
-  ok(!!b.d.querySelector('.pick.alert')&&/Past its due day/.test(b.d.querySelector('.pick.alert .note').textContent)&&/late 1/.test(b.d.getElementById('nowSub').textContent),'and needs attention');
+  ok(!!b.d.querySelector('.rows .why.alert')&&/Past its due day/.test(b.d.querySelector('.rows .why.alert').title)&&/late 1/.test(b.d.getElementById('nowSub').textContent),'and needs attention');
   ok(/done/.test(b.d.querySelector('.lane .done-list summary').textContent)||!!b.d.querySelector('.lane .done-list'),'done work folds under its lane');
   b.d.querySelector('tr.item').click();await tick();
   const fs_=b.d.getElementById('fStatus');fs_.value='done';fs_.dispatchEvent(new b.w.Event('change'));await tick();
@@ -203,10 +203,28 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
   ok(b.store['tasks/M1-2'].status==='done'&&b.store['tasks/M1-2'].owner==='ana'&&/^\d{4}-/.test(b.store['tasks/M1-2'].doneAt),'a reviewer marks it done in one click; the holder keeps it');
   ok(lastMsg().author==='ben'&&/Review → Done/.test(lastMsg().text),'the thread says who finished it');
 
+  console.log('# archive');
+  b=boot({storage:{'ab-view':'kanban'}});all.push(b);await tick();await heal();b.pick('ana');await tick();
+  const col=(k)=>[...b.d.querySelectorAll('.col')].find(c=>c.querySelector('h3').textContent.startsWith(k));
+  const arch=col('Done').querySelector('.colbtn');
+  ok(/Archive/.test(arch.textContent),'the done column offers to archive');
+  arch.click();await tick();
+  ok(!b.store['tasks/M1-4'].archivedAt&&/Archive 1\?/.test(col('Done').querySelector('.colbtn').textContent),'archiving asks twice');
+  col('Done').querySelector('.colbtn').click();await tick();await tick();
+  ok(/^\d{4}-/.test(b.store['tasks/M1-4'].archivedAt||'')&&b.store['tasks/M1-4'].status==='done','then archives the done tasks, which stay done');
+  ok(!col('Done').querySelector('.card')&&col('Archived').classList.contains('folded'),'they leave the done column for an archive that starts folded');
+  col('Archived').click();await tick();
+  col('Archived').querySelector('.card').click();await tick();
+  [...b.d.querySelectorAll('.sheet .acts button')].find(x=>/Back from the archive/.test(x.textContent)).click();await tick();
+  ok(b.store['tasks/M1-4'].archivedAt===null&&!col('Archived'),'a task comes back from the archive');
+  b.key('Escape');
+  col('To do').querySelector('.colbtn').click();await tick();
+  ok(col('To do').classList.contains('two')&&JSON.parse(b.w.localStorage.getItem('ab-kcol')).todo.two,'a column takes two card columns, remembered');
+
   console.log('# view-only viewer');
   b=boot({user:fakeUser('u_ana',false)});all.push(b);await tick();await heal();
   ok(/View only/.test(note(b.d)),'header says the board is view only');
-  ok(!b.d.querySelector('.pick .btn')&&!writeNotice(b.d)&&!b.d.getElementById('noticeText'),'no claim buttons and no notice form');
+  ok(!b.d.querySelector('.rows.ready .btn')&&!writeNotice(b.d)&&!b.d.getElementById('noticeText'),'no claim buttons and no notice form');
   b.pick('ben');b.d.querySelector('tr.item').click();await tick();
   ok(!b.d.querySelector('.composer')&&b.d.getElementById('fStatus').disabled&&b.d.getElementById('fOwner').disabled,'detail sheet has no composer and locked fields');
   ok(![...b.d.querySelectorAll('.sheet .linkbtn')].some(x=>/Write|Edit/.test(x.textContent)),'summary cannot be edited');
@@ -214,9 +232,9 @@ const meLane=d=>{const t=d.querySelector('.lane .head .me');return t&&t.parentNo
 
   console.log('# viewer the platform said nothing about');
   b=boot({user:fakeUser(null,null),deny:true});all.push(b);await tick();await heal();
-  ok(!note(b.d)&&!!b.d.querySelector('.pick .btn'),'controls stay while write access is unknown');
-  b.d.querySelector('.pick .btn').click();await tick();await tick();
-  ok(!b.d.querySelector('.pick .btn')&&/View only/.test(note(b.d)),'a refused write turns the page read-only');
+  ok(!note(b.d)&&!!b.d.querySelector('.rows.ready .btn'),'controls stay while write access is unknown');
+  b.d.querySelector('.rows.ready .btn').click();await tick();await tick();
+  ok(!b.d.querySelector('.rows.ready .btn')&&/View only/.test(note(b.d)),'a refused write turns the page read-only');
 
   const errs=all.flatMap(x=>x.errors);
   ok(errs.length===0,'no script errors '+(errs.join('; ')||''));
