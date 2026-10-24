@@ -14,9 +14,9 @@ artiboard is read by agents on every session they spend on a board, so it has th
 | `server/core.js` | Errors, write guards, and the board rules text every agent receives. |
 | `server/store/sqlite.js`, `supabase/migrations/` | Storage. Both backends pass the same tests in `tests/server.test.js`. |
 | `server/public/shim.js` | The page's runtime on a self-hosted site (reads, writes, live updates). |
-| `skills/artiboard/assets/board.html` | The page. It carries a copy of `server/tasks.js` between marker lines. Its script keeps prettier's shape (`npx prettier --print-width 120 --single-quote --trailing-comma none`), and names say what a thing is: no one-letter helpers beyond `T`, `$` and `el`. |
+| `skills/artiboard/assets/board.html` | The page. It carries a copy of `server/tasks.js` between marker lines. Its script keeps the shape `scripts/page-shape.mjs` writes (prettier, width 120), and names say what a thing is: no one-letter helpers beyond `T`, `$` and `el`. |
 | `skills/artiboard/` | The skill people install: `SKILL.md`, the agents' protocol, the hosted guide. |
-| `scripts/` | Levers: `check.mjs` (every gate), `inline-rules.mjs`, `stamp-version.mjs`, `readme-shape.mjs`, `unused.mjs`, `release-check.mjs` (CI: the bump, the PR in the changelog, squash merges only), `bench.mjs`, `supabase-env.sh`. |
+| `scripts/` | Levers: `check.mjs` (every gate), `inline-rules.mjs`, `page-shape.mjs`, `stamp-version.mjs`, `readme-shape.mjs`, `unused.mjs`, `release-check.mjs` (CI: the bump, the PR in the changelog, squash merges only), `bench.mjs`, `supabase-env.sh`. |
 
 ## How we work
 
@@ -42,7 +42,7 @@ artiboard is read by agents on every session they spend on a board, so it has th
 
 ## Done means
 
-- `npm run check` passes: version stamped, READMEs in one shape, the page's rules copy current, the demo still building, server and page tests green. CI also runs the server tests on Supabase.
+- `npm run check` passes: version stamped, READMEs in one shape, the page's rules copy current and its scripts in shape, the demo still building, server and page tests green. CI also runs the server tests on Supabase.
 - A version bump (`npm version <x.y.z> --no-git-tag-version`) and a changelog entry, as [CONTRIBUTING.md](CONTRIBUTING.md) says. The first number stays 1.
 - After merging, the follow-through the change calls for: refresh an installed copy of the skill, build the demo (`node examples/build-demo.cjs`, not kept in git) and republish it, deploy a site. Ask before the last two.
 

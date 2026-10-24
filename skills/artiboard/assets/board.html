@@ -1431,7 +1431,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function dateCell(t) {
     if (knownStatus(t) === 'done') return dateChip(t);
     var a = startOf(t),
-      s0 = knownStatus(t) === 'todo' ? startChip(t) : a ? el('span', { class: 'arrow', text: dayLabel(a) + ' →' }) : null;
+      s0 =
+        knownStatus(t) === 'todo' ? startChip(t) : a ? el('span', { class: 'arrow', text: dayLabel(a) + ' →' }) : null;
     return el('span', { class: 'dates' }, [s0, dueChip(t)]);
   }
 
@@ -1622,7 +1623,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     }
   }
   function personChip(o) {
-    return el('span', { class: 'who' + (o ? personClass(o) || '' : ' none'), text: o ? personName(o) : T('unassigned') });
+    return el('span', {
+      class: 'who' + (o ? personClass(o) || '' : ' none'),
+      text: o ? personName(o) : T('unassigned')
+    });
   }
   function statusChip(s) {
     return el('span', { class: 'state ' + s, text: statusLabel(s) });
@@ -1891,7 +1895,15 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // ---------- search ----------
   function matchQ(t) {
     if (!searchText) return true;
-    var hay = [t.key, t.title, t.feature, t.owner ? personName(t.owner) : T('unassigned'), statusLabel(knownStatus(t)), t.branch, t.repo]
+    var hay = [
+      t.key,
+      t.title,
+      t.feature,
+      t.owner ? personName(t.owner) : T('unassigned'),
+      statusLabel(knownStatus(t)),
+      t.branch,
+      t.repo
+    ]
       .join(' ')
       .toLowerCase();
     return searchText
@@ -2018,7 +2030,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         );
     } else if (h === me) {
       addAction(T('act_review'), { status: 'review' }, true);
-      addAction(s === 'blocked' ? T('act_resume') : T('act_blocked'), { status: s === 'blocked' ? 'doing' : 'blocked' });
+      addAction(s === 'blocked' ? T('act_resume') : T('act_blocked'), {
+        status: s === 'blocked' ? 'doing' : 'blocked'
+      });
       addAction(T('act_release'), { status: 'todo' });
     }
     if (h && h !== me && s !== 'done') {
@@ -2123,7 +2137,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           })
         );
       lg.appendChild(
-        el('span', {}, [el('i', { style: 'background:' + (BAR_COLORS[k] || 'var(--text2)') }), statusLabel(k) + ' ' + c[k]])
+        el('span', {}, [
+          el('i', { style: 'background:' + (BAR_COLORS[k] || 'var(--text2)') }),
+          statusLabel(k) + ' ' + c[k]
+        ])
       );
     });
   }
@@ -2219,11 +2236,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     if (changed) showViewTop();
   }
   // a view opens at its top. Scrolled deep into the document view, the kanban would otherwise start above the window,
-  // and its own scrolling (kept inside the board) could not bring it back.
+  // and its own scrolling (kept inside the board) could not bring it back. The toolbar's bottom is the line while it
+  // sticks; on a narrow window it scrolls with the page, so it comes back into view with the tabs.
   function showViewTop() {
-    var shown = document.querySelector('.view:not([hidden])');
+    var shown = document.querySelector('.view:not([hidden])'),
+      tb = $('toolbar');
     if (!shown) return;
-    var hidden = shown.getBoundingClientRect().top - $('toolbar').getBoundingClientRect().bottom;
+    var bar = tb.getBoundingClientRect();
+    var hidden = getComputedStyle(tb).position === 'sticky' ? shown.getBoundingClientRect().top - bar.bottom : bar.top;
     if (hidden < 0) window.scrollBy(0, hidden);
   }
 
@@ -2281,7 +2301,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       return !t.owner && knownStatus(t) !== 'done';
     });
     row.appendChild(
-      el('span', { class: 'np none' }, [el('i'), el('b', { text: T('unassigned') }), el('span', { text: String(free.length) })])
+      el('span', { class: 'np none' }, [
+        el('i'),
+        el('b', { text: T('unassigned') }),
+        el('span', { text: String(free.length) })
+      ])
     );
     return row;
   }
@@ -2312,7 +2336,6 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       );
     return nodes;
   }
-  // why the task needs hands, its key and title, who has it, and the PR (in review) or its dates
   function attentionRow(x) {
     var t = x.t,
       side = x.a.o === 2 ? (prEls(t).length ? prEls(t) : [el('span', { text: T('noPrShort') })]) : [dateChip(t)];
@@ -2324,7 +2347,6 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       el('span', { class: 'side' }, [newDot(isNew(t))].concat(side))
     ]);
   }
-  // a free task: what finishing it unlocks, its dates, and a claim button for the viewer
   function readyRow(t) {
     var unlocks = tasks
       .filter(function (o) {
@@ -2334,7 +2356,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         return o.key;
       });
     var unlockText = unlocks.length
-      ? T('unlocks', { k: unlocks.length > 2 ? unlocks.slice(0, 2).join(', ') + ' +' + (unlocks.length - 2) : unlocks.join(', ') })
+      ? T('unlocks', {
+          k: unlocks.length > 2 ? unlocks.slice(0, 2).join(', ') + ' +' + (unlocks.length - 2) : unlocks.join(', ')
+        })
       : '';
     return el('li', {}, [
       el('span', { class: 'key', text: t.key }),
@@ -2400,13 +2424,15 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         box.appendChild(n);
       });
     }
-    var free = tasks.filter(ready).sort(byKey);
-    box.appendChild(el('div', { class: 'subhead' }, [T('ready'), el('span', { class: 'n', text: String(free.length) })]));
-    if (!free.length) {
+    var pickable = tasks.filter(ready).sort(byKey);
+    box.appendChild(
+      el('div', { class: 'subhead' }, [T('ready'), el('span', { class: 'n', text: String(pickable.length) })])
+    );
+    if (!pickable.length) {
       box.appendChild(el('p', { class: 'empty', text: T('readyNone') }));
       return;
     }
-    nowRows('ready', 'rows ready', free, readyRow).forEach(function (n) {
+    nowRows('ready', 'rows ready', pickable, readyRow).forEach(function (n) {
       box.appendChild(n);
     });
   }
@@ -3211,26 +3237,30 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     write('ab-kcol', JSON.stringify(kanbanColumns));
     renderKanban();
   }
-  // the board runs from the window's left edge to its right and down to its bottom, so both scrollbars stay in reach
-  // a node spans the window while keeping its content aligned with the page
+  // the padding keeps the content on the page's columns while the box spans the window; off, nothing is measured
   function fullBleed(node, on) {
+    if (!on) {
+      node.style.marginLeft = node.style.marginRight = node.style.paddingLeft = node.style.paddingRight = '';
+      return;
+    }
     var r = document.querySelector('.page').getBoundingClientRect(),
       cw = document.documentElement.clientWidth;
-    node.style.marginLeft = on ? -r.left + 'px' : '';
-    node.style.marginRight = on ? -(cw - r.right) + 'px' : '';
-    node.style.paddingLeft = on ? r.left + 'px' : '';
-    node.style.paddingRight = on ? cw - r.right + 'px' : '';
+    node.style.marginLeft = -r.left + 'px';
+    node.style.marginRight = -(cw - r.right) + 'px';
+    node.style.paddingLeft = r.left + 'px';
+    node.style.paddingRight = cw - r.right + 'px';
   }
-  // the kanban fills the window below the toolbar, like a board app; the toolbar spans the window with it, so cards
-  // scrolling under it do not show beside it
+  // the board runs from the window's left edge to its right and down to its bottom, so both scrollbars stay in reach;
+  // the toolbar spans the window with it, so cards scrolling under it do not show beside it. The height goes first:
+  // it can bring in the page's vertical scrollbar, which moves the edges the widths are measured from.
   function sizeBoard() {
     var k = $('kanban'),
       tb = $('toolbar');
     if (!k || view !== 'kanban') return;
-    fullBleed(k, true);
-    fullBleed(tb, true);
     var top = getComputedStyle(tb).position === 'sticky' ? tb.offsetHeight : 0;
     k.style.height = Math.max(360, window.innerHeight - top - 12) + 'px';
+    fullBleed(k, true);
+    fullBleed(tb, true);
   }
   window.addEventListener('resize', sizeBoard);
   // done tasks in or out of the archive: many at once go as batches where the runtime takes them
@@ -3692,7 +3722,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
                 (critSet[t.id] ? ' oncrit' : '') +
                 (filtering() && !hit ? ' nomatch' : ''),
               style: 'left:' + cardX(t) + 'px;top:' + cardY(t) + 'px;width:' + GRAPH.W + 'px;height:' + GRAPH.H + 'px',
-              'aria-label': t.key + ' ' + (t.title || '') + ', ' + statusLabel(knownStatus(t)) + ', ' + personName(t.owner),
+              'aria-label':
+                t.key + ' ' + (t.title || '') + ', ' + statusLabel(knownStatus(t)) + ', ' + personName(t.owner),
               onclick: function () {
                 openSheet(t.id);
               },
@@ -4049,7 +4080,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var sum = (detailsDoc && detailsDoc.summary) || '';
     var head = el('h3', { style: 'display:flex;gap:8px;align-items:baseline' }, [
       T('summary'),
-      detailsDoc && detailsDoc.summaryAt ? el('span', { style: 'font-weight:400', text: stamp(detailsDoc.summaryAt) }) : null,
+      detailsDoc && detailsDoc.summaryAt
+        ? el('span', { style: 'font-weight:400', text: stamp(detailsDoc.summaryAt) })
+        : null,
       writable() && !summaryEditing
         ? el('button', {
             type: 'button',
@@ -4127,8 +4160,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         : false
     };
   }
-  // the editable fields: status and owner selects, branch, PR, start and due, and a repo select when the board names
-  // repositories; a field being typed in keeps its draft
+  // a field being typed in keeps its draft across a re-render
   function sheetFields(t, kept) {
     var f = {};
     f.status = el('select', { id: 'fStatus', 'aria-label': T('f_status') });
@@ -4214,7 +4246,6 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       finished ? el('span', { text: stamp(t.doneAt) }) : null
     ]);
   }
-  // the feature, repo, status, owner and dates, the title, a warning while deps are unfinished, and the actions
   function sheetHead(t) {
     var waiting = unmet(t);
     return el('div', { class: 'block' }, [
@@ -4222,7 +4253,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         el('span', { class: 'tag', text: t.feature || '' }),
         repoTag(t),
         statusChip(knownStatus(t)),
-        t.archivedAt ? el('span', { class: 'tag', text: T('archivedOn', { d: dayLabel(localDay(t.archivedAt)) }) }) : null,
+        t.archivedAt
+          ? el('span', { class: 'tag', text: T('archivedOn', { d: dayLabel(localDay(t.archivedAt)) }) })
+          : null,
         personChip(t.owner),
         dateChip(t),
         agentMark(t)
@@ -4252,7 +4285,6 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       })
     );
   }
-  // what the task waits on, and what waits on it
   function depBlocks(t) {
     var deps = t.deps || [];
     var unlocks = tasks
@@ -4344,10 +4376,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     return el('div', { class: 'composer' }, [
       warnLine(),
       ta,
-      el('div', { class: 'form-row' }, [ty, send, el('span', { class: 'muted', style: 'font-size:12px', text: T('sendHint') })])
+      el('div', { class: 'form-row' }, [
+        ty,
+        send,
+        el('span', { class: 'muted', style: 'font-size:12px', text: T('sendHint') })
+      ])
     ]);
   }
-  // previous and next along the keyboard cursor's order
   function sheetNav(t) {
     var idx = order.indexOf(t.id);
     return el('div', { class: 'nav' }, [
@@ -4373,7 +4408,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       })
     ]);
   }
-  // the field that was being edited gets focus back, with the caret at its end
+  // a re-render replaces the field under the typist, so focus and the caret go back where they were
   function refocus(activeId) {
     var a = activeId && $(activeId);
     if (!a) return;
@@ -4405,9 +4440,15 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         claimLine(t),
         prLinks(t).length ? el('div', { class: 'form-row' }, prEls(t)) : null,
         summaryBlock(t, kept.values),
-        acc ? el('div', { class: 'block' }, [el('h3', { text: T('acceptance') }), el('div', { class: 'pre', text: acc })]) : null,
-        spec ? el('div', { class: 'block' }, [el('h3', { text: T('spec') }), el('div', { class: 'pre', text: spec })]) : null
-      ].concat(depBlocks(t), [el('div', { class: 'block' }, [el('h3', { text: T('thread', { n: msgs.length }) }), threadList()])])
+        acc
+          ? el('div', { class: 'block' }, [el('h3', { text: T('acceptance') }), el('div', { class: 'pre', text: acc })])
+          : null,
+        spec
+          ? el('div', { class: 'block' }, [el('h3', { text: T('spec') }), el('div', { class: 'pre', text: spec })])
+          : null
+      ].concat(depBlocks(t), [
+        el('div', { class: 'block' }, [el('h3', { text: T('thread', { n: msgs.length }) }), threadList()])
+      ])
     );
     var sheet = el('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheetTitle' }, [
       el('div', { class: 'bar' }, [

@@ -342,6 +342,9 @@ const meLane = (d) => {
   // switching views while scrolled past their top: the page scrolls back by what the toolbar hides, once per switch
   const scrolls = [];
   w.scrollBy = (x, y) => scrolls.push(y);
+  const computed = w.getComputedStyle;
+  let toolbarPosition = 'sticky';
+  w.getComputedStyle = (n, p) => (n.id === 'toolbar' ? { position: toolbarPosition } : computed.call(w, n, p));
   d.getElementById('toolbar').getBoundingClientRect = () => ({ top: 0, bottom: 50 });
   d.getElementById('viewDoc').getBoundingClientRect = () => ({ top: -300, bottom: 900 });
   key('1');
@@ -354,6 +357,28 @@ const meLane = (d) => {
   key('2');
   await tick();
   ok(scrolls.length === 1, 'a view whose top shows stays where it is');
+  // on a narrow window the toolbar scrolls with the page: it comes back with the view, tabs included
+  toolbarPosition = 'static';
+  d.getElementById('toolbar').getBoundingClientRect = () => ({ top: -140, bottom: -90 });
+  key('3');
+  await tick();
+  ok(scrolls.join() === '-350,-140', 'a toolbar that scrolled away comes back with the view');
+  toolbarPosition = 'sticky';
+  // the toolbar spans the window with the kanban, and only there
+  d.querySelector('.page').getBoundingClientRect = () => ({ left: 24, right: 1000 });
+  Object.defineProperty(d.documentElement, 'clientWidth', { value: 1024, configurable: true });
+  key('2');
+  await tick();
+  const toolbar = d.getElementById('toolbar');
+  ok(
+    toolbar.style.marginLeft === '-24px' && toolbar.style.paddingRight === '24px',
+    'the toolbar spans the window with the kanban'
+  );
+  key('1');
+  await tick();
+  ok(toolbar.style.marginLeft === '' && toolbar.style.paddingRight === '', 'and keeps the page width elsewhere');
+  key('2');
+  await tick();
   key('j');
   key('Enter');
   await tick();
