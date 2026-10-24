@@ -17,12 +17,13 @@ for (const page of ['skills/artiboard/assets/board.html', 'server/public/index.h
 
 // keys of the English UI strings no code reads: T('key'), or a key built from a prefix the code names (T('st_'+s))
 for (const page of ['skills/artiboard/assets/board.html', 'server/public/index.html']) {
-  const src = read(page), at = src.search(/\ben:\{/);
-  if (at < 0) continue;
-  let depth = 0, end = at + 4;
-  for (let i = at + 4; i < src.length; i++) { if (src[i] === '{') depth++; else if (src[i] === '}') { if (!depth) { end = i; break; } depth--; } }
+  const src = read(page), table_at = /\ben:\s*\{/.exec(src);
+  if (!table_at) continue;
+  const at = table_at.index, open = at + table_at[0].length - 1;
+  let depth = 0, end = open;
+  for (let i = open + 1; i < src.length; i++) { if (src[i] === '{') depth++; else if (src[i] === '}') { if (!depth) { end = i; break; } depth--; } }
   const table = src.slice(at, end), rest = src.slice(0, at) + src.slice(end);
-  const keys = [...new Set([...table.matchAll(/(?:^|[{,\s])([A-Za-z_]\w*):(?=['"[{])/gm)].map((m) => m[1]))];
+  const keys = [...new Set([...table.matchAll(/(?:^[ \t]*|[{,][ \t]*)([A-Za-z_]\w*):\s*(?=['"[{])/gm)].map((m) => m[1]))];
   const prefixes = [...rest.matchAll(/['"]([A-Za-z]+_)['"]\s*\+/g)].map((m) => m[1]);
   const suffixes = [...rest.matchAll(/\+\s*['"]([A-Z]\w*)['"]/g)].map((m) => m[1]);
   for (const k of keys) {

@@ -202,226 +202,768 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
 <div id="dialogRoot"></div>
 <script src="/shim.js"></script>
 <script>
-(function(){
-  var I18N={
-    en:{working:'Working now',workSub:'Boards where someone has work in hand (in progress, review, blocked). A ring: an agent has it.',workMe:'You: {n} on {p} boards.',workNone:'Nothing in hand right now.',
-      boards:'Boards',loading:'Loading…',loadFail:'Could not load the projects ({e})',none:'No projects yet. Make one below.',signOut:'Sign out',
-      new:'New project',title:'Name',titlePh:'e.g. Checkout redesign',id:'Address (lowercase letters, digits, -)',idPh:'e.g. checkout',create:'Create',
-      hint:'Creates a board at {u} with every member on it. Agents can also create one with the MCP tool board_create_project.',
-      tasks:'{n} tasks',done:'done {n}',last:'last change {t}',now:'just now',m:'{n}m ago',h:'{n}h ago',d:'{n}d ago',never:'never',
-      st:{todo:'to do',doing:'doing',review:'review',blocked:'blocked',done:'done'},
-      members:'Members',memSub:'Everyone on this site, with a seat on every board. A new member gets one token, shown once: send it to them privately. They sign in to the site with it, or ask their agent for a sign-in link.',
-      th:['Person','Name','Access','Tokens','Last used',''],ac:{admin:'admin',member:'member',viewer:'viewer'},meTag:'you',
-      person:'Person id (lowercase letters, digits, -, _)',personPh:'e.g. ana',name:'Display name',namePh:'e.g. Ana',access:'Access',add:'Add member',
-      memHint:'The id goes into document ids and never changes; the person can set their own name and role later from their profile. Viewers read every board but sit on none.',
-      newToken:'New token',link:'Sign-in link',revoke:'Revoke',remove:'Remove',confirmRevoke:'Revoke every token of {p} and sign them out everywhere?',confirmRemove:'Remove {p} from the site? Their tasks and messages stay.',
-      added:'{p} is on the site',tokenFor:'Token for {p}',linkFor:'Sign-in link for {p}',once:'Shown once. Send it privately; it is not stored anywhere readable.',
-      tokenK:'Token',linkK:'One-time link (one hour, one use)',claudeK:'Claude Code',codexK:'Codex (the token stays in the shell environment)',browserK:'Browser: open {u} and paste the token, or open the link.',copy:'Copy',copied:'Copied',close:'Close',
-      profile:'Profile',pName:'Display name',pTitle:'What you do (shown on every board)',pTitlePh:'e.g. backend, design',save:'Save',cancel:'Cancel',
-      pHint:'Your name and role show on every board you sit on. The person id and the access level are set by site admins.',pFixed:'Person {p} · {a}',
-      changes:'Updates',older:'Show {n} earlier versions',fewer:'Show fewer',
-      fail:'Could not do that ({e})'},
-    ko:{working:'지금 작업 중',workSub:'누군가 손에 쥔 일(진행 중 · 검토 · 막힘)이 있는 판만 보여요. 테두리는 에이전트가 맡고 있다는 뜻이에요.',workMe:'나: 판 {p}개에서 {n}개를 맡고 있어요.',workNone:'지금 손에 쥔 일이 없어요.',
-      boards:'작업판',loading:'불러오는 중이에요.',loadFail:'불러오지 못했어요 ({e})',none:'아직 프로젝트가 없어요. 아래에서 만드세요.',signOut:'로그아웃',
-      new:'새 프로젝트',title:'이름',titlePh:'예: 결제 화면 개편',id:'주소 (영문 소문자 · 숫자 · -)',idPh:'예: checkout',create:'만들기',
-      hint:'만들면 {u} 에 판이 생기고, 멤버 모두가 사람 목록에 들어가요. 에이전트는 MCP 도구 board_create_project로도 만들 수 있어요.',
-      tasks:'태스크 {n}',done:'완료 {n}',last:'마지막 변화 {t}',now:'방금',m:'{n}분 전',h:'{n}시간 전',d:'{n}일 전',never:'없음',
-      st:{todo:'할 일',doing:'진행 중',review:'검토',blocked:'막힘',done:'완료'},
-      members:'멤버',memSub:'이 사이트의 모든 사람이에요. 모든 판에 자리가 생겨요. 새 멤버는 토큰 하나를 받고, 토큰은 한 번만 보여요. 본인에게 따로 전해 주세요. 그 토큰으로 사이트에 로그인하거나, 에이전트에게 로그인 링크를 받아요.',
-      th:['아이디','이름','권한','토큰','마지막 사용',''],ac:{admin:'관리자',member:'멤버',viewer:'보기 전용'},meTag:'나',
-      person:'아이디 (영문 소문자 · 숫자 · - · _)',personPh:'예: ana',name:'표시 이름',namePh:'예: 안나',access:'권한',add:'멤버 추가',
-      memHint:'아이디는 문서 id에 들어가서 바뀌지 않아요. 이름과 역할은 본인이 프로필에서 바꿀 수 있어요. 보기 전용은 모든 판을 읽지만 사람 목록에는 들어가지 않아요.',
-      newToken:'새 토큰',link:'로그인 링크',revoke:'토큰 회수',remove:'삭제',confirmRevoke:'{p}의 토큰을 모두 회수하고 모든 곳에서 로그아웃할까요?',confirmRemove:'{p}을(를) 사이트에서 뺄까요? 태스크와 메시지는 남아요.',
-      added:'{p}이(가) 사이트에 들어왔어요',tokenFor:'{p}의 토큰',linkFor:'{p}의 로그인 링크',once:'한 번만 보여요. 본인에게 따로 전해 주세요. 어디에도 읽을 수 있는 형태로 남지 않아요.',
-      tokenK:'토큰',linkK:'일회용 링크 (한 시간, 한 번)',claudeK:'Claude Code',codexK:'Codex (토큰은 셸 환경 변수에 둬요)',browserK:'브라우저: {u} 을 열고 토큰을 붙여 넣거나, 링크를 열어요.',copy:'복사',copied:'복사했어요',close:'닫기',
-      profile:'프로필',pName:'표시 이름',pTitle:'하는 일 (모든 판에 보여요)',pTitlePh:'예: 백엔드, 디자인',save:'저장',cancel:'취소',
-      pHint:'이름과 역할은 내가 있는 모든 판의 사람 목록에 보여요. 아이디와 권한은 사이트 관리자가 정해요.',pFixed:'아이디 {p} · {a}',
-      changes:'업데이트 내역',older:'이전 버전 {n}개 보기',fewer:'접기',
-      fail:'하지 못했어요 ({e})'}
+(function () {
+  var I18N = {
+    en: {
+      working: 'Working now',
+      workSub: 'Boards where someone has work in hand (in progress, review, blocked). A ring: an agent has it.',
+      workMe: 'You: {n} on {p} boards.',
+      workNone: 'Nothing in hand right now.',
+      boards: 'Boards',
+      loading: 'Loading…',
+      loadFail: 'Could not load the projects ({e})',
+      none: 'No projects yet. Make one below.',
+      signOut: 'Sign out',
+      new: 'New project',
+      title: 'Name',
+      titlePh: 'e.g. Checkout redesign',
+      id: 'Address (lowercase letters, digits, -)',
+      idPh: 'e.g. checkout',
+      create: 'Create',
+      hint: 'Creates a board at {u} with every member on it. Agents can also create one with the MCP tool board_create_project.',
+      tasks: '{n} tasks',
+      done: 'done {n}',
+      last: 'last change {t}',
+      now: 'just now',
+      m: '{n}m ago',
+      h: '{n}h ago',
+      d: '{n}d ago',
+      never: 'never',
+      st: { todo: 'to do', doing: 'doing', review: 'review', blocked: 'blocked', done: 'done' },
+      members: 'Members',
+      memSub:
+        'Everyone on this site, with a seat on every board. A new member gets one token, shown once: send it to them privately. They sign in to the site with it, or ask their agent for a sign-in link.',
+      th: ['Person', 'Name', 'Access', 'Tokens', 'Last used', ''],
+      ac: { admin: 'admin', member: 'member', viewer: 'viewer' },
+      meTag: 'you',
+      person: 'Person id (lowercase letters, digits, -, _)',
+      personPh: 'e.g. ana',
+      name: 'Display name',
+      namePh: 'e.g. Ana',
+      access: 'Access',
+      add: 'Add member',
+      memHint:
+        'The id goes into document ids and never changes; the person can set their own name and role later from their profile. Viewers read every board but sit on none.',
+      newToken: 'New token',
+      link: 'Sign-in link',
+      revoke: 'Revoke',
+      remove: 'Remove',
+      confirmRevoke: 'Revoke every token of {p} and sign them out everywhere?',
+      confirmRemove: 'Remove {p} from the site? Their tasks and messages stay.',
+      added: '{p} is on the site',
+      tokenFor: 'Token for {p}',
+      linkFor: 'Sign-in link for {p}',
+      once: 'Shown once. Send it privately; it is not stored anywhere readable.',
+      tokenK: 'Token',
+      linkK: 'One-time link (one hour, one use)',
+      claudeK: 'Claude Code',
+      codexK: 'Codex (the token stays in the shell environment)',
+      browserK: 'Browser: open {u} and paste the token, or open the link.',
+      copy: 'Copy',
+      copied: 'Copied',
+      close: 'Close',
+      profile: 'Profile',
+      pName: 'Display name',
+      pTitle: 'What you do (shown on every board)',
+      pTitlePh: 'e.g. backend, design',
+      save: 'Save',
+      cancel: 'Cancel',
+      pHint:
+        'Your name and role show on every board you sit on. The person id and the access level are set by site admins.',
+      pFixed: 'Person {p} · {a}',
+      changes: 'Updates',
+      older: 'Show {n} earlier versions',
+      fewer: 'Show fewer',
+      fail: 'Could not do that ({e})'
+    },
+    ko: {
+      working: '지금 작업 중',
+      workSub: '누군가 손에 쥔 일(진행 중 · 검토 · 막힘)이 있는 판만 보여요. 테두리는 에이전트가 맡고 있다는 뜻이에요.',
+      workMe: '나: 판 {p}개에서 {n}개를 맡고 있어요.',
+      workNone: '지금 손에 쥔 일이 없어요.',
+      boards: '작업판',
+      loading: '불러오는 중이에요.',
+      loadFail: '불러오지 못했어요 ({e})',
+      none: '아직 프로젝트가 없어요. 아래에서 만드세요.',
+      signOut: '로그아웃',
+      new: '새 프로젝트',
+      title: '이름',
+      titlePh: '예: 결제 화면 개편',
+      id: '주소 (영문 소문자 · 숫자 · -)',
+      idPh: '예: checkout',
+      create: '만들기',
+      hint: '만들면 {u} 에 판이 생기고, 멤버 모두가 사람 목록에 들어가요. 에이전트는 MCP 도구 board_create_project로도 만들 수 있어요.',
+      tasks: '태스크 {n}',
+      done: '완료 {n}',
+      last: '마지막 변화 {t}',
+      now: '방금',
+      m: '{n}분 전',
+      h: '{n}시간 전',
+      d: '{n}일 전',
+      never: '없음',
+      st: { todo: '할 일', doing: '진행 중', review: '검토', blocked: '막힘', done: '완료' },
+      members: '멤버',
+      memSub:
+        '이 사이트의 모든 사람이에요. 모든 판에 자리가 생겨요. 새 멤버는 토큰 하나를 받고, 토큰은 한 번만 보여요. 본인에게 따로 전해 주세요. 그 토큰으로 사이트에 로그인하거나, 에이전트에게 로그인 링크를 받아요.',
+      th: ['아이디', '이름', '권한', '토큰', '마지막 사용', ''],
+      ac: { admin: '관리자', member: '멤버', viewer: '보기 전용' },
+      meTag: '나',
+      person: '아이디 (영문 소문자 · 숫자 · - · _)',
+      personPh: '예: ana',
+      name: '표시 이름',
+      namePh: '예: 안나',
+      access: '권한',
+      add: '멤버 추가',
+      memHint:
+        '아이디는 문서 id에 들어가서 바뀌지 않아요. 이름과 역할은 본인이 프로필에서 바꿀 수 있어요. 보기 전용은 모든 판을 읽지만 사람 목록에는 들어가지 않아요.',
+      newToken: '새 토큰',
+      link: '로그인 링크',
+      revoke: '토큰 회수',
+      remove: '삭제',
+      confirmRevoke: '{p}의 토큰을 모두 회수하고 모든 곳에서 로그아웃할까요?',
+      confirmRemove: '{p}을(를) 사이트에서 뺄까요? 태스크와 메시지는 남아요.',
+      added: '{p}이(가) 사이트에 들어왔어요',
+      tokenFor: '{p}의 토큰',
+      linkFor: '{p}의 로그인 링크',
+      once: '한 번만 보여요. 본인에게 따로 전해 주세요. 어디에도 읽을 수 있는 형태로 남지 않아요.',
+      tokenK: '토큰',
+      linkK: '일회용 링크 (한 시간, 한 번)',
+      claudeK: 'Claude Code',
+      codexK: 'Codex (토큰은 셸 환경 변수에 둬요)',
+      browserK: '브라우저: {u} 을 열고 토큰을 붙여 넣거나, 링크를 열어요.',
+      copy: '복사',
+      copied: '복사했어요',
+      close: '닫기',
+      profile: '프로필',
+      pName: '표시 이름',
+      pTitle: '하는 일 (모든 판에 보여요)',
+      pTitlePh: '예: 백엔드, 디자인',
+      save: '저장',
+      cancel: '취소',
+      pHint: '이름과 역할은 내가 있는 모든 판의 사람 목록에 보여요. 아이디와 권한은 사이트 관리자가 정해요.',
+      pFixed: '아이디 {p} · {a}',
+      changes: '업데이트 내역',
+      older: '이전 버전 {n}개 보기',
+      fewer: '접기',
+      fail: '하지 못했어요 ({e})'
+    }
   };
-  var L=I18N.en;
-  function T(k,v){return String(L[k]).replace(/\{(\w+)\}/g,function(_,x){return v&&v[x]!=null?v[x]:''})}
-  var BAR={done:'var(--s-done)',review:'var(--s-review)',doing:'var(--s-doing)',blocked:'var(--s-blocked)',todo:'var(--s-todo)'};
+  var L = I18N.en;
+  function T(k, v) {
+    return String(L[k]).replace(/\{(\w+)\}/g, function (_, x) {
+      return v && v[x] != null ? v[x] : '';
+    });
+  }
+  var BAR = {
+    done: 'var(--s-done)',
+    review: 'var(--s-review)',
+    doing: 'var(--s-doing)',
+    blocked: 'var(--s-blocked)',
+    todo: 'var(--s-todo)'
+  };
   // one color per person, the same on every visit
-  function hue(id){var h=0;for(var i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))>>>0;return 'c'+h%6}
-  function $(id){return document.getElementById(id)}
-  function el(tag,a,kids){var n=document.createElement(tag);for(var k in a||{}){if(a[k]==null)continue;if(k==='text')n.textContent=a[k];else if(k==='class')n.className=a[k];else if(k.slice(0,2)==='on')n.addEventListener(k.slice(2),a[k]);else n.setAttribute(k,a[k])}(kids||[]).forEach(function(c){if(c!=null&&c!==false)n.appendChild(typeof c==='string'?document.createTextNode(c):c)});return n}
+  function hue(id) {
+    var h = 0;
+    for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    return 'c' + (h % 6);
+  }
+  function $(id) {
+    return document.getElementById(id);
+  }
+  function el(tag, a, kids) {
+    var n = document.createElement(tag);
+    for (var k in a || {}) {
+      if (a[k] == null) continue;
+      if (k === 'text') n.textContent = a[k];
+      else if (k === 'class') n.className = a[k];
+      else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), a[k]);
+      else n.setAttribute(k, a[k]);
+    }
+    (kids || []).forEach(function (c) {
+      if (c != null && c !== false) n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    return n;
+  }
   // owner/name of each GitHub repository the project lists (meta/config.repos)
-  function repos(p){return (Array.isArray(p.repos)?p.repos:[]).map(function(r){return typeof r==='string'?r:r&&r.repo}).filter(function(r){return typeof r==='string'&&/^[\w.-]+\/[\w.-]+$/.test(r)})}
-  function ago(iso){var d=new Date(iso);if(!iso||isNaN(d))return '';var s=(Date.now()-d)/1000;if(s<60)return T('now');if(s<3600)return T('m',{n:Math.floor(s/60)});if(s<86400)return T('h',{n:Math.floor(s/3600)});return T('d',{n:Math.floor(s/86400)})}
-  function errOf(b){return (b&&(b.message||b.error))||'error'}
-  function copyBtn(text){var b=el('button',{type:'button',class:'btn small',text:T('copy')});b.addEventListener('click',function(){
-    var done=function(){b.textContent=T('copied');setTimeout(function(){b.textContent=T('copy')},1500)};
-    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(done,function(){prompt('',text)});else prompt('',text)});return b}
-
-  window.abSession.then(function(s){
-    L=I18N[s.config.lang]||I18N.en;document.documentElement.lang=s.config.lang||'en';
-    var me=s.me;
-    function call(method,url,body){return s.api(method,url,body).then(function(r){return r.json().catch(function(){return {}}).then(function(b){if(!r.ok){var e=new Error(errOf(b));e.code=b.code||b.error;throw e}return b})})}
-    document.title=s.config.site;$('hSite').textContent=s.config.site;$('hBoards').textContent=T('boards');$('hNew').textContent=T('new');
-    $('lTitle').textContent=T('title');$('lId').textContent=T('id');$('nGo').textContent=T('create');
-    $('nTitle').placeholder=T('titlePh');$('nId').placeholder=T('idPh');
-    function hint(id){$('nHint').textContent=T('hint',{u:'/p/'+(id||'…')})}
-    hint('');
-    function renderMe(){var b=$('meBtn');b.textContent='';b.appendChild(document.createTextNode(me.name||me.person));b.appendChild(el('span',{text:' · '+(L.ac[me.role]||me.role)+' · '+T('profile')}));b.hidden=false;b.title=T('profile')}
-    renderMe();
-    $('signOut').textContent=T('signOut');$('signOut').hidden=false;$('signOut').onclick=s.signOut;
-    $('newSec').hidden=me.role==='viewer';
-    $('list').appendChild(el('p',{class:'empty',text:T('loading')}));
-
-    function load(){
-      call('GET','/api/projects').then(function(ps){
-        renderWork(ps);
-        var list=$('list');list.textContent='';
-        if(!ps.length){list.appendChild(el('p',{class:'empty',text:T('none')}));return}
-        ps.forEach(function(p){
-          var bar=el('div',{class:'progress','aria-hidden':'true'});
-          ['done','review','doing','blocked','todo'].forEach(function(k){var n=p.tasks[k]||0;if(n)bar.appendChild(el('span',{style:'width:'+(n/p.total*100)+'%;background:'+BAR[k]}))});
-          var nums=[T('tasks',{n:p.total})].concat(['doing','review','blocked'].filter(function(k){return p.tasks[k]}).map(function(k){return L.st[k]+' '+p.tasks[k]})).concat([T('done',{n:p.tasks.done||0})]);
-          list.appendChild(el('a',{class:'card',href:'/p/'+p.id},[
-            el('div',{class:'top'},[el('strong',{text:p.title}),el('span',{class:'id',text:'/p/'+p.id})]),
-            p.subtitle?el('p',{class:'sub',text:p.subtitle}):null,
-            repos(p).length?el('div',{class:'repos'},repos(p).map(function(r){return el('span',{text:r})})):null,
-            p.total?bar:null,
-            el('div',{class:'nums'},nums.map(function(t){return el('span',{text:t})}).concat(p.last?[el('span',{text:T('last',{t:ago(p.last)})})]:[]))
-          ]));
+  function repos(p) {
+    return (Array.isArray(p.repos) ? p.repos : [])
+      .map(function (r) {
+        return typeof r === 'string' ? r : r && r.repo;
+      })
+      .filter(function (r) {
+        return typeof r === 'string' && /^[\w.-]+\/[\w.-]+$/.test(r);
+      });
+  }
+  function ago(iso) {
+    var d = new Date(iso);
+    if (!iso || isNaN(d)) return '';
+    var s = (Date.now() - d) / 1000;
+    if (s < 60) return T('now');
+    if (s < 3600) return T('m', { n: Math.floor(s / 60) });
+    if (s < 86400) return T('h', { n: Math.floor(s / 3600) });
+    return T('d', { n: Math.floor(s / 86400) });
+  }
+  function errOf(b) {
+    return (b && (b.message || b.error)) || 'error';
+  }
+  function copyBtn(text) {
+    var b = el('button', { type: 'button', class: 'btn small', text: T('copy') });
+    b.addEventListener('click', function () {
+      var done = function () {
+        b.textContent = T('copied');
+        setTimeout(function () {
+          b.textContent = T('copy');
+        }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText)
+        navigator.clipboard.writeText(text).then(done, function () {
+          prompt('', text);
         });
-      },function(e){$('list').textContent='';$('list').appendChild(el('p',{class:'err',text:T('loadFail',{e:e.message})}))});
+      else prompt('', text);
+    });
+    return b;
+  }
+
+  window.abSession.then(function (s) {
+    L = I18N[s.config.lang] || I18N.en;
+    document.documentElement.lang = s.config.lang || 'en';
+    var me = s.me;
+    function call(method, url, body) {
+      return s.api(method, url, body).then(function (r) {
+        return r
+          .json()
+          .catch(function () {
+            return {};
+          })
+          .then(function (b) {
+            if (!r.ok) {
+              var e = new Error(errOf(b));
+              e.code = b.code || b.error;
+              throw e;
+            }
+            return b;
+          });
+      });
+    }
+    document.title = s.config.site;
+    $('hSite').textContent = s.config.site;
+    $('hBoards').textContent = T('boards');
+    $('hNew').textContent = T('new');
+    $('lTitle').textContent = T('title');
+    $('lId').textContent = T('id');
+    $('nGo').textContent = T('create');
+    $('nTitle').placeholder = T('titlePh');
+    $('nId').placeholder = T('idPh');
+    function hint(id) {
+      $('nHint').textContent = T('hint', { u: '/p/' + (id || '…') });
+    }
+    hint('');
+    function renderMe() {
+      var b = $('meBtn');
+      b.textContent = '';
+      b.appendChild(document.createTextNode(me.name || me.person));
+      b.appendChild(el('span', { text: ' · ' + (L.ac[me.role] || me.role) + ' · ' + T('profile') }));
+      b.hidden = false;
+      b.title = T('profile');
+    }
+    renderMe();
+    $('signOut').textContent = T('signOut');
+    $('signOut').hidden = false;
+    $('signOut').onclick = s.signOut;
+    $('newSec').hidden = me.role === 'viewer';
+    $('list').appendChild(el('p', { class: 'empty', text: T('loading') }));
+
+    function load() {
+      call('GET', '/api/projects').then(
+        function (ps) {
+          renderWork(ps);
+          var list = $('list');
+          list.textContent = '';
+          if (!ps.length) {
+            list.appendChild(el('p', { class: 'empty', text: T('none') }));
+            return;
+          }
+          ps.forEach(function (p) {
+            var bar = el('div', { class: 'progress', 'aria-hidden': 'true' });
+            ['done', 'review', 'doing', 'blocked', 'todo'].forEach(function (k) {
+              var n = p.tasks[k] || 0;
+              if (n) bar.appendChild(el('span', { style: 'width:' + (n / p.total) * 100 + '%;background:' + BAR[k] }));
+            });
+            var nums = [T('tasks', { n: p.total })]
+              .concat(
+                ['doing', 'review', 'blocked']
+                  .filter(function (k) {
+                    return p.tasks[k];
+                  })
+                  .map(function (k) {
+                    return L.st[k] + ' ' + p.tasks[k];
+                  })
+              )
+              .concat([T('done', { n: p.tasks.done || 0 })]);
+            list.appendChild(
+              el('a', { class: 'card', href: '/p/' + p.id }, [
+                el('div', { class: 'top' }, [
+                  el('strong', { text: p.title }),
+                  el('span', { class: 'id', text: '/p/' + p.id })
+                ]),
+                p.subtitle ? el('p', { class: 'sub', text: p.subtitle }) : null,
+                repos(p).length
+                  ? el(
+                      'div',
+                      { class: 'repos' },
+                      repos(p).map(function (r) {
+                        return el('span', { text: r });
+                      })
+                    )
+                  : null,
+                p.total ? bar : null,
+                el(
+                  'div',
+                  { class: 'nums' },
+                  nums
+                    .map(function (t) {
+                      return el('span', { text: t });
+                    })
+                    .concat(p.last ? [el('span', { text: T('last', { t: ago(p.last) }) })] : [])
+                )
+              ])
+            );
+          });
+        },
+        function (e) {
+          $('list').textContent = '';
+          $('list').appendChild(el('p', { class: 'err', text: T('loadFail', { e: e.message }) }));
+        }
+      );
     }
     // who has what in hand, board by board; a board nobody is working on stays out
-    function renderWork(ps){
-      var rows=ps.filter(function(p){return Array.isArray(p.working)&&p.working.length});
-      var mine=rows.filter(function(p){return p.working.some(function(w){return w.who===me.person})});
-      rows=mine.concat(rows.filter(function(p){return mine.indexOf(p)<0}));
-      var n=0;mine.forEach(function(p){p.working.forEach(function(w){if(w.who===me.person)n+=w.n})});
-      $('hWork').textContent=T('working');$('workSec').hidden=!ps.length;
-      $('workSub').textContent=rows.length?(n?T('workMe',{n:n,p:mine.length})+' ':'')+T('workSub'):T('workNone');
-      var ul=$('work');ul.textContent='';ul.hidden=!rows.length;
-      rows.forEach(function(p){
-        ul.appendChild(el('li',{},[
-          el('a',{class:'proj',href:'/p/'+p.id,title:p.title},[p.title,el('span',{text:'/p/'+p.id})]),
-          el('div',{class:'ppl'},p.working.map(function(w){
-            var name=w.name||w.who,tip=(w.tasks||[]).map(function(t){return t.key+' '+t.title+' · '+(L.st[t.status]||t.status)}).join('\n');
-            return el('span',{class:'pp '+hue(w.who)+(w.agent?' agent':'')+(w.who===me.person?' mine':''),title:tip},[el('i',{text:name.charAt(0).toUpperCase()}),el('b',{text:name}),el('span',{class:'n',text:String(w.n)})]);
-          }))
-        ]));
+    function renderWork(ps) {
+      var rows = ps.filter(function (p) {
+        return Array.isArray(p.working) && p.working.length;
+      });
+      var mine = rows.filter(function (p) {
+        return p.working.some(function (w) {
+          return w.who === me.person;
+        });
+      });
+      rows = mine.concat(
+        rows.filter(function (p) {
+          return mine.indexOf(p) < 0;
+        })
+      );
+      var n = 0;
+      mine.forEach(function (p) {
+        p.working.forEach(function (w) {
+          if (w.who === me.person) n += w.n;
+        });
+      });
+      $('hWork').textContent = T('working');
+      $('workSec').hidden = !ps.length;
+      $('workSub').textContent = rows.length
+        ? (n ? T('workMe', { n: n, p: mine.length }) + ' ' : '') + T('workSub')
+        : T('workNone');
+      var ul = $('work');
+      ul.textContent = '';
+      ul.hidden = !rows.length;
+      rows.forEach(function (p) {
+        ul.appendChild(
+          el('li', {}, [
+            el('a', { class: 'proj', href: '/p/' + p.id, title: p.title }, [
+              p.title,
+              el('span', { text: '/p/' + p.id })
+            ]),
+            el(
+              'div',
+              { class: 'ppl' },
+              p.working.map(function (w) {
+                var name = w.name || w.who,
+                  tip = (w.tasks || [])
+                    .map(function (t) {
+                      return t.key + ' ' + t.title + ' · ' + (L.st[t.status] || t.status);
+                    })
+                    .join('\n');
+                return el(
+                  'span',
+                  {
+                    class: 'pp ' + hue(w.who) + (w.agent ? ' agent' : '') + (w.who === me.person ? ' mine' : ''),
+                    title: tip
+                  },
+                  [
+                    el('i', { text: name.charAt(0).toUpperCase() }),
+                    el('b', { text: name }),
+                    el('span', { class: 'n', text: String(w.n) })
+                  ]
+                );
+              })
+            )
+          ])
+        );
       });
     }
     load();
-    document.addEventListener('visibilitychange',function(){if(!document.hidden){load();if(me.role==='admin')loadMembers()}});
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) {
+        load();
+        if (me.role === 'admin') loadMembers();
+      }
+    });
 
     // what changed, version by version, from the changelog.json shipped with this site
-    fetch('/changelog.json',{cache:'no-cache'}).then(function(r){return r.ok?r.json():null}).then(function(c){
-      var vs=(c&&Array.isArray(c.versions)?c.versions:[]).filter(function(v){return v&&v.version});
-      if(!vs.length)return;
-      var ver=$('ver');ver.textContent='v'+vs[0].version;ver.hidden=false;
-      $('hChanges').textContent=T('changes');$('changes').hidden=false;
-      var repo=typeof c.repo==='string'&&/^https:\/\//.test(c.repo)?c.repo.replace(/\/$/,''):'',all=false,SHOW=3;
-      function when(v){
-        var prs=(Array.isArray(v.prs)?v.prs:[]).filter(function(n){return typeof n==='number'});
-        return el('span',{class:'when'},[v.date||''].concat(prs.length?[' · ']:[]).concat(prs.map(function(n,i){
-          var t=(i?' ':'')+'#'+n;return repo?el('a',{href:repo+'/pull/'+n,target:'_blank',rel:'noopener',text:t}):t})));
-      }
-      function draw(){
-        var ol=$('log');ol.textContent='';
-        (all?vs:vs.slice(0,SHOW)).forEach(function(v){
-          var lines=v.lines&&(v.lines[s.config.lang]||v.lines.en)||[];
-          ol.appendChild(el('li',{},[el('div',{class:'h'},[el('span',{class:'v',text:'v'+v.version}),when(v)]),
-            el('ul',{},lines.map(function(t){return el('li',{text:t})}))]));
+    fetch('/changelog.json', { cache: 'no-cache' })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (c) {
+        var vs = (c && Array.isArray(c.versions) ? c.versions : []).filter(function (v) {
+          return v && v.version;
         });
-        if(vs.length>SHOW){
-          var b=el('button',{type:'button',class:'linkbtn',text:all?T('fewer'):T('older',{n:vs.length-SHOW})});
-          b.addEventListener('click',function(){all=!all;draw()});
-          ol.appendChild(el('li',{},[b]));
+        if (!vs.length) return;
+        var ver = $('ver');
+        ver.textContent = 'v' + vs[0].version;
+        ver.hidden = false;
+        $('hChanges').textContent = T('changes');
+        $('changes').hidden = false;
+        var repo = typeof c.repo === 'string' && /^https:\/\//.test(c.repo) ? c.repo.replace(/\/$/, '') : '',
+          all = false,
+          SHOW = 3;
+        function when(v) {
+          var prs = (Array.isArray(v.prs) ? v.prs : []).filter(function (n) {
+            return typeof n === 'number';
+          });
+          return el(
+            'span',
+            { class: 'when' },
+            [v.date || ''].concat(prs.length ? [' · '] : []).concat(
+              prs.map(function (n, i) {
+                var t = (i ? ' ' : '') + '#' + n;
+                return repo ? el('a', { href: repo + '/pull/' + n, target: '_blank', rel: 'noopener', text: t }) : t;
+              })
+            )
+          );
         }
-      }
-      draw();
-    }).catch(function(){});
+        function draw() {
+          var ol = $('log');
+          ol.textContent = '';
+          (all ? vs : vs.slice(0, SHOW)).forEach(function (v) {
+            var lines = (v.lines && (v.lines[s.config.lang] || v.lines.en)) || [];
+            ol.appendChild(
+              el('li', {}, [
+                el('div', { class: 'h' }, [el('span', { class: 'v', text: 'v' + v.version }), when(v)]),
+                el(
+                  'ul',
+                  {},
+                  lines.map(function (t) {
+                    return el('li', { text: t });
+                  })
+                )
+              ])
+            );
+          });
+          if (vs.length > SHOW) {
+            var b = el('button', {
+              type: 'button',
+              class: 'linkbtn',
+              text: all ? T('fewer') : T('older', { n: vs.length - SHOW })
+            });
+            b.addEventListener('click', function () {
+              all = !all;
+              draw();
+            });
+            ol.appendChild(el('li', {}, [b]));
+          }
+        }
+        draw();
+      })
+      .catch(function () {});
 
-    var title=$('nTitle'),id=$('nId'),touched=false;
-    title.addEventListener('input',function(){if(touched)return;var g=title.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);id.value=g;hint(g)});
-    id.addEventListener('input',function(){touched=true;hint(id.value)});
-    $('newForm').addEventListener('submit',function(e){
-      e.preventDefault();var err=$('nErr');err.hidden=true;$('nGo').disabled=true;
-      call('POST','/api/projects',{id:id.value.trim(),title:title.value.trim()}).then(function(b){location.href='/p/'+b.id},function(e){$('nGo').disabled=false;err.textContent=e.message;err.hidden=false});
+    var title = $('nTitle'),
+      id = $('nId'),
+      touched = false;
+    title.addEventListener('input', function () {
+      if (touched) return;
+      var g = title.value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40);
+      id.value = g;
+      hint(g);
+    });
+    id.addEventListener('input', function () {
+      touched = true;
+      hint(id.value);
+    });
+    $('newForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var err = $('nErr');
+      err.hidden = true;
+      $('nGo').disabled = true;
+      call('POST', '/api/projects', { id: id.value.trim(), title: title.value.trim() }).then(
+        function (b) {
+          location.href = '/p/' + b.id;
+        },
+        function (e) {
+          $('nGo').disabled = false;
+          err.textContent = e.message;
+          err.hidden = false;
+        }
+      );
     });
 
     // ---------- profile: the name and role everyone sees; the id and access stay with admins ----------
-    function openProfile(){
-      var root=$('dialogRoot');root.textContent='';
-      var name=el('input',{type:'text',id:'pName',maxlength:'60',placeholder:T('namePh')});name.value=me.name||'';
-      var tt=el('input',{type:'text',id:'pTitle',maxlength:'80',placeholder:T('pTitlePh')});tt.value=me.title||'';
-      var err=el('p',{class:'err',hidden:''}),ok=el('button',{type:'button',class:'btn primary',text:T('save')});
-      function close(){root.textContent='';$('meBtn').focus()}
-      ok.addEventListener('click',function(){ok.disabled=true;err.hidden=true;
-        call('POST','/api/me',{name:name.value,title:tt.value}).then(function(b){me=b;renderMe();close();if(me.role==='admin')loadMembers()},function(e){ok.disabled=false;err.textContent=T('fail',{e:e.message});err.hidden=false})});
-      var dlg=el('div',{class:'dialog',role:'dialog','aria-modal':'true','aria-labelledby':'pHead'},[
-        el('h2',{id:'pHead',text:T('profile')}),
-        el('p',{class:'fixed',text:T('pFixed',{p:me.person,a:L.ac[me.role]||me.role})}),
-        el('div',{class:'fields'},[el('label',{},[T('pName'),name]),el('label',{},[T('pTitle'),tt])]),
-        el('p',{class:'hint',text:T('pHint')}),err,
-        el('div',{class:'foot'},[ok,el('button',{type:'button',class:'btn',text:T('cancel'),onclick:close})])
+    function openProfile() {
+      var root = $('dialogRoot');
+      root.textContent = '';
+      var name = el('input', { type: 'text', id: 'pName', maxlength: '60', placeholder: T('namePh') });
+      name.value = me.name || '';
+      var tt = el('input', { type: 'text', id: 'pTitle', maxlength: '80', placeholder: T('pTitlePh') });
+      tt.value = me.title || '';
+      var err = el('p', { class: 'err', hidden: '' }),
+        ok = el('button', { type: 'button', class: 'btn primary', text: T('save') });
+      function close() {
+        root.textContent = '';
+        $('meBtn').focus();
+      }
+      ok.addEventListener('click', function () {
+        ok.disabled = true;
+        err.hidden = true;
+        call('POST', '/api/me', { name: name.value, title: tt.value }).then(
+          function (b) {
+            me = b;
+            renderMe();
+            close();
+            if (me.role === 'admin') loadMembers();
+          },
+          function (e) {
+            ok.disabled = false;
+            err.textContent = T('fail', { e: e.message });
+            err.hidden = false;
+          }
+        );
+      });
+      var dlg = el('div', { class: 'dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pHead' }, [
+        el('h2', { id: 'pHead', text: T('profile') }),
+        el('p', { class: 'fixed', text: T('pFixed', { p: me.person, a: L.ac[me.role] || me.role }) }),
+        el('div', { class: 'fields' }, [el('label', {}, [T('pName'), name]), el('label', {}, [T('pTitle'), tt])]),
+        el('p', { class: 'hint', text: T('pHint') }),
+        err,
+        el('div', { class: 'foot' }, [
+          ok,
+          el('button', { type: 'button', class: 'btn', text: T('cancel'), onclick: close })
+        ])
       ]);
-      dlg.addEventListener('keydown',function(e){if(e.key==='Escape')close();if(e.key==='Enter'&&e.target.tagName==='INPUT'){e.preventDefault();ok.click()}});
-      root.appendChild(el('div',{class:'scrim',onclick:close}));root.appendChild(dlg);name.focus();
+      dlg.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') close();
+        if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+          e.preventDefault();
+          ok.click();
+        }
+      });
+      root.appendChild(el('div', { class: 'scrim', onclick: close }));
+      root.appendChild(dlg);
+      name.focus();
     }
-    $('meBtn').addEventListener('click',openProfile);
+    $('meBtn').addEventListener('click', openProfile);
     // the full profile (with the role shown on boards) comes from the server, whatever signed the viewer in
-    call('GET','/api/me').then(function(b){me=b;renderMe()},function(){});
+    call('GET', '/api/me').then(
+      function (b) {
+        me = b;
+        renderMe();
+      },
+      function () {}
+    );
 
     // ---------- members (admins): the same steps as `artiboard member …`, on the page ----------
-    if(me.role!=='admin')return;
-    $('memSec').hidden=false;$('hMembers').textContent=T('members');$('memSub').textContent=T('memSub');
-    var th=$('memHead');L.th.forEach(function(x){th.appendChild(el('th',{text:x}))});
-    $('lPerson').textContent=T('person');$('lName').textContent=T('name');$('lAccess').textContent=T('access');$('mGo').textContent=T('add');$('mHint').textContent=T('memHint');
-    $('mPerson').placeholder=T('personPh');$('mName').placeholder=T('namePh');
-    [].forEach.call($('mAccess').options,function(o){o.textContent=L.ac[o.value]});
+    if (me.role !== 'admin') return;
+    $('memSec').hidden = false;
+    $('hMembers').textContent = T('members');
+    $('memSub').textContent = T('memSub');
+    var th = $('memHead');
+    L.th.forEach(function (x) {
+      th.appendChild(el('th', { text: x }));
+    });
+    $('lPerson').textContent = T('person');
+    $('lName').textContent = T('name');
+    $('lAccess').textContent = T('access');
+    $('mGo').textContent = T('add');
+    $('mHint').textContent = T('memHint');
+    $('mPerson').placeholder = T('personPh');
+    $('mName').placeholder = T('namePh');
+    [].forEach.call($('mAccess').options, function (o) {
+      o.textContent = L.ac[o.value];
+    });
 
-    function reveal(head,parts){
-      var r=$('reveal');r.textContent='';r.hidden=false;
-      r.appendChild(el('div',{class:'head'},[el('h3',{text:head}),el('span',{class:'once',text:T('once')}),el('button',{type:'button',class:'linkbtn x',text:T('close'),onclick:function(){r.hidden=true;r.textContent=''}})]));
-      parts.forEach(function(p){r.appendChild(p)});
-      r.scrollIntoView({block:'nearest'});
+    function reveal(head, parts) {
+      var r = $('reveal');
+      r.textContent = '';
+      r.hidden = false;
+      r.appendChild(
+        el('div', { class: 'head' }, [
+          el('h3', { text: head }),
+          el('span', { class: 'once', text: T('once') }),
+          el('button', {
+            type: 'button',
+            class: 'linkbtn x',
+            text: T('close'),
+            onclick: function () {
+              r.hidden = true;
+              r.textContent = '';
+            }
+          })
+        ])
+      );
+      parts.forEach(function (p) {
+        r.appendChild(p);
+      });
+      r.scrollIntoView({ block: 'nearest' });
     }
-    function line(k,text,pre){return el('div',{class:'step'},[el('span',{class:'k',text:k}),el('div',{class:'line'},[el(pre?'pre':'code',{text:text}),copyBtn(text)])])}
-    function showToken(p,b){
-      reveal(T('tokenFor',{p:p}),[line(T('tokenK'),b.token),line(T('claudeK'),b.connect.claude,true),line(T('codexK'),b.connect.codex.join('\n'),true),el('p',{class:'ok',text:T('browserK',{u:location.origin})})]);
+    function line(k, text, pre) {
+      return el('div', { class: 'step' }, [
+        el('span', { class: 'k', text: k }),
+        el('div', { class: 'line' }, [el(pre ? 'pre' : 'code', { text: text }), copyBtn(text)])
+      ]);
     }
-    function act(btn,fn){btn.disabled=true;return fn().then(null,function(e){alert(T('fail',{e:e.message}))}).then(function(){btn.disabled=false})}
-    function loadMembers(){
-      call('GET','/api/members').then(function(ms){
-        var body=$('memRows');body.textContent='';
-        ms.forEach(function(m){
-          var mine=m.uid===me.uid,p=m.person;
-          var sel=el('select',{'aria-label':T('access'),disabled:mine?'':null});
-          ['member','admin','viewer'].forEach(function(a){sel.appendChild(el('option',{value:a,text:L.ac[a]}))});sel.value=m.role;
-          sel.addEventListener('change',function(){act(sel,function(){return call('POST','/api/members/'+p+'/access',{access:sel.value}).then(loadMembers)})});
-          body.appendChild(el('tr',{},[
-            el('td',{class:'person'},[p,' ',mine?el('span',{class:'tag me',text:T('meTag')}):null]),
-            el('td',{class:'name'},[m.name||'—',m.title?el('span',{class:'title',text:m.title}):null]),
-            el('td',{},[el('span',{class:'tag '+m.role,text:L.ac[m.role]||m.role})]),
-            el('td',{text:String(m.tokens)}),
-            el('td',{class:'empty',text:m.lastUsed?ago(m.lastUsed):T('never')}),
-            el('td',{class:'actions'},[
-              el('button',{type:'button',class:'btn small',text:T('newToken'),onclick:function(e){act(e.currentTarget,function(){return call('POST','/api/members/'+p+'/token').then(function(b){showToken(p,b);loadMembers()})})}}),
-              el('button',{type:'button',class:'btn small',text:T('link'),onclick:function(e){act(e.currentTarget,function(){return call('POST','/api/members/'+p+'/link').then(function(b){reveal(T('linkFor',{p:p}),[line(T('linkK'),b.url)])})})}}),
-              sel,
-              el('button',{type:'button',class:'btn small',text:T('revoke'),onclick:function(e){if(!confirm(T('confirmRevoke',{p:p})))return;act(e.currentTarget,function(){return call('POST','/api/members/'+p+'/revoke').then(loadMembers)})}}),
-              mine?null:el('button',{type:'button',class:'btn small danger',text:T('remove'),onclick:function(e){if(!confirm(T('confirmRemove',{p:p})))return;act(e.currentTarget,function(){return call('POST','/api/members/'+p+'/remove').then(loadMembers)})}})
-            ])
-          ]));
+    function showToken(p, b) {
+      reveal(T('tokenFor', { p: p }), [
+        line(T('tokenK'), b.token),
+        line(T('claudeK'), b.connect.claude, true),
+        line(T('codexK'), b.connect.codex.join('\n'), true),
+        el('p', { class: 'ok', text: T('browserK', { u: location.origin }) })
+      ]);
+    }
+    function act(btn, fn) {
+      btn.disabled = true;
+      return fn()
+        .then(null, function (e) {
+          alert(T('fail', { e: e.message }));
+        })
+        .then(function () {
+          btn.disabled = false;
         });
-      },function(e){var body=$('memRows');body.textContent='';body.appendChild(el('tr',{},[el('td',{colspan:'6',class:'err',text:T('loadFail',{e:e.message})})]))});
+    }
+    function loadMembers() {
+      call('GET', '/api/members').then(
+        function (ms) {
+          var body = $('memRows');
+          body.textContent = '';
+          ms.forEach(function (m) {
+            var mine = m.uid === me.uid,
+              p = m.person;
+            var sel = el('select', { 'aria-label': T('access'), disabled: mine ? '' : null });
+            ['member', 'admin', 'viewer'].forEach(function (a) {
+              sel.appendChild(el('option', { value: a, text: L.ac[a] }));
+            });
+            sel.value = m.role;
+            sel.addEventListener('change', function () {
+              act(sel, function () {
+                return call('POST', '/api/members/' + p + '/access', { access: sel.value }).then(loadMembers);
+              });
+            });
+            body.appendChild(
+              el('tr', {}, [
+                el('td', { class: 'person' }, [
+                  p,
+                  ' ',
+                  mine ? el('span', { class: 'tag me', text: T('meTag') }) : null
+                ]),
+                el('td', { class: 'name' }, [
+                  m.name || '—',
+                  m.title ? el('span', { class: 'title', text: m.title }) : null
+                ]),
+                el('td', {}, [el('span', { class: 'tag ' + m.role, text: L.ac[m.role] || m.role })]),
+                el('td', { text: String(m.tokens) }),
+                el('td', { class: 'empty', text: m.lastUsed ? ago(m.lastUsed) : T('never') }),
+                el('td', { class: 'actions' }, [
+                  el('button', {
+                    type: 'button',
+                    class: 'btn small',
+                    text: T('newToken'),
+                    onclick: function (e) {
+                      act(e.currentTarget, function () {
+                        return call('POST', '/api/members/' + p + '/token').then(function (b) {
+                          showToken(p, b);
+                          loadMembers();
+                        });
+                      });
+                    }
+                  }),
+                  el('button', {
+                    type: 'button',
+                    class: 'btn small',
+                    text: T('link'),
+                    onclick: function (e) {
+                      act(e.currentTarget, function () {
+                        return call('POST', '/api/members/' + p + '/link').then(function (b) {
+                          reveal(T('linkFor', { p: p }), [line(T('linkK'), b.url)]);
+                        });
+                      });
+                    }
+                  }),
+                  sel,
+                  el('button', {
+                    type: 'button',
+                    class: 'btn small',
+                    text: T('revoke'),
+                    onclick: function (e) {
+                      if (!confirm(T('confirmRevoke', { p: p }))) return;
+                      act(e.currentTarget, function () {
+                        return call('POST', '/api/members/' + p + '/revoke').then(loadMembers);
+                      });
+                    }
+                  }),
+                  mine
+                    ? null
+                    : el('button', {
+                        type: 'button',
+                        class: 'btn small danger',
+                        text: T('remove'),
+                        onclick: function (e) {
+                          if (!confirm(T('confirmRemove', { p: p }))) return;
+                          act(e.currentTarget, function () {
+                            return call('POST', '/api/members/' + p + '/remove').then(loadMembers);
+                          });
+                        }
+                      })
+                ])
+              ])
+            );
+          });
+        },
+        function (e) {
+          var body = $('memRows');
+          body.textContent = '';
+          body.appendChild(
+            el('tr', {}, [el('td', { colspan: '6', class: 'err', text: T('loadFail', { e: e.message }) })])
+          );
+        }
+      );
     }
     loadMembers();
-    $('memForm').addEventListener('submit',function(e){
-      e.preventDefault();var err=$('mErr');err.hidden=true;$('mGo').disabled=true;
-      var person=$('mPerson').value.trim();
-      call('POST','/api/members',{person:person,name:$('mName').value.trim(),access:$('mAccess').value}).then(function(b){
-        $('mGo').disabled=false;$('mPerson').value='';$('mName').value='';
-        reveal(T('added',{p:person}),[line(T('tokenK'),b.token),line(T('claudeK'),b.connect.claude,true),line(T('codexK'),b.connect.codex.join('\n'),true),el('p',{class:'ok',text:T('browserK',{u:location.origin})})]);
-        loadMembers();
-      },function(e){$('mGo').disabled=false;err.textContent=T('fail',{e:e.message});err.hidden=false});
+    $('memForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var err = $('mErr');
+      err.hidden = true;
+      $('mGo').disabled = true;
+      var person = $('mPerson').value.trim();
+      call('POST', '/api/members', { person: person, name: $('mName').value.trim(), access: $('mAccess').value }).then(
+        function (b) {
+          $('mGo').disabled = false;
+          $('mPerson').value = '';
+          $('mName').value = '';
+          reveal(T('added', { p: person }), [
+            line(T('tokenK'), b.token),
+            line(T('claudeK'), b.connect.claude, true),
+            line(T('codexK'), b.connect.codex.join('\n'), true),
+            el('p', { class: 'ok', text: T('browserK', { u: location.origin }) })
+          ]);
+          loadMembers();
+        },
+        function (e) {
+          $('mGo').disabled = false;
+          err.textContent = T('fail', { e: e.message });
+          err.hidden = false;
+        }
+      );
     });
   });
 })();

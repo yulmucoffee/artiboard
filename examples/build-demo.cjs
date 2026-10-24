@@ -60,9 +60,11 @@ const shim=`<script>
 `;
 function swap(a,b){if(!page.includes(a))throw new Error('board.html changed; update build-demo.cjs: '+a);page=page.replace(a,b)}
 swap('<title>Project Board</title>','<meta charset="utf-8">\n<title>artiboard demo</title>');
-swap("claude.use('db')","DEMO.use('db')");
-swap("claude.use('user')","DEMO.use('user')");
-swap('if(window.claude&&window.claude.use)start();','if(window.DEMO)start();');
+// the page asks claude.use('db') and claude.use('user'); the demo answers both
+const uses=(page.match(/\bclaude(\s*)\.use\(/g)||[]).length;
+if(uses!==2)throw new Error('board.html changed; update build-demo.cjs: '+uses+' claude.use calls, expected 2');
+page=page.replace(/\bclaude(\s*)\.use\(/g,'DEMO$1.use(');
+swap('if (window.claude && window.claude.use) start();','if (window.DEMO) start();');
 const i=page.lastIndexOf('<script>');
 page=page.slice(0,i)+shim+page.slice(i);
 const out=path.join(__dirname,'demo.html');
