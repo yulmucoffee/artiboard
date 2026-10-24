@@ -746,7 +746,7 @@ for (const backend of backends) {
       cfg.agentPageEdits = true;
       const info = (await call(board, 'board_page', { project: P })).value;
       assert.deepEqual([info.version, info.custom], [0, false]);
-      assert.match((await call(board, 'board_page', { project: P, find: "var STATUS=", context: 0 })).value, /^version 0 \(bundled\)\n\d+: /);
+      assert.match((await call(board, 'board_page', { project: P, find: "var STATUS", context: 0 })).value, /^version 0 \(bundled\)\n\d+: /);
       const member = await connect(tokens.member);
       try {
         const denied = await call(member, 'board_page', { project: P, edits: [{ old: '<title>Project Board</title>', new: '<title>Mine</title>' }] });

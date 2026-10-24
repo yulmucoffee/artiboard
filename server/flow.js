@@ -15,6 +15,8 @@ function keyOrder(a, b) {
   const x = p(a), y = p(b);
   return x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] - y[1] || x[2] - y[2];
 }
+// documents in key order: M1-2 before M1-10, an id standing in for a missing key
+const byDocKey = (a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id);
 const CLAIMED = { ko: '집었어요.', en: 'Claimed.' };
 
 // a pinned write lost a race (someone wrote in between): read again and redo it once
@@ -140,65 +142,95 @@ export function makeFlow(store) {
     if (!project && !repo) throw new BoardError('invalid_argument', 'pass project, or repo (owner/name from git remote) to find it');
     if (!project) project = await projectFor(repo);
     const me = member.person;
-    const reads = [
-      { path: 'meta/config' },
-      { path: `cursors/${me}` },
-      { collection: 'tasks', where: [{ field: 'owner', op: '==', value: me }], limit: 200 },
-      ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'todo' }], limit: 200 },
-      rules && { path: 'meta/rules' },
-      rules && { path: 'meta/notes' },
-      { collection: 'notices', order: [{ field: 'at', dir: 'desc' }], limit: 20 },
-      ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'review' }], limit: 200 },
-    ];
-    const got = await read(project, reads.filter(Boolean));
-    const [config, cursor, firstOwned, firstTodo = [], own = null, notes = null, latest, firstReview = []] = reads.map((r) => (r ? got.shift() : undefined));
-    const [owned, todo, inReview] = await Promise.all([[firstOwned, reads[2]], [firstTodo, reads[3]], [firstReview, reads[7]]]
-      .map(([first, r]) => (r ? rest(project, first, r) : first)));
-    // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
-    const mine = owned.filter((t) => (t.data.status || 'todo') !== 'done');
-    // the 20 latest notices: those after the cursor are new (all 20 new: older ones went unread); no cursor yet, the latest 5
-    const since = cursor?.data?.noticesAt || null;
-    const notices = (since ? latest.filter((n) => typeof n.data.at === 'string' && n.data.at > since) : latest.slice(0, 5)).reverse();
+    const got = await readStart(project, me, { ready, rules });
+    const since = got.cursor?.data?.noticesAt || null;
+    const notices = newNotices(got.latest, since);
     const newest = notices.map((n) => n.data.at).filter((a) => typeof a === 'string').sort().pop();
-    const moving = !peek && newest && (!since || newest > since) ? moveCursor(member, project, cursor, newest).catch(() => {}) : null;
+    const moving = !peek && newest && (!since || newest > since) ? moveCursor(member, project, got.cursor, newest).catch(() => {}) : null;
+    const config = got.config?.data || {}, scope = repoScope(repo, project, config);
+    let free = (ready ? await readyWork(member, project, got.todo) : []).sort(byDocKey);
+    await moving;
+    const elsewhere = scope.want ? free.filter((t) => { const r = taskRepo(t.data, scope.repos); return r && r !== scope.want; }).length : 0;
+    if (scope.want) free = free.filter(scope.here);
+    // someone else's work waiting for a review, which anyone may finish after the merge or send back
+    const toReview = got.inReview.filter((t) => holderOf(t.data) !== me && scope.here(t)).sort(byDocKey);
+    // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
+    const mine = got.owned.filter((t) => statusOf(t.data) !== 'done');
 
-    // repo, given with a project, may also be one of its labels; one the project does not list turns the filter off
-    const c = config?.data || {}, repos = reposOf(c);
+    const out = [`${me} · ${project}${config.milestone ? ` · ${config.milestone}` : ''} · artiboard ${VERSION}`];
+    if (scope.repos.length) out.push(`repos: ${repoList(scope.repos)}`);
+    if (scope.stray) out.push(scope.stray);
+    if (rules) out.push(...rulesLines(got.rules, got.notes));
+    out.push(...noticeLines(notices, got.latest.length, since));
+    out.push(...mineLines(mine, me));
+    if (ready) out.push(...readyLines(free, toReview, ready, elsewhere));
+    return out.join('\n');
+  }
+
+  // Everything board_start reads, in one request, by name; a list whose first page came back full continues page by page.
+  async function readStart(project, me, { ready, rules }) {
+    const wanted = {
+      config: { path: 'meta/config' },
+      cursor: { path: `cursors/${me}` },
+      owned: { collection: 'tasks', where: [{ field: 'owner', op: '==', value: me }], limit: 200 },
+      todo: ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'todo' }], limit: 200 },
+      rules: rules && { path: 'meta/rules' },
+      notes: rules && { path: 'meta/notes' },
+      latest: { collection: 'notices', order: [{ field: 'at', dir: 'desc' }], limit: 20 },
+      inReview: ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'review' }], limit: 200 },
+    };
+    const names = Object.keys(wanted).filter((k) => wanted[k]);
+    const results = await read(project, names.map((k) => wanted[k]));
+    const got = Object.fromEntries(names.map((k, i) => [k, results[i]]));
+    const [owned, todo, inReview] = await Promise.all(['owned', 'todo', 'inReview'].map((k) => (wanted[k] ? rest(project, got[k], wanted[k]) : [])));
+    return { ...got, owned, todo, inReview };
+  }
+
+  // the 20 latest notices, oldest first: those after the cursor are new (all 20 new: older ones went unread); no cursor
+  // yet, the latest 5
+  function newNotices(latest, since) {
+    return (since ? latest.filter((n) => typeof n.data.at === 'string' && n.data.at > since) : latest.slice(0, 5)).reverse();
+  }
+
+  // Which repository's work to show. repo, given with a project, may also be one of its labels; one the project does
+  // not list turns the filter off and says so.
+  function repoScope(repo, project, config) {
+    const repos = reposOf(config);
     let want = repo ? repoName(repos.find((r) => r.label === repo)?.repo ?? repo) : null, stray = '';
     if (repo && (!want || !repos.some((r) => repoName(r.repo) === want))) {
       stray = `repo ${want || '(not a GitHub repository)'} is not linked to ${project}; showing all ready work (link it in meta/config.repos)`;
       want = null;
     }
-    let free = (ready ? await readyWork(member, project, todo) : []).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
-    await moving;
-    const elsewhere = want ? free.filter((t) => { const r = taskRepo(t.data, repos); return r && r !== want; }).length : 0;
     const here = (t) => { const r = want && taskRepo(t.data, repos); return !r || r === want; };
-    if (want) free = free.filter(here);
-    // someone else's work waiting for a review, which anyone may finish after the merge or send back
-    const toReview = inReview.filter((t) => holderOf(t.data) !== me && here(t)).sort((a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id));
+    return { repos, want, stray, here };
+  }
 
-    const out = [`${me} · ${project}${c.milestone ? ` · ${c.milestone}` : ''} · artiboard ${VERSION}`];
-    if (repos.length) out.push(`repos: ${repoList(repos)}`);
-    if (stray) out.push(stray);
-    if (rules) {
-      out.push(BOARD_RULES);
-      const r = own?.data;
-      if (typeof r?.text === 'string' && r.text.trim()) out.push(`project rules (rev ${r.rev || 1}${r.by ? ` · ${r.by}` : ''}${r.updatedAt ? ` ${short(r.updatedAt).slice(0, 5)}` : ''}):`, r.text.trim());
-      else out.push('project rules: none yet');
-      // the shared status (schedule, where things stand) is long and changes daily: pointed at, not printed
-      const n = notes?.data;
-      if (typeof n?.text === 'string' && n.text.trim()) out.push(`project notes: meta/notes (rev ${n.rev || 1}${n.updatedAt ? ` ${short(n.updatedAt).slice(0, 5)}` : ''}); board_get it when you need the schedule or status`);
-    }
-    out.push(notices.length ? `notices${since ? (notices.length === latest.length ? ' (new, the latest 20; older ones skipped)' : ' (new)') : ' (latest)'}:` : 'notices: none new');
-    notices.forEach((n) => out.push(msgLine(n.data)));
-    // where someone else wrote last (a question, a review, an override) first, so the holder opens that thread first,
-    // then work under way before work not started; work in review waits on others, so it is one line of keys. A person
-    // holding a great many sees the first ones and how many more, not a page per session.
+  // the board rules, the project's rules in full, and a pointer to its notes: the shared status (schedule, where things
+  // stand) is long and changes daily, so it is pointed at, not printed
+  function rulesLines(own, notes) {
+    const out = [BOARD_RULES];
+    const r = own?.data;
+    if (typeof r?.text === 'string' && r.text.trim()) out.push(`project rules (rev ${r.rev || 1}${r.by ? ` · ${r.by}` : ''}${r.updatedAt ? ` ${short(r.updatedAt).slice(0, 5)}` : ''}):`, r.text.trim());
+    else out.push('project rules: none yet');
+    const n = notes?.data;
+    if (typeof n?.text === 'string' && n.text.trim()) out.push(`project notes: meta/notes (rev ${n.rev || 1}${n.updatedAt ? ` ${short(n.updatedAt).slice(0, 5)}` : ''}); board_get it when you need the schedule or status`);
+    return out;
+  }
+
+  function noticeLines(notices, latestCount, since) {
+    const head = notices.length ? `notices${since ? (notices.length === latestCount ? ' (new, the latest 20; older ones skipped)' : ' (new)') : ' (latest)'}:` : 'notices: none new';
+    return [head, ...notices.map((n) => msgLine(n.data))];
+  }
+
+  // This person's own work. Where someone else wrote last (a question, a review, an override) comes first, so the holder
+  // opens that thread first, then work under way before work not started; work in review waits on others, so it is one
+  // line of keys. A person holding a great many sees the first ones and how many more, not a page per session.
+  function mineLines(mine, me) {
     const other = (d) => d.lastMessageBy && d.lastMessageBy !== me ? d.lastMessageBy : null;
     const rank = (d) => (other(d) ? 0 : 1) * 10 + ({ doing: 0, blocked: 1, todo: 3 }[statusOf(d)] ?? 2);
-    const byKey = (a, b) => keyOrder(a.data.key || a.id, b.data.key || b.id);
-    const working = mine.filter((t) => t.data.status !== 'review').sort((a, b) => rank(a.data) - rank(b.data) || byKey(a, b));
-    const waiting = mine.filter((t) => t.data.status === 'review').sort((a, b) => (other(a.data) ? 0 : 1) - (other(b.data) ? 0 : 1) || byKey(a, b));
+    const working = mine.filter((t) => t.data.status !== 'review').sort((a, b) => rank(a.data) - rank(b.data) || byDocKey(a, b));
+    const waiting = mine.filter((t) => t.data.status === 'review').sort((a, b) => (other(a.data) ? 0 : 1) - (other(b.data) ? 0 : 1) || byDocKey(a, b));
+    const out = [];
     if (working.length) {
       out.push(working.length > MINE_LINES ? `mine (${MINE_LINES} of ${working.length}):` : 'mine:');
       working.slice(0, MINE_LINES).forEach((t) => out.push(`${taskLine(t.data, t.id, true)}${other(t.data) ? ` · ${other(t.data)} wrote last` : ''}`));
@@ -207,17 +239,20 @@ export function makeFlow(store) {
       const keys = waiting.slice(0, MINE_KEYS).map((t) => `${t.data.key || t.id}${other(t.data) ? ` (${other(t.data)} wrote last)` : ''}`);
       out.push(`mine in review (${waiting.length}): ${keys.join(', ')}${waiting.length > MINE_KEYS ? `, and ${waiting.length - MINE_KEYS} more` : ''}`);
     }
-    if (ready) {
-      const more = elsewhere ? `; ${elsewhere} more in other repos` : '';
-      out.push(free.length ? `ready (${free.length > ready ? `${ready} of ` : ''}${free.length}${more}):` : `ready: none${more}`);
-      free.slice(0, ready).forEach((t) => out.push(taskLine(t.data, t.id)));
-      if (toReview.length) {
-        out.push(`to review (${toReview.length > ready ? `${ready} of ` : ''}${toReview.length}):`);
-        // the header says review and the PR stands for the branch; who to ask is what a reviewer needs
-        toReview.slice(0, ready).forEach((t) => out.push(reviewLine(t.data, t.id)));
-      }
+    return out;
+  }
+
+  // ready work, then others' work to review: the header says review and the PR stands for the branch, so a review line
+  // carries who to ask instead
+  function readyLines(free, toReview, ready, elsewhere) {
+    const more = elsewhere ? `; ${elsewhere} more in other repos` : '';
+    const out = [free.length ? `ready (${free.length > ready ? `${ready} of ` : ''}${free.length}${more}):` : `ready: none${more}`];
+    free.slice(0, ready).forEach((t) => out.push(taskLine(t.data, t.id)));
+    if (toReview.length) {
+      out.push(`to review (${toReview.length > ready ? `${ready} of ` : ''}${toReview.length}):`);
+      toReview.slice(0, ready).forEach((t) => out.push(reviewLine(t.data, t.id)));
     }
-    return out.join('\n');
+    return out;
   }
 
   // cursors only move forward; another session of the same person may have moved it meanwhile
@@ -289,6 +324,24 @@ export function makeFlow(store) {
     return [result, ...detailLines(det)].join('\n');
   }
 
+  // Finished tasks leave every dependent's waitingOn. A dependent changed in the same call takes the key out with its own
+  // patch (one write per document); the rest get a write each. unblocked names the todo tasks now waiting on nothing.
+  async function unblockDependents(project, keys, patches) {
+    const finished = new Set(keys), seen = new Map(), more = [], unblocked = [];
+    for (const found of await Promise.all(keys.map((k) => query(project, 'tasks', { where: [{ field: 'deps', op: 'array-contains', value: k }], limit: 200 })))) {
+      for (const o of found) seen.set(o.id, o);
+    }
+    for (const o of seen.values()) {
+      const waiting = Array.isArray(o.data.waitingOn) ? o.data.waitingOn : [];
+      const left = waiting.filter((k) => !finished.has(k));
+      if (left.length === waiting.length) continue;
+      if (patches.has(o.id)) { patches.get(o.id).waitingOn = left; continue; }
+      more.push({ op: 'update', path: `tasks/${o.id}`, if_version: o.version, data: { waitingOn: left } });
+      if (!left.length && statusOf(o.data) === 'todo') unblocked.push(o.data.key || o.id);
+    }
+    return { more, unblocked };
+  }
+
   // A thread message, optionally with a status, branch, PR, start or due day, repo or summary change; without a task, a notice.
   // Only the task's holder changes it, except: anyone moves its due day (the thread records who and from what), anyone
   // reviews a task in review (status done after the merge, or doing to send it back, with a summary), and override,
@@ -352,22 +405,8 @@ export function makeFlow(store) {
           writes.unshift(det ? { op: 'update', path: `details/${id}`, if_version: det.version, data: s, ...o } : { op: 'set', path: `details/${id}`, if_absent: true, data: s, ...o });
         }
       });
-      const unblocked = [];
-      if (status === 'done') {
-        const finished = new Set(keys), seen = new Map();
-        for (const found of await Promise.all(keys.map((k) => query(project, 'tasks', { where: [{ field: 'deps', op: 'array-contains', value: k }], limit: 200 })))) {
-          for (const o of found) seen.set(o.id, o);
-        }
-        for (const o of seen.values()) {
-          const waiting = Array.isArray(o.data.waitingOn) ? o.data.waitingOn : [];
-          const left = waiting.filter((k) => !finished.has(k));
-          if (left.length === waiting.length) continue;
-          // a dependent finished in the same call takes its waitingOn with its own change, one write per document
-          if (patches.has(o.id)) { patches.get(o.id).waitingOn = left; continue; }
-          writes.push({ op: 'update', path: `tasks/${o.id}`, if_version: o.version, data: { waitingOn: left } });
-          if (!left.length && (o.data.status || 'todo') === 'todo') unblocked.push(o.data.key || o.id);
-        }
-      }
+      const { more, unblocked } = status === 'done' ? await unblockDependents(project, keys, patches) : { more: [], unblocked: [] };
+      writes.push(...more);
       if (writes.length > 100) throw new BoardError('invalid_argument', `${writes.length} writes is more than one call takes (100): pass fewer tasks`);
       await apply(member, project, writes);
       return [`ok ${keys.join(', ')}${status ? ` → ${status}` : ''}`, unblocked.length && `unblocked ${unblocked.sort(keyOrder).join(', ')}`].filter(Boolean).join(' · ');

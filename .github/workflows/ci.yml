@@ -38,7 +38,7 @@ jobs:
       - name: Install
         run: |
           npm ci --no-audit --no-fund
-          npm install --no-save --no-audit --no-fund jsdom@24.1.1
+          npm install --no-save --no-audit --no-fund jsdom@24.1.1 prettier@3.9.10
       - name: npm run check (versions, READMEs, page rules copy, demo, tests on SQLite, page smoke test)
         run: npm run check
 

@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.15.2",
+      "date": "2026-10-24",
+      "prs": [
+        39
+      ],
+      "lines": {
+        "en": [
+          "Switching to the kanban from far down the page now shows it from its top, and the toolbar spans the window alongside it.",
+          "Under the hood, the board page's code is formatted and named for the people and agents who adapt it; nothing else changes on screen."
+        ],
+        "ko": [
+          "문서 보기를 한참 내려본 뒤 칸반으로 바꾸면 이제 칸반이 처음부터 보이고, 툴바도 칸반과 함께 창 너비로 펼쳐져요.",
+          "보드 페이지의 코드를 사람과 에이전트가 고치기 쉽게 정리하고 이름을 붙였어요. 화면은 그대로예요."
+        ]
+      }
+    },
+    {
       "version": "1.15.1",
       "date": "2026-10-24",
       "prs": [
