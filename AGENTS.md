@@ -14,7 +14,7 @@ artiboard is read by agents on every session they spend on a board, so it has th
 | `server/core.js` | Errors, write guards, and the board rules text every agent receives. |
 | `server/store/sqlite.js`, `supabase/migrations/` | Storage. Both backends pass the same tests in `tests/server.test.js`. |
 | `server/public/shim.js` | The page's runtime on a self-hosted site (reads, writes, live updates). |
-| `skills/artiboard/assets/board.html` | The page. It carries a copy of `server/tasks.js` between marker lines. |
+| `skills/artiboard/assets/board.html` | The page. It carries a copy of `server/tasks.js` between marker lines. Its script keeps prettier's shape (`npx prettier --print-width 120 --single-quote --trailing-comma none`), and names say what a thing is: no one-letter helpers beyond `T`, `$` and `el`. |
 | `skills/artiboard/` | The skill people install: `SKILL.md`, the agents' protocol, the hosted guide. |
 | `scripts/` | Levers: `check.mjs` (every gate), `inline-rules.mjs`, `stamp-version.mjs`, `readme-shape.mjs`, `unused.mjs`, `release-check.mjs` (CI: the bump, the PR in the changelog, squash merges only), `bench.mjs`, `supabase-env.sh`. |
 
