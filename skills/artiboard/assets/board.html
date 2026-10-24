@@ -540,7 +540,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var I18N = {
     en: {
       loading: 'Loading…',
-      noDb: 'Board data is not available. Reload the page, or openSheet the board where it is hosted.',
+      noDb: 'Board data is not available. Reload the page, or open the board where it is hosted.',
       back: '← Projects',
       loadFail: 'Could not load tasks ({e})',
       milestone: 'Milestone',
@@ -570,7 +570,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       newTitle: 'Show only changed tasks',
       newNoticeOnly: 'New notices are in the Notices section',
       readAll: 'Mark all read',
-      hint: '<kbd>/</kbd> find · <kbd>j</kbd><kbd>k</kbd> moveCursor · <kbd>Enter</kbd> openSheet · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> views · <kbd>m</kbd> mine · <kbd>Esc</kbd> close',
+      hint: '<kbd>/</kbd> find · <kbd>j</kbd><kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> views · <kbd>m</kbd> mine · <kbd>Esc</kbd> close',
       h_now: 'Now',
       h_activity: 'Recent activity',
       activitySub: 'The last message on the tasks touched most recently. Open a task for its whole thread.',
@@ -603,16 +603,16 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       offline: 'Reconnecting…',
       h_rules: 'Project rules',
       rulesSub:
-        'What this project agrees on: personChip owns what, where specs live, branches and merges, what to announce. Agents receive them when they start board work.',
+        'What this project agrees on: who owns what, where specs live, branches and merges, what to announce. Agents receive them when they start board work.',
       rulesEmpty:
-        'No project rules yet. Write down personChip owns what, where specs live and how branches merge; agents read them before they work.',
+        'No project rules yet. Write down who owns what, where specs live and how branches merge; agents read them before they work.',
       rulesLegacy:
         "This is the board's older rules card (meta/protocol). Edit and save it to make it the project rules agents receive.",
       tellAll: 'Also post a notice about the change',
       rulesChanged: 'Project rules changed (rev {r}).',
       h_notes: 'Project notes',
       notesSub:
-        'Schedule, where things stand, openSheet questions: what people keep up to date together. Agents read it only when they need it.',
+        'Schedule, where things stand, open questions: what people keep up to date together. Agents read it only when they need it.',
       notesEmpty: 'No notes yet.',
       notesChanged: 'Project notes updated (rev {r}).',
       h_guide: 'How this board works',
@@ -628,23 +628,23 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         {
           t: "A task's way",
           i: [
-            'To do → claimed (In progress) → PR openSheet (Review) → a person merges (Done). The holder or the reviewer marks it done; a reviewer may also send it back to In progress.',
+            'To do → claimed (In progress) → PR open (Review) → a person merges (Done). The holder or the reviewer marks it done; a reviewer may also send it back to In progress.',
             'A task can be picked once everything it depends on is done; finishing it unlocks the tasks that waited for it.',
             'Stuck: set Blocked and say why in the thread. Dropped before done: back to To do with a handoff summary, for anyone to pick up.',
-            "Done work piles up: moveCursor it to the archive from the kanban's done column or a task's panel. Archived tasks still count as done."
+            "Done work piles up: move it to the archive from the kanban's done column or a task's panel. Archived tasks still count as done."
           ]
         },
         {
           t: 'Dates',
           i: [
             'A task can carry a start day and a due day.',
-            "Anyone may moveCursor a due day, on anyone's task; the thread records personChip moved it. Everything else on a held task is its owner's, unless a person tells their agent to change it or take it over."
+            "Anyone may move a due day, on anyone's task; the thread records who moved it. Everything else on a held task is its owner's, unless a person tells their agent to change it or take it over."
           ]
         },
         {
           t: 'Writing',
           i: [
-            'Messages and notices at most three lines, a summary at most five (statusChip, decisions, what is left).',
+            'Messages and notices at most three lines, a summary at most five (state, decisions, what is left).',
             'Details stay in the repository and PRs; the board points at them.',
             'Notices only for what everyone must know.'
           ]
@@ -710,7 +710,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       noPrShort: 'no PR',
       blockedNote: 'Blocked. See the thread for why.',
       reviewNote: 'Waiting for PR review and merge.',
-      noPr: ' (no PR linkAccount)',
+      noPr: ' (no PR link)',
       openPr: 'Open PR',
       ready: 'Ready to pick',
       readyNone: 'No unassigned task has all its dependencies done.',
@@ -789,7 +789,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       save: 'Save',
       cancel: 'Cancel',
       summaryEmpty:
-        'No summary yet. At handoff, review or done, write the current statusChip, decisions and what is left in five lines. The next person and agent read only the summary and later messages.',
+        'No summary yet. At handoff, review or done, write the current state, decisions and what is left in five lines. The next person and agent read only the summary and later messages.',
       acceptance: 'Acceptance',
       spec: 'Spec',
       msgPh: 'Write as {p}',
@@ -1195,7 +1195,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     view = read('ab-view') || 'doc';
   if (VIEWS.indexOf(view) < 0) view = 'doc';
   var me = read('ab-me') || '';
-  // personChip is viewing, from the user capability: uid null = unknown (keep the honor-system picker), canWrite null = not told (keep controls)
+  // who is viewing, from the user capability: uid null = unknown (keep the honor-system picker), canWrite null = not told (keep controls)
   var uid = null,
     canWrite = null,
     links = {};
@@ -1568,7 +1568,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     for (var i = 0; i < people.length; i++) if (uidOf(people[i].id) === uid) return people[i].id;
     return null;
   }
-  // the signed-in account decides personChip the viewer is: a linked account is that person; an unlinked one is nobody
+  // the signed-in account decides who the viewer is: a linked account is that person; an unlinked one is nobody
   // until it picks an unlinked person, which links it for good (a board of one links its only person at once)
   function identify() {
     var l = linked();
@@ -1910,7 +1910,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   }
 
   // A person's change from the page: the task, then one line in its thread saying what changed, as agents' changes do,
-  // so the holder and their agents see personChip moved it. It reads the task first and writes with that version: the page's
+  // so the holder and their agents see who moved it. It reads the task first and writes with that version: the page's
   // copy may lag an agent's write, and status side effects and the holder rule must see the task as it is now. A task
   // that moved again in between is read once more.
   function change(t, patch, extra) {
@@ -2234,6 +2234,118 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     if (a && a < td && s === 'todo' && !t.claimedBy) return { o: 4, cls: 'soon', note: T('startLateNote') };
     return null;
   }
+  // one chip per person: what they hold now, then what is unassigned
+  function peopleRow() {
+    var row = el('div', { class: 'np-row' }),
+      parts = T('tallyParts');
+    people.forEach(function (p) {
+      var held = tasks.filter(function (t) {
+        return t.owner === p.id;
+      });
+      var n = function (s) {
+        return held.filter(function (t) {
+          return knownStatus(t) === s;
+        }).length;
+      };
+      var bits = [];
+      ['doing', 'review', 'blocked'].forEach(function (s) {
+        if (n(s)) bits.push(parts[s] + ' ' + n(s));
+      });
+      var name = p.name || p.id;
+      row.appendChild(
+        el(
+          'span',
+          {
+            class: 'np' + personClass(p.id) + (p.id === me && people.length > 1 ? ' mine' : ''),
+            title: T('total', { n: held.length }) + ' · ' + parts.done + ' ' + n('done')
+          },
+          [
+            el('i', { text: name.charAt(0).toUpperCase() }),
+            el('b', { text: name }),
+            el('span', { text: bits.length ? bits.join(' · ') : T('noneYet') })
+          ]
+        )
+      );
+    });
+    var free = tasks.filter(function (t) {
+      return !t.owner && knownStatus(t) !== 'done';
+    });
+    row.appendChild(
+      el('span', { class: 'np none' }, [el('i'), el('b', { text: T('unassigned') }), el('span', { text: String(free.length) })])
+    );
+    return row;
+  }
+  function titleButton(t) {
+    return el('button', {
+      type: 'button',
+      class: 't',
+      text: t.title || T('untitled'),
+      title: t.title || '',
+      onclick: function () {
+        openSheet(t.id);
+      }
+    });
+  }
+  // a few rows, the rest behind "more"; which lists stay open is kept in nowExpanded by name
+  function nowRows(name, cls, items, row) {
+    var ul = el('ul', { class: cls });
+    (nowExpanded[name] ? items : items.slice(0, NOW_MAX)).forEach(function (x) {
+      ul.appendChild(row(x));
+    });
+    var nodes = [ul];
+    if (items.length > NOW_MAX)
+      nodes.push(
+        moreBtn(!!nowExpanded[name], items.length - NOW_MAX, function () {
+          nowExpanded[name] = !nowExpanded[name];
+          renderNow();
+        })
+      );
+    return nodes;
+  }
+  // why the task needs hands, its key and title, who has it, and the PR (in review) or its dates
+  function attentionRow(x) {
+    var t = x.t,
+      side = x.a.o === 2 ? (prEls(t).length ? prEls(t) : [el('span', { text: T('noPrShort') })]) : [dateChip(t)];
+    return el('li', {}, [
+      el('span', { class: 'why ' + x.a.cls, title: x.a.note, text: T('why')[x.a.o] }),
+      el('span', { class: 'key', text: t.key }),
+      titleButton(t),
+      t.owner ? avatar(t) : el('span'),
+      el('span', { class: 'side' }, [newDot(isNew(t))].concat(side))
+    ]);
+  }
+  // a free task: what finishing it unlocks, its dates, and a claim button for the viewer
+  function readyRow(t) {
+    var unlocks = tasks
+      .filter(function (o) {
+        return (o.deps || []).indexOf(t.key) >= 0;
+      })
+      .map(function (o) {
+        return o.key;
+      });
+    var unlockText = unlocks.length
+      ? T('unlocks', { k: unlocks.length > 2 ? unlocks.slice(0, 2).join(', ') + ' +' + (unlocks.length - 2) : unlocks.join(', ') })
+      : '';
+    return el('li', {}, [
+      el('span', { class: 'key', text: t.key }),
+      titleButton(t),
+      el('span', { class: 'side', title: unlocks.length ? T('unlocks', { k: unlocks.join(', ') }) : null }, [
+        [t.feature, unlockText].filter(Boolean).join(' · '),
+        dateChip(t)
+      ]),
+      me && writable()
+        ? el('button', {
+            type: 'button',
+            class: 'btn small',
+            text: T('claim', { p: personName(me) }),
+            title: T('claimTitle', { p: personName(me) }),
+            onclick: function (e) {
+              claim(t, e.currentTarget);
+            }
+          })
+        : el('span')
+    ]);
+  }
   function renderNow() {
     var box = $('now');
     box.textContent = '';
@@ -2259,52 +2371,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       box.appendChild(el('p', { class: 'muted', style: 'font-size:13.5px', text: T('emptyHint') }));
       return;
     }
-    // one chip per person: what they hold now, then what is unassigned
-    var ppl = el('div', { class: 'np-row' }),
-      parts = T('tallyParts');
-    people.forEach(function (p) {
-      var mine = tasks.filter(function (t) {
-          return t.owner === p.id;
-        }),
-        n = function (s) {
-          return mine.filter(function (t) {
-            return knownStatus(t) === s;
-          }).length;
-        };
-      var bits = [];
-      ['doing', 'review', 'blocked'].forEach(function (s) {
-        if (n(s)) bits.push(parts[s] + ' ' + n(s));
-      });
-      var name = p.name || p.id;
-      ppl.appendChild(
-        el(
-          'span',
-          {
-            class: 'np' + personClass(p.id) + (p.id === me && people.length > 1 ? ' mine' : ''),
-            title: T('total', { n: mine.length }) + ' · ' + parts.done + ' ' + n('done')
-          },
-          [
-            el('i', { text: name.charAt(0).toUpperCase() }),
-            el('b', { text: name }),
-            el('span', { text: bits.length ? bits.join(' · ') : T('noneYet') })
-          ]
-        )
-      );
-    });
-    var free = tasks.filter(function (t) {
-        return !t.owner && knownStatus(t) !== 'done';
-      }),
-      rd = tasks.filter(ready).sort(byKey);
-    ppl.appendChild(
-      el('span', { class: 'np none' }, [
-        el('i'),
-        el('b', { text: T('unassigned') }),
-        el('span', { text: String(free.length) })
-      ])
-    );
-    box.appendChild(ppl);
-
-    // each list shows a few and opens the rest on demand
+    box.appendChild(peopleRow());
     var alerts = tasks
       .map(function (t) {
         return { t: t, a: attention(t) };
@@ -2315,100 +2382,23 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       .sort(function (x, y) {
         return x.a.o - y.a.o || byKey(x.t, y.t);
       });
-    function titleBtn(t) {
-      return el('button', {
-        type: 'button',
-        class: 't',
-        text: t.title || T('untitled'),
-        title: t.title || '',
-        onclick: function () {
-          openSheet(t.id);
-        }
-      });
-    }
     if (alerts.length) {
       box.appendChild(
         el('div', { class: 'subhead' }, [T('needsHands'), el('span', { class: 'n', text: String(alerts.length) })])
       );
-      var ul = el('ul', { class: 'rows' });
-      (nowExpanded.alerts ? alerts : alerts.slice(0, NOW_MAX)).forEach(function (x) {
-        var t = x.t,
-          side = x.a.o === 2 ? (prEls(t).length ? prEls(t) : [el('span', { text: T('noPrShort') })]) : [dateChip(t)];
-        ul.appendChild(
-          el('li', {}, [
-            el('span', { class: 'why ' + x.a.cls, title: x.a.note, text: T('why')[x.a.o] }),
-            el('span', { class: 'key', text: t.key }),
-            titleBtn(t),
-            t.owner ? avatar(t) : el('span'),
-            el('span', { class: 'side' }, [newDot(isNew(t))].concat(side))
-          ])
-        );
+      nowRows('alerts', 'rows', alerts, attentionRow).forEach(function (n) {
+        box.appendChild(n);
       });
-      box.appendChild(ul);
-      if (alerts.length > NOW_MAX)
-        box.appendChild(
-          moreBtn(!!nowExpanded.alerts, alerts.length - NOW_MAX, function () {
-            nowExpanded.alerts = !nowExpanded.alerts;
-            renderNow();
-          })
-        );
     }
-    box.appendChild(el('div', { class: 'subhead' }, [T('ready'), el('span', { class: 'n', text: String(rd.length) })]));
-    if (!rd.length) {
+    var free = tasks.filter(ready).sort(byKey);
+    box.appendChild(el('div', { class: 'subhead' }, [T('ready'), el('span', { class: 'n', text: String(free.length) })]));
+    if (!free.length) {
       box.appendChild(el('p', { class: 'empty', text: T('readyNone') }));
       return;
     }
-    var ul2 = el('ul', { class: 'rows ready' });
-    (nowExpanded.ready ? rd : rd.slice(0, NOW_MAX)).forEach(function (t) {
-      var unlocks = tasks
-        .filter(function (o) {
-          return (o.deps || []).indexOf(t.key) >= 0;
-        })
-        .map(function (o) {
-          return o.key;
-        });
-      ul2.appendChild(
-        el('li', {}, [
-          el('span', { class: 'key', text: t.key }),
-          titleBtn(t),
-          el('span', { class: 'side', title: unlocks.length ? T('unlocks', { k: unlocks.join(', ') }) : null }, [
-            [
-              t.feature,
-              unlocks.length
-                ? T('unlocks', {
-                    k:
-                      unlocks.length > 2
-                        ? unlocks.slice(0, 2).join(', ') + ' +' + (unlocks.length - 2)
-                        : unlocks.join(', ')
-                  })
-                : ''
-            ]
-              .filter(Boolean)
-              .join(' · '),
-            dateChip(t)
-          ]),
-          me && writable()
-            ? el('button', {
-                type: 'button',
-                class: 'btn small',
-                text: T('claim', { p: personName(me) }),
-                title: T('claimTitle', { p: personName(me) }),
-                onclick: function (e) {
-                  claim(t, e.currentTarget);
-                }
-              })
-            : el('span')
-        ])
-      );
+    nowRows('ready', 'rows ready', free, readyRow).forEach(function (n) {
+      box.appendChild(n);
     });
-    box.appendChild(ul2);
-    if (rd.length > NOW_MAX)
-      box.appendChild(
-        moreBtn(!!nowExpanded.ready, rd.length - NOW_MAX, function () {
-          nowExpanded.ready = !nowExpanded.ready;
-          renderNow();
-        })
-      );
   }
   // read, then write only if nothing changed since; a change that left the task free (a repair, a post) gets one retry
   function claim(t, btn) {
@@ -2942,7 +2932,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     });
   }
   // A text document people keep on the page, read as cards: the project rules (meta/rules, which agents receive when they
-  // start board work) and the project notes (meta/notes: schedule, where things stand, openSheet questions; agents read them
+  // start board work) and the project notes (meta/notes: schedule, where things stand, open questions; agents read them
   // only when they need them). Each subscribes once its section opens; the rules show the older meta/protocol card until saved.
   function textDoc(k, path, legacyPath, tellByDefault) {
     var d = { doc: null, loaded: false, old: null, oldLoaded: !legacyPath, subbed: false, editing: false, draft: null },
@@ -3108,7 +3098,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       [el('i', { text: String(name).trim().charAt(0).toUpperCase() }), solo ? null : el('span', { text: name })]
     );
   }
-  // the one thing to know about an openSheet card now, most urgent first; nothing when there is nothing to act on
+  // the one thing to know about an open card now, most urgent first; nothing when there is nothing to act on
   function cardFlag(t) {
     var s = knownStatus(t),
       u = unmet(t),
@@ -3167,7 +3157,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   }
   // each column remembers, in this browser, whether it is folded or shows two card columns; the archive starts folded
   var kanbanColumns = readJSON('ab-kcol') || {};
-  // column header icons: one or two card columns, fold or openSheet
+  // column header icons: one or two card columns, fold or open
   function columnIcon(kind) {
     var g = {
       one: [['rect', { x: 3.5, y: 2.5, width: 7, height: 9, rx: 1.5 }]],
@@ -4100,140 +4090,177 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     ]);
   }
 
-  function renderSheet(fresh) {
-    var root = $('sheetRoot');
-    var t = openId ? taskById(openId) : null;
-    if (!t) {
-      root.textContent = '';
-      return;
-    }
-    // keep drafts, the focused field and the scroll position across re-renders
-    var keep = {};
+  // what a re-render of the sheet keeps: drafts, the focused field and where the body was scrolled
+  function sheetState(root) {
+    var values = {};
     ['msgText', 'msgType', 'fBranch', 'fPr', 'sumText'].forEach(function (id) {
       var n = $(id);
-      if (n) keep[id] = n.value;
+      if (n) values[id] = n.value;
     });
-    var activeId = document.activeElement && document.activeElement.id;
-    var oldBody = root.querySelector('.body'),
-      scroll = oldBody ? oldBody.scrollTop : 0;
-    var atBottom = oldBody
-      ? oldBody.scrollHeight > oldBody.clientHeight + 8 &&
-        oldBody.scrollTop + oldBody.clientHeight >= oldBody.scrollHeight - 8
-      : false;
-    root.textContent = '';
-
-    var s = el('select', { id: 'fStatus', 'aria-label': T('f_status') });
+    var oldBody = root.querySelector('.body');
+    return {
+      values: values,
+      activeId: document.activeElement && document.activeElement.id,
+      scroll: oldBody ? oldBody.scrollTop : 0,
+      atBottom: oldBody
+        ? oldBody.scrollHeight > oldBody.clientHeight + 8 &&
+          oldBody.scrollTop + oldBody.clientHeight >= oldBody.scrollHeight - 8
+        : false
+    };
+  }
+  // the editable fields: status and owner selects, branch, PR, start and due, and a repo select when the board names
+  // repositories; a field being typed in keeps its draft
+  function sheetFields(t, kept) {
+    var f = {};
+    f.status = el('select', { id: 'fStatus', 'aria-label': T('f_status') });
     STATUS.forEach(function (x) {
-      s.appendChild(el('option', { value: x, text: statusLabel(x) }));
+      f.status.appendChild(el('option', { value: x, text: statusLabel(x) }));
     });
-    s.value = knownStatus(t);
-    s.addEventListener('change', function () {
-      change(t, { status: s.value });
+    f.status.value = knownStatus(t);
+    f.status.addEventListener('change', function () {
+      change(t, { status: f.status.value });
     });
-    var o = el('select', { id: 'fOwner', 'aria-label': T('f_owner') });
-    o.appendChild(el('option', { value: '', text: T('unassigned') }));
+    f.owner = el('select', { id: 'fOwner', 'aria-label': T('f_owner') });
+    f.owner.appendChild(el('option', { value: '', text: T('unassigned') }));
     people.forEach(function (p) {
-      o.appendChild(el('option', { value: p.id, text: p.name || p.id }));
+      f.owner.appendChild(el('option', { value: p.id, text: p.name || p.id }));
     });
-    if (t.owner && !person(t.owner)) o.appendChild(el('option', { value: t.owner, text: t.owner }));
-    o.value = t.owner || '';
-    o.addEventListener('change', function () {
-      change(t, { owner: o.value || null });
+    if (t.owner && !person(t.owner)) f.owner.appendChild(el('option', { value: t.owner, text: t.owner }));
+    f.owner.value = t.owner || '';
+    f.owner.addEventListener('change', function () {
+      change(t, { owner: f.owner.value || null });
     });
-    var br = el('input', { type: 'text', id: 'fBranch', placeholder: 'feature/…', 'aria-label': T('f_branch') });
-    br.value = activeId === 'fBranch' ? keep.fBranch : t.branch || '';
-    br.addEventListener('change', function () {
-      change(t, { branch: br.value.trim() || null });
+    f.branch = el('input', { type: 'text', id: 'fBranch', placeholder: 'feature/…', 'aria-label': T('f_branch') });
+    f.branch.value = kept.activeId === 'fBranch' ? kept.values.fBranch : t.branch || '';
+    f.branch.addEventListener('change', function () {
+      change(t, { branch: f.branch.value.trim() || null });
     });
-    var pr = el('input', {
-      type: 'url',
-      id: 'fPr',
-      placeholder: 'https://github.com/…/pull/N',
-      'aria-label': T('f_pr')
+    f.pr = el('input', { type: 'url', id: 'fPr', placeholder: 'https://github.com/…/pull/N', 'aria-label': T('f_pr') });
+    f.pr.value = kept.activeId === 'fPr' ? kept.values.fPr : t.pr || '';
+    f.pr.addEventListener('change', function () {
+      change(t, { pr: f.pr.value.trim() || null });
     });
-    pr.value = activeId === 'fPr' ? keep.fPr : t.pr || '';
-    pr.addEventListener('change', function () {
-      change(t, { pr: pr.value.trim() || null });
+    f.start = el('input', { type: 'date', id: 'fStart', 'aria-label': T('f_start') });
+    f.start.value = startOf(t);
+    f.start.addEventListener('change', function () {
+      change(t, { start: f.start.value || null });
     });
-    var sd = el('input', { type: 'date', id: 'fStart', 'aria-label': T('f_start') });
-    sd.value = startOf(t);
-    sd.addEventListener('change', function () {
-      change(t, { start: sd.value || null });
-    });
-    var du = el('input', { type: 'date', id: 'fDue', 'aria-label': T('f_due') });
-    du.value = dueOf(t);
-    du.addEventListener('change', function () {
-      change(t, { due: du.value || null });
+    f.due = el('input', { type: 'date', id: 'fDue', 'aria-label': T('f_due') });
+    f.due.value = dueOf(t);
+    f.due.addEventListener('change', function () {
+      change(t, { due: f.due.value || null });
     });
     // the repo a task belongs to: a label (or owner/name) from meta/config.repos
-    var rs = repoList(),
-      rp = null;
+    var rs = repoList();
+    f.repo = null;
     if (rs.length || t.repo) {
-      rp = el('select', { id: 'fRepo', 'aria-label': T('f_repo') });
-      rp.appendChild(el('option', { value: '', text: T('repoNone') }));
+      f.repo = el('select', { id: 'fRepo', 'aria-label': T('f_repo') });
+      f.repo.appendChild(el('option', { value: '', text: T('repoNone') }));
       rs.forEach(function (r) {
         var v = r.label || r.repo;
-        rp.appendChild(el('option', { value: v, text: r.label ? r.label + ' · ' + r.repo : r.repo }));
+        f.repo.appendChild(el('option', { value: v, text: r.label ? r.label + ' · ' + r.repo : r.repo }));
       });
-      if (
-        t.repo &&
-        !rs.some(function (r) {
-          return (r.label || r.repo) === t.repo;
-        })
-      )
-        rp.appendChild(el('option', { value: t.repo, text: t.repo }));
-      rp.value = t.repo || '';
-      rp.addEventListener('change', function () {
-        change(t, { repo: rp.value || null });
+      var listed = rs.some(function (r) {
+        return (r.label || r.repo) === t.repo;
+      });
+      if (t.repo && !listed) f.repo.appendChild(el('option', { value: t.repo, text: t.repo }));
+      f.repo.value = t.repo || '';
+      f.repo.addEventListener('change', function () {
+        change(t, { repo: f.repo.value || null });
       });
     }
-    s.disabled = o.disabled = br.disabled = pr.disabled = sd.disabled = du.disabled = !writable();
-    if (rp) rp.disabled = !writable();
-
-    var spec = (detailsDoc && detailsDoc.spec) || t.spec || '',
-      acc = (detailsDoc && detailsDoc.acceptance) || t.acceptance || '';
-    var u = unmet(t),
-      ds = t.deps || [];
+    ['status', 'owner', 'branch', 'pr', 'start', 'due', 'repo'].forEach(function (k) {
+      if (f[k]) f[k].disabled = !writable();
+    });
+    return f;
+  }
+  function fieldGrid(t, f) {
+    var finished = knownStatus(t) === 'done' && t.doneAt;
+    return el('div', { class: 'fields' }, [
+      el('span', { class: 'k', text: T('f_status') }),
+      f.status,
+      el('span', { class: 'k', text: T('f_owner') }),
+      f.owner,
+      f.repo ? el('span', { class: 'k', text: T('f_repo') }) : null,
+      f.repo,
+      el('span', { class: 'k', text: T('f_branch') }),
+      f.branch,
+      el('span', { class: 'k', text: T('f_pr') }),
+      f.pr,
+      el('span', { class: 'k', text: T('f_start') }),
+      f.start,
+      el('span', { class: 'k', text: T('f_due') }),
+      f.due,
+      finished ? el('span', { class: 'k', text: T('f_doneAt') }) : null,
+      finished ? el('span', { text: stamp(t.doneAt) }) : null
+    ]);
+  }
+  // the feature, repo, status, owner and dates, the title, a warning while deps are unfinished, and the actions
+  function sheetHead(t) {
+    var waiting = unmet(t);
+    return el('div', { class: 'block' }, [
+      el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center' }, [
+        el('span', { class: 'tag', text: t.feature || '' }),
+        repoTag(t),
+        statusChip(knownStatus(t)),
+        t.archivedAt ? el('span', { class: 'tag', text: T('archivedOn', { d: dayLabel(localDay(t.archivedAt)) }) }) : null,
+        personChip(t.owner),
+        dateChip(t),
+        agentMark(t)
+      ]),
+      el('h2', { id: 'sheetTitle', text: t.title || T('untitled') }),
+      knownStatus(t) !== 'done' && waiting.length
+        ? el('p', { style: 'color:var(--warn);font-size:13.5px', text: T('depsPending', { k: waiting.join(', ') }) })
+        : null,
+      actions(t)
+    ]);
+  }
+  function depButtons(list) {
+    return el(
+      'div',
+      { class: 'deplist' },
+      list.map(function (d) {
+        return el(
+          'button',
+          {
+            type: 'button',
+            onclick: function () {
+              openSheet(d.id);
+            }
+          },
+          [el('span', { class: 'key', text: d.key }), statusChip(knownStatus(d))]
+        );
+      })
+    );
+  }
+  // what the task waits on, and what waits on it
+  function depBlocks(t) {
+    var deps = t.deps || [];
     var unlocks = tasks
       .filter(function (x) {
         return (x.deps || []).indexOf(t.key) >= 0;
       })
       .sort(byKey);
-    function depButtons(list) {
-      return el(
-        'div',
-        { class: 'deplist' },
-        list.map(function (d) {
-          return el(
-            'button',
-            {
-              type: 'button',
-              onclick: function () {
-                openSheet(d.id);
-              }
-            },
-            [el('span', { class: 'key', text: d.key }), statusChip(knownStatus(d))]
-          );
-        })
-      );
-    }
-    var depBlock = el('div', { class: 'block' }, [
-      el('h3', { text: T('depsBlock') }),
-      ds.length ? depButtons(ds.map(taskByKey).filter(Boolean)) : el('p', { class: 'muted', text: T('depsNone') })
+    return [
+      el('div', { class: 'block' }, [
+        el('h3', { text: T('depsBlock') }),
+        deps.length ? depButtons(deps.map(taskByKey).filter(Boolean)) : el('p', { class: 'muted', text: T('depsNone') })
+      ]),
+      unlocks.length ? el('div', { class: 'block' }, [el('h3', { text: T('unlockBlock') }), depButtons(unlocks)]) : null
+    ];
+  }
+  function claimLine(t) {
+    if (!t.claimedBy) return null;
+    return el('p', { class: 'muted', style: 'font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center' }, [
+      T('claimedBy'),
+      personChip(t.claimedBy.who),
+      t.claimedBy.agent ? el('span', { class: 'agent-mark', text: T('agent') }) : null,
+      t.claimedBy.session ? el('span', { class: 'key', text: t.claimedBy.session }) : null,
+      t.claimedBy.at ? stamp(t.claimedBy.at) : ''
     ]);
-    var unlockBlock = unlocks.length
-      ? el('div', { class: 'block' }, [el('h3', { text: T('unlockBlock') }), depButtons(unlocks)])
-      : null;
-    var claimLine = t.claimedBy
-      ? el('p', { class: 'muted', style: 'font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center' }, [
-          T('claimedBy'),
-          personChip(t.claimedBy.who),
-          t.claimedBy.agent ? el('span', { class: 'agent-mark', text: T('agent') }) : null,
-          t.claimedBy.session ? el('span', { class: 'key', text: t.claimedBy.session }) : null,
-          t.claimedBy.at ? stamp(t.claimedBy.at) : ''
-        ])
-      : null;
-
+  }
+  // the open task's thread; a message after the viewer's last look is marked new, their own excepted
+  function threadList() {
     var list = el('div', { class: 'msgs' });
     if (msgErr) list.appendChild(el('p', { class: 'err', text: T('threadFail') }));
     else if (!msgs.length) list.appendChild(el('p', { class: 'empty', text: T('threadEmpty') }));
@@ -4256,107 +4283,55 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         ])
       );
     });
-
-    var body = el('div', { class: 'body' }, [
-      el('div', { class: 'block' }, [
-        el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center' }, [
-          el('span', { class: 'tag', text: t.feature || '' }),
-          repoTag(t),
-          statusChip(knownStatus(t)),
-          t.archivedAt
-            ? el('span', { class: 'tag', text: T('archivedOn', { d: dayLabel(localDay(t.archivedAt)) }) })
-            : null,
-          personChip(t.owner),
-          dateChip(t),
-          agentMark(t)
-        ]),
-        el('h2', { id: 'sheetTitle', text: t.title || T('untitled') }),
-        knownStatus(t) !== 'done' && u.length
-          ? el('p', { style: 'color:var(--warn);font-size:13.5px', text: T('depsPending', { k: u.join(', ') }) })
-          : null,
-        actions(t)
-      ]),
-      el('div', { class: 'fields' }, [
-        el('span', { class: 'k', text: T('f_status') }),
-        s,
-        el('span', { class: 'k', text: T('f_owner') }),
-        o,
-        rp ? el('span', { class: 'k', text: T('f_repo') }) : null,
-        rp,
-        el('span', { class: 'k', text: T('f_branch') }),
-        br,
-        el('span', { class: 'k', text: T('f_pr') }),
-        pr,
-        el('span', { class: 'k', text: T('f_start') }),
-        sd,
-        el('span', { class: 'k', text: T('f_due') }),
-        du,
-        knownStatus(t) === 'done' && t.doneAt ? el('span', { class: 'k', text: T('f_doneAt') }) : null,
-        knownStatus(t) === 'done' && t.doneAt ? el('span', { text: stamp(t.doneAt) }) : null
-      ]),
-      claimLine,
-      prLinks(t).length ? el('div', { class: 'form-row' }, prEls(t)) : null,
-      summaryBlock(t, keep),
-      acc
-        ? el('div', { class: 'block' }, [el('h3', { text: T('acceptance') }), el('div', { class: 'pre', text: acc })])
-        : null,
-      spec
-        ? el('div', { class: 'block' }, [el('h3', { text: T('spec') }), el('div', { class: 'pre', text: spec })])
-        : null,
-      depBlock,
-      unlockBlock,
-      el('div', { class: 'block' }, [el('h3', { text: T('thread', { n: msgs.length }) }), list])
+    return list;
+  }
+  // write a message as the viewer (⌘/Ctrl+Enter posts); none for a viewer who cannot write
+  function composerBlock(t, values) {
+    if (!writable() || !me) return null;
+    var ta = el('textarea', { id: 'msgText', 'aria-label': T('post'), placeholder: T('msgPh', { p: personName(me) }) });
+    ta.value = values.msgText || '';
+    var ty = el('select', { id: 'msgType', 'aria-label': 'type' });
+    TYPES.forEach(function (x) {
+      ty.appendChild(el('option', { value: x, text: T('ty_' + x) }));
+    });
+    ty.value = values.msgType || 'note';
+    var send = el('button', { type: 'button', class: 'btn primary', text: T('post') });
+    send.addEventListener('click', function () {
+      var v = ta.value.trim();
+      if (!v) return;
+      send.disabled = true;
+      var at = now();
+      markSeen(t.id, at);
+      db.doc('tasks/' + t.id + '/messages/' + at.replace(/:/g, '-') + '-' + me)
+        .set({ at: at, author: me, kind: 'human', type: ty.value, text: v })
+        .then(function () {
+          ta.value = '';
+          return db.doc('tasks/' + t.id).update({ lastMessageAt: at, lastMessageBy: me, updatedAt: at });
+        })
+        .catch(function (e) {
+          toast(T('postFail', { e: errText(e) }));
+          refused(e);
+        })
+        .then(function () {
+          send.disabled = false;
+        });
+    });
+    ta.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        send.click();
+      }
+    });
+    return el('div', { class: 'composer' }, [
+      warnLine(),
+      ta,
+      el('div', { class: 'form-row' }, [ty, send, el('span', { class: 'muted', style: 'font-size:12px', text: T('sendHint') })])
     ]);
-
-    var comp = null;
-    if (writable() && me) {
-      var ta = el('textarea', { id: 'msgText', 'aria-label': T('post'), placeholder: T('msgPh', { p: personName(me) }) });
-      ta.value = keep.msgText || '';
-      var ty = el('select', { id: 'msgType', 'aria-label': 'type' });
-      TYPES.forEach(function (x) {
-        ty.appendChild(el('option', { value: x, text: T('ty_' + x) }));
-      });
-      ty.value = keep.msgType || 'note';
-      var send = el('button', { type: 'button', class: 'btn primary', text: T('post') });
-      send.addEventListener('click', function () {
-        var v = ta.value.trim();
-        if (!v) return;
-        send.disabled = true;
-        var at = now();
-        markSeen(t.id, at);
-        db.doc('tasks/' + t.id + '/messages/' + at.replace(/:/g, '-') + '-' + me)
-          .set({ at: at, author: me, kind: 'human', type: ty.value, text: v })
-          .then(function () {
-            ta.value = '';
-            return db.doc('tasks/' + t.id).update({ lastMessageAt: at, lastMessageBy: me, updatedAt: at });
-          })
-          .catch(function (e) {
-            toast(T('postFail', { e: errText(e) }));
-            refused(e);
-          })
-          .then(function () {
-            send.disabled = false;
-          });
-      });
-      ta.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-          e.preventDefault();
-          send.click();
-        }
-      });
-      comp = el('div', { class: 'composer' }, [
-        warnLine(),
-        ta,
-        el('div', { class: 'form-row' }, [
-          ty,
-          send,
-          el('span', { class: 'muted', style: 'font-size:12px', text: T('sendHint') })
-        ])
-      ]);
-    }
-
+  }
+  // previous and next along the keyboard cursor's order
+  function sheetNav(t) {
     var idx = order.indexOf(t.id);
-    var nav = el('div', { class: 'nav' }, [
+    return el('div', { class: 'nav' }, [
       el('button', {
         type: 'button',
         'aria-label': T('prev'),
@@ -4378,33 +4353,63 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         }
       })
     ]);
+  }
+  // the field that was being edited gets focus back, with the caret at its end
+  function refocus(activeId) {
+    var a = activeId && $(activeId);
+    if (!a) return;
+    a.focus();
+    if (a.setSelectionRange && (activeId === 'msgText' || activeId === 'fBranch' || activeId === 'fPr')) {
+      try {
+        a.setSelectionRange(a.value.length, a.value.length);
+      } catch (e) {}
+    }
+  }
+  function renderSheet(fresh) {
+    var root = $('sheetRoot');
+    var t = openId ? taskById(openId) : null;
+    if (!t) {
+      root.textContent = '';
+      return;
+    }
+    var kept = sheetState(root);
+    root.textContent = '';
+    var fields = sheetFields(t, kept);
+    var spec = (detailsDoc && detailsDoc.spec) || t.spec || '',
+      acc = (detailsDoc && detailsDoc.acceptance) || t.acceptance || '';
+    var body = el(
+      'div',
+      { class: 'body' },
+      [
+        sheetHead(t),
+        fieldGrid(t, fields),
+        claimLine(t),
+        prLinks(t).length ? el('div', { class: 'form-row' }, prEls(t)) : null,
+        summaryBlock(t, kept.values),
+        acc ? el('div', { class: 'block' }, [el('h3', { text: T('acceptance') }), el('div', { class: 'pre', text: acc })]) : null,
+        spec ? el('div', { class: 'block' }, [el('h3', { text: T('spec') }), el('div', { class: 'pre', text: spec })]) : null
+      ].concat(depBlocks(t), [el('div', { class: 'block' }, [el('h3', { text: T('thread', { n: msgs.length }) }), threadList()])])
+    );
     var sheet = el('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheetTitle' }, [
       el('div', { class: 'bar' }, [
         el('span', { class: 'key', text: t.key }),
-        nav,
+        sheetNav(t),
         el('button', { type: 'button', class: 'x', 'aria-label': T('close'), text: '×', onclick: close })
       ]),
       body,
-      comp
+      composerBlock(t, kept.values)
     ]);
     root.appendChild(el('div', { class: 'scrim', onclick: close }));
     root.appendChild(sheet);
-    body.scrollTop = fresh ? 0 : atBottom ? body.scrollHeight : scroll;
+    // a fresh sheet starts at the top; a re-render stays where the reader was, or at the bottom if they were following the thread
+    body.scrollTop = fresh ? 0 : kept.atBottom ? body.scrollHeight : kept.scroll;
     if (fresh) sheet.querySelector('.x').focus();
-    else if (activeId && $(activeId)) {
-      var a = $(activeId);
-      a.focus();
-      if (a.setSelectionRange && (activeId === 'msgText' || activeId === 'fBranch' || activeId === 'fPr')) {
-        try {
-          a.setSelectionRange(a.value.length, a.value.length);
-        } catch (e) {}
-      }
-    }
+    else refocus(kept.activeId);
   }
 
   // waitingOn (unfinished deps) lets an agent find pickable work with one query: status == todo, waitingOn == [].
-  // While the board is openSheet the page repairs any drift itself. It touches only waitingOn, not updatedAt, so it raises no "new" marker.
-  // Every openSheet board sees the same drift, so each waits a random moment and re-checks the latest snapshot:
+  // While the board is open the page repairs any drift itself. It touches only waitingOn, not updatedAt, so it raises no "new" marker.
+  // Every open board sees the same drift, so each waits a random moment and re-checks the latest snapshot:
   // usually one board fixes it and the rest find nothing to do. A view-only viewer never tries; one the platform said nothing about stops after the first refusal.
   var healing = {},
     healTimer = null,
@@ -4513,7 +4518,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         loaded = true;
         if (first) {
           first = false;
-          // a browser opening the board for the first time treats the current statusChip as seen; only later changes count as new
+          // a browser opening the board for the first time treats the current state as seen; only later changes count as new
           if (!read('ab-seen-init')) {
             tasks.forEach(function (t) {
               markSeen(t.id, lastTouch(t));
