@@ -540,7 +540,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var I18N = {
     en: {
       loading: 'Loading…',
-      noDb: 'Board data is not available. Reload the page, or open the board where it is hosted.',
+      noDb: 'Board data is not available. Reload the page, or openSheet the board where it is hosted.',
       back: '← Projects',
       loadFail: 'Could not load tasks ({e})',
       milestone: 'Milestone',
@@ -570,7 +570,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       newTitle: 'Show only changed tasks',
       newNoticeOnly: 'New notices are in the Notices section',
       readAll: 'Mark all read',
-      hint: '<kbd>/</kbd> find · <kbd>j</kbd><kbd>k</kbd> move · <kbd>Enter</kbd> open · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> views · <kbd>m</kbd> mine · <kbd>Esc</kbd> close',
+      hint: '<kbd>/</kbd> find · <kbd>j</kbd><kbd>k</kbd> moveCursor · <kbd>Enter</kbd> openSheet · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> views · <kbd>m</kbd> mine · <kbd>Esc</kbd> close',
       h_now: 'Now',
       h_activity: 'Recent activity',
       activitySub: 'The last message on the tasks touched most recently. Open a task for its whole thread.',
@@ -603,16 +603,16 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       offline: 'Reconnecting…',
       h_rules: 'Project rules',
       rulesSub:
-        'What this project agrees on: who owns what, where specs live, branches and merges, what to announce. Agents receive them when they start board work.',
+        'What this project agrees on: personChip owns what, where specs live, branches and merges, what to announce. Agents receive them when they start board work.',
       rulesEmpty:
-        'No project rules yet. Write down who owns what, where specs live and how branches merge; agents read them before they work.',
+        'No project rules yet. Write down personChip owns what, where specs live and how branches merge; agents read them before they work.',
       rulesLegacy:
         "This is the board's older rules card (meta/protocol). Edit and save it to make it the project rules agents receive.",
       tellAll: 'Also post a notice about the change',
       rulesChanged: 'Project rules changed (rev {r}).',
       h_notes: 'Project notes',
       notesSub:
-        'Schedule, where things stand, open questions: what people keep up to date together. Agents read it only when they need it.',
+        'Schedule, where things stand, openSheet questions: what people keep up to date together. Agents read it only when they need it.',
       notesEmpty: 'No notes yet.',
       notesChanged: 'Project notes updated (rev {r}).',
       h_guide: 'How this board works',
@@ -628,23 +628,23 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         {
           t: "A task's way",
           i: [
-            'To do → claimed (In progress) → PR open (Review) → a person merges (Done). The holder or the reviewer marks it done; a reviewer may also send it back to In progress.',
+            'To do → claimed (In progress) → PR openSheet (Review) → a person merges (Done). The holder or the reviewer marks it done; a reviewer may also send it back to In progress.',
             'A task can be picked once everything it depends on is done; finishing it unlocks the tasks that waited for it.',
             'Stuck: set Blocked and say why in the thread. Dropped before done: back to To do with a handoff summary, for anyone to pick up.',
-            "Done work piles up: move it to the archive from the kanban's done column or a task's panel. Archived tasks still count as done."
+            "Done work piles up: moveCursor it to the archive from the kanban's done column or a task's panel. Archived tasks still count as done."
           ]
         },
         {
           t: 'Dates',
           i: [
             'A task can carry a start day and a due day.',
-            "Anyone may move a due day, on anyone's task; the thread records who moved it. Everything else on a held task is its owner's, unless a person tells their agent to change it or take it over."
+            "Anyone may moveCursor a due day, on anyone's task; the thread records personChip moved it. Everything else on a held task is its owner's, unless a person tells their agent to change it or take it over."
           ]
         },
         {
           t: 'Writing',
           i: [
-            'Messages and notices at most three lines, a summary at most five (state, decisions, what is left).',
+            'Messages and notices at most three lines, a summary at most five (statusChip, decisions, what is left).',
             'Details stay in the repository and PRs; the board points at them.',
             'Notices only for what everyone must know.'
           ]
@@ -710,7 +710,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       noPrShort: 'no PR',
       blockedNote: 'Blocked. See the thread for why.',
       reviewNote: 'Waiting for PR review and merge.',
-      noPr: ' (no PR link)',
+      noPr: ' (no PR linkAccount)',
       openPr: 'Open PR',
       ready: 'Ready to pick',
       readyNone: 'No unassigned task has all its dependencies done.',
@@ -789,7 +789,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       save: 'Save',
       cancel: 'Cancel',
       summaryEmpty:
-        'No summary yet. At handoff, review or done, write the current state, decisions and what is left in five lines. The next person and agent read only the summary and later messages.',
+        'No summary yet. At handoff, review or done, write the current statusChip, decisions and what is left in five lines. The next person and agent read only the summary and later messages.',
       acceptance: 'Acceptance',
       spec: 'Spec',
       msgPh: 'Write as {p}',
@@ -1165,7 +1165,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // ---------- end of task rules ----------
 
   var STATUS = TASK_STATUSES; // the board's own list once meta/config arrives (boardStatuses)
-  var BAR = {
+  var BAR_COLORS = {
     done: 'var(--s-done)',
     review: 'var(--s-review)',
     doing: 'var(--s-doing)',
@@ -1176,7 +1176,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var VIEWS = ['doc', 'kanban', 'graph'];
   // a hosted site keeps several boards on one origin, so its browser storage is namespaced by project
   // (set before anything below reads it)
-  var ns = window.AB_PROJECT ? window.AB_PROJECT + ':' : '';
+  var storagePrefix = window.AB_PROJECT ? window.AB_PROJECT + ':' : '';
   var config = {},
     people = [],
     db = null,
@@ -1184,18 +1184,18 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     allTasks = [],
     archived = [],
     notices = [],
-    sel = null,
+    openId = null,
     msgs = [],
     msgErr = false,
     unsub = null,
     loaded = false,
     failed = '',
     noticesLoaded = false;
-  var feat = read('ab-feature') || 'all',
+  var featureFilter = read('ab-feature') || 'all',
     view = read('ab-view') || 'doc';
   if (VIEWS.indexOf(view) < 0) view = 'doc';
   var me = read('ab-me') || '';
-  // who is viewing, from the user capability: uid null = unknown (keep the honor-system picker), canWrite null = not told (keep controls)
+  // personChip is viewing, from the user capability: uid null = unknown (keep the honor-system picker), canWrite null = not told (keep controls)
   var uid = null,
     canWrite = null,
     links = {};
@@ -1203,17 +1203,17 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     noticesAll = false,
     composing = false,
     settingsOpen = false;
-  var laneAll = {},
-    nowAll = {};
-  var q = '',
+  var laneExpanded = {},
+    nowExpanded = {};
+  var searchText = '',
     newOnly = false,
     mineOnly = false,
     cursor = null,
     order = [],
     openPrevSeen = '',
-    det = null,
-    unsubDet = null,
-    sumEditing = false;
+    detailsDoc = null,
+    unsubDetails = null,
+    summaryEditing = false;
   // the item table's order: a column and a direction, remembered per board
   var sort = readJSON('ab-sort') || { by: 'key', dir: 'asc' };
   var seen = readJSON('ab-seen') || {},
@@ -1247,14 +1247,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   applyTheme(readTheme());
   function read(k) {
     try {
-      return localStorage.getItem(ns + k);
+      return localStorage.getItem(storagePrefix + k);
     } catch (e) {
       return null;
     }
   }
   function write(k, v) {
     try {
-      localStorage.setItem(ns + k, v);
+      localStorage.setItem(storagePrefix + k, v);
     } catch (e) {}
   }
   function readJSON(k) {
@@ -1281,7 +1281,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     return n;
   }
   var SVGNS = 'http://www.w3.org/2000/svg';
-  function sv(tag, a, kids) {
+  function svgEl(tag, a, kids) {
     var n = document.createElementNS(SVGNS, tag);
     for (var k in a || {}) n.setAttribute(k, a[k]);
     (kids || []).forEach(function (c) {
@@ -1327,21 +1327,21 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       if (typeof t.key === 'string' && !(t.key in byKeyMap)) byKeyMap[t.key] = t;
     }
   }
-  function byKeyStr(k) {
+  function taskByKey(k) {
     return Object.prototype.hasOwnProperty.call(byKeyMap, k) ? byKeyMap[k] : null;
   }
-  function byId(id) {
+  function taskById(id) {
     return Object.prototype.hasOwnProperty.call(byIdMap, id) ? byIdMap[id] : null;
   }
-  function st(t) {
+  function knownStatus(t) {
     return STATUS.indexOf(t.status) >= 0 ? t.status : 'todo';
   }
-  function SL(s) {
+  function statusLabel(s) {
     var l = T('st_' + s);
     return l === 'st_' + s ? s : l;
   }
   function isDoneKey(k) {
-    var d = byKeyStr(k);
+    var d = taskByKey(k);
     return !!d && d.status === 'done';
   }
   function unmet(t) {
@@ -1411,7 +1411,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function startChip(t) {
     var a = startOf(t),
       td = localDay(now());
-    if (!a || st(t) !== 'todo') return null;
+    if (!a || knownStatus(t) !== 'todo') return null;
     var slow = a < td && !t.claimedBy;
     return el('span', {
       class: 'date' + (slow ? ' slow' : a === td ? ' today' : ''),
@@ -1419,7 +1419,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     });
   }
   function dateChip(t) {
-    if (st(t) === 'done') {
+    if (knownStatus(t) === 'done') {
       var d = localDay(t.doneAt);
       return d ? el('span', { class: 'date', text: T('doneOn', { d: dayLabel(d) }) }) : null;
     }
@@ -1429,9 +1429,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   }
   // the table shows the whole span: start → due
   function dateCell(t) {
-    if (st(t) === 'done') return dateChip(t);
+    if (knownStatus(t) === 'done') return dateChip(t);
     var a = startOf(t),
-      s0 = st(t) === 'todo' ? startChip(t) : a ? el('span', { class: 'arrow', text: dayLabel(a) + ' →' }) : null;
+      s0 = knownStatus(t) === 'todo' ? startChip(t) : a ? el('span', { class: 'arrow', text: dayLabel(a) + ' →' }) : null;
     return el('span', { class: 'dates' }, [s0, dueChip(t)]);
   }
 
@@ -1471,8 +1471,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     return r && r.label ? r.label : name.split('/')[1];
   }
   function repoIcon() {
-    return sv('svg', { width: '14', height: '14', viewBox: '0 0 16 16', 'aria-hidden': 'true' }, [
-      sv('path', {
+    return svgEl('svg', { width: '14', height: '14', viewBox: '0 0 16 16', 'aria-hidden': 'true' }, [
+      svgEl('path', {
         fill: 'currentColor',
         d: 'M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z'
       })
@@ -1549,11 +1549,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     for (var i = 0; i < people.length; i++) if (people[i].id === id) return people[i];
     return null;
   }
-  function pname(id) {
+  function personName(id) {
     var p = person(id);
     return p ? p.name || p.id : id || T('unassigned');
   }
-  function pclass(id) {
+  function personClass(id) {
     for (var i = 0; i < people.length; i++)
       if (people[i].id === id) return ' p' + (typeof people[i].color === 'number' ? people[i].color % 6 : i % 6);
     return '';
@@ -1568,7 +1568,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     for (var i = 0; i < people.length; i++) if (uidOf(people[i].id) === uid) return people[i].id;
     return null;
   }
-  // the signed-in account decides who the viewer is: a linked account is that person; an unlinked one is nobody
+  // the signed-in account decides personChip the viewer is: a linked account is that person; an unlinked one is nobody
   // until it picks an unlinked person, which links it for good (a board of one links its only person at once)
   function identify() {
     var l = linked();
@@ -1579,7 +1579,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     if (!uid) return;
     if (people.length === 1 && !uidOf(people[0].id)) {
       me = people[0].id;
-      link(me);
+      linkAccount(me);
     } else me = '';
   }
   function writable() {
@@ -1590,9 +1590,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var u = uidOf(me),
       l = linked();
     return u && u !== uid
-      ? T('notYou', { p: pname(me) })
+      ? T('notYou', { p: personName(me) })
       : l && l !== me
-        ? T('linkedElse', { p: pname(me), q: pname(l) })
+        ? T('linkedElse', { p: personName(me), q: personName(l) })
         : '';
   }
   function warnLine() {
@@ -1600,7 +1600,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     return w ? el('p', { class: 'err', text: w }) : null;
   }
   // first-come link: lease the doc so two viewers picking the same person at once cannot both win
-  function link(id) {
+  function linkAccount(id) {
     if (!uid || !id || !writable() || linked() || uidOf(id)) return;
     var ref = db.doc('people/' + id);
     ref
@@ -1621,18 +1621,18 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       renderAll();
     }
   }
-  function who(o) {
-    return el('span', { class: 'who' + (o ? pclass(o) || '' : ' none'), text: o ? pname(o) : T('unassigned') });
+  function personChip(o) {
+    return el('span', { class: 'who' + (o ? personClass(o) || '' : ' none'), text: o ? personName(o) : T('unassigned') });
   }
-  function state(s) {
-    return el('span', { class: 'state ' + s, text: SL(s) });
+  function statusChip(s) {
+    return el('span', { class: 'state ' + s, text: statusLabel(s) });
   }
   function agentLive(t) {
     var l = lastTouch(t);
     return !!l && Date.now() - Date.parse(l) < 30 * 60000;
   }
   function agentMark(t) {
-    if (!(t.claimedBy && t.claimedBy.agent && st(t) !== 'done')) return null;
+    if (!(t.claimedBy && t.claimedBy.agent && knownStatus(t) !== 'done')) return null;
     var live = agentLive(t);
     return el('span', {
       class: 'agent-mark' + (live ? ' live' : ''),
@@ -1796,13 +1796,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   function cmpBy(by) {
     if (by === 'owner')
       return function (a, b) {
-        var x = a.owner ? pname(a.owner).toLowerCase() : '\uffff',
-          y = b.owner ? pname(b.owner).toLowerCase() : '\uffff';
+        var x = a.owner ? personName(a.owner).toLowerCase() : '\uffff',
+          y = b.owner ? personName(b.owner).toLowerCase() : '\uffff';
         return x < y ? -1 : x > y ? 1 : byKey(a, b);
       };
     if (by === 'status')
       return function (a, b) {
-        return STATUS.indexOf(st(a)) - STATUS.indexOf(st(b)) || byKey(a, b);
+        return STATUS.indexOf(knownStatus(a)) - STATUS.indexOf(knownStatus(b)) || byKey(a, b);
       };
     if (by === 'due') return byDue;
     if (by === 'updated')
@@ -1824,7 +1824,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     ms.textContent = '';
     ms.setAttribute('aria-label', T('iAm'));
     if (l) {
-      ms.appendChild(el('span', { class: 'me-fixed', text: pname(l) }));
+      ms.appendChild(el('span', { class: 'me-fixed', text: personName(l) }));
       return;
     }
     people.forEach(function (p) {
@@ -1890,11 +1890,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // ---------- search ----------
   function matchQ(t) {
-    if (!q) return true;
-    var hay = [t.key, t.title, t.feature, t.owner ? pname(t.owner) : T('unassigned'), SL(st(t)), t.branch, t.repo]
+    if (!searchText) return true;
+    var hay = [t.key, t.title, t.feature, t.owner ? personName(t.owner) : T('unassigned'), statusLabel(knownStatus(t)), t.branch, t.repo]
       .join(' ')
       .toLowerCase();
-    return q
+    return searchText
       .toLowerCase()
       .split(/\s+/)
       .filter(Boolean)
@@ -1906,11 +1906,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     return matchQ(t) && (!newOnly || isNew(t)) && (!mineOnly || t.owner === me);
   }
   function filtering() {
-    return !!q || newOnly || mineOnly;
+    return !!searchText || newOnly || mineOnly;
   }
 
   // A person's change from the page: the task, then one line in its thread saying what changed, as agents' changes do,
-  // so the holder and their agents see who moved it. It reads the task first and writes with that version: the page's
+  // so the holder and their agents see personChip moved it. It reads the task first and writes with that version: the page's
   // copy may lag an agent's write, and status side effects and the holder rule must see the task as it is now. A task
   // that moved again in between is read once more.
   function change(t, patch, extra) {
@@ -1945,8 +1945,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       if (k in patch && (a || null) !== (b || null))
         bits.push(T(k === 'status' ? 'f_status' : 'f_' + k) + ' ' + (a ? f(a) : dash) + ' → ' + (b ? f(b) : dash));
     }
-    was('status', st(t), patch.status, SL);
-    was('owner', t.owner, patch.owner, pname);
+    was('status', knownStatus(t), patch.status, statusLabel);
+    was('owner', t.owner, patch.owner, personName);
     was('start', startOf(t), patch.start, dayLabel);
     was('due', dueOf(t), patch.due, dayLabel);
     was('branch', t.branch, patch.branch, String);
@@ -1954,7 +1954,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     was('repo', t.repo, patch.repo, String);
     // a person may change a task someone else holds; the write says so and the thread names the holder
     var over = !mayChange(t, me, patch, false);
-    if (over && !extra) extra = T('saidOver', { p: pname(holderOf(t)) });
+    if (over && !extra) extra = T('saidOver', { p: personName(holderOf(t)) });
     if (!bits.length && !extra) return save(t.id, patch);
     patch.updatedAt = patch.lastMessageAt = at;
     patch.lastMessageBy = me;
@@ -1979,10 +1979,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // one-click moves for the task in the sheet: the review step is anyone's, taking over asks twice
   function actions(t) {
     if (!writable() || !me) return null;
-    var s = st(t),
+    var s = knownStatus(t),
       h = holderOf(t),
       bs = [];
-    function b(label, patch, primary, extra) {
+    function addAction(label, patch, primary, extra) {
       bs.push(
         el('button', {
           type: 'button',
@@ -1999,11 +1999,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       );
     }
     if (s === 'review') {
-      b(T('act_done'), { status: 'done' }, true);
-      b(T('act_back'), { status: 'doing' });
+      addAction(T('act_done'), { status: 'done' }, true);
+      addAction(T('act_back'), { status: 'doing' });
     } else if (s === 'done') {
-      b(T('act_reopen'), { status: 'doing' });
-      b(t.archivedAt ? T('unarch') : T('archSheet'), { archivedAt: t.archivedAt ? null : now() });
+      addAction(T('act_reopen'), { status: 'doing' });
+      addAction(t.archivedAt ? T('unarch') : T('archSheet'), { archivedAt: t.archivedAt ? null : now() });
     } else if (statusOf(t) === 'todo' && !t.claimedBy && (!h || h === me)) {
       if (!unmet(t).length)
         bs.push(
@@ -2017,12 +2017,12 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           })
         );
     } else if (h === me) {
-      b(T('act_review'), { status: 'review' }, true);
-      b(s === 'blocked' ? T('act_resume') : T('act_blocked'), { status: s === 'blocked' ? 'doing' : 'blocked' });
-      b(T('act_release'), { status: 'todo' });
+      addAction(T('act_review'), { status: 'review' }, true);
+      addAction(s === 'blocked' ? T('act_resume') : T('act_blocked'), { status: s === 'blocked' ? 'doing' : 'blocked' });
+      addAction(T('act_release'), { status: 'todo' });
     }
     if (h && h !== me && s !== 'done') {
-      var tk = el('button', { type: 'button', class: 'btn small', text: T('act_take', { p: pname(h) }) });
+      var tk = el('button', { type: 'button', class: 'btn small', text: T('act_take', { p: personName(h) }) });
       tk.addEventListener('click', function () {
         if (!tk.dataset.sure) {
           tk.dataset.sure = '1';
@@ -2033,7 +2033,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         change(
           t,
           { status: 'doing', owner: me, claimedBy: { who: me, agent: false, at: now() } },
-          T('saidTake', { p: pname(h) })
+          T('saidTake', { p: personName(h) })
         ).then(function () {
           tk.disabled = false;
         });
@@ -2069,7 +2069,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       c[s] = 0;
     });
     allTasks.forEach(function (t) {
-      c[st(t)]++;
+      c[knownStatus(t)]++;
     });
     $('mCount').textContent = !loaded
       ? failed || T('loading')
@@ -2119,11 +2119,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       if (c[k])
         p.appendChild(
           el('span', {
-            style: 'width:' + (c[k] / allTasks.length) * 100 + '%;background:' + (BAR[k] || 'var(--text2)')
+            style: 'width:' + (c[k] / allTasks.length) * 100 + '%;background:' + (BAR_COLORS[k] || 'var(--text2)')
           })
         );
       lg.appendChild(
-        el('span', {}, [el('i', { style: 'background:' + (BAR[k] || 'var(--text2)') }), SL(k) + ' ' + c[k]])
+        el('span', {}, [el('i', { style: 'background:' + (BAR_COLORS[k] || 'var(--text2)') }), statusLabel(k) + ' ' + c[k]])
       );
     });
   }
@@ -2144,7 +2144,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     b.setAttribute('aria-pressed', String(newOnly));
     b.title = nn && !nt ? T('newNoticeOnly') : T('newTitle');
     $('readAll').hidden = !total;
-    $('qClear').hidden = !q;
+    $('qClear').hidden = !searchText;
     var mb = $('mineBtn');
     mb.hidden = !(loaded && me && people.length > 1);
     mb.textContent = T('mine');
@@ -2158,7 +2158,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     if (!b || (uid && (linked() || uidOf(b.dataset.me)))) return;
     me = b.dataset.me;
     write('ab-me', me);
-    link(me);
+    linkAccount(me);
     renderAll();
   });
   $('tabs').addEventListener('click', function (e) {
@@ -2178,36 +2178,36 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     readNotices();
     renderAll();
   });
-  var qi = $('q');
-  qi.addEventListener('input', function () {
-    q = qi.value.trim();
+  var searchInput = $('q');
+  searchInput.addEventListener('input', function () {
+    searchText = searchInput.value.trim();
     renderToolbar();
     renderView();
   });
-  qi.addEventListener('keydown', function (e) {
+  searchInput.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      qi.value = '';
-      q = '';
-      qi.blur();
+      searchInput.value = '';
+      searchText = '';
+      searchInput.blur();
       renderToolbar();
       renderView();
     } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
       e.preventDefault();
       if (order.length) {
         cursor = order[0];
-        qi.blur();
+        searchInput.blur();
         applyCursor(true);
       }
     }
   });
   $('qClear').addEventListener('click', function () {
-    qi.value = '';
-    q = '';
+    searchInput.value = '';
+    searchText = '';
     renderToolbar();
     renderView();
-    qi.focus();
+    searchInput.focus();
   });
   function setView(v) {
     if (VIEWS.indexOf(v) < 0) return;
@@ -2222,7 +2222,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     doneOpen = {};
   // what needs a person's hands, most urgent first: blocked, past due, waiting for review, due today, a start day nobody took
   function attention(t) {
-    var s = st(t);
+    var s = knownStatus(t);
     if (s === 'done') return null;
     if (s === 'blocked') return { o: 0, cls: 'alert', note: T('blockedNote') };
     var td = localDay(now()),
@@ -2239,7 +2239,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     box.textContent = '';
     var count = function (s) {
       return tasks.filter(function (t) {
-        return st(t) === s;
+        return knownStatus(t) === s;
       }).length;
     };
     var late = tasks.filter(function (t) {
@@ -2268,7 +2268,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         }),
         n = function (s) {
           return mine.filter(function (t) {
-            return st(t) === s;
+            return knownStatus(t) === s;
           }).length;
         };
       var bits = [];
@@ -2280,7 +2280,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         el(
           'span',
           {
-            class: 'np' + pclass(p.id) + (p.id === me && people.length > 1 ? ' mine' : ''),
+            class: 'np' + personClass(p.id) + (p.id === me && people.length > 1 ? ' mine' : ''),
             title: T('total', { n: mine.length }) + ' · ' + parts.done + ' ' + n('done')
           },
           [
@@ -2292,7 +2292,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       );
     });
     var free = tasks.filter(function (t) {
-        return !t.owner && st(t) !== 'done';
+        return !t.owner && knownStatus(t) !== 'done';
       }),
       rd = tasks.filter(ready).sort(byKey);
     ppl.appendChild(
@@ -2322,7 +2322,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         text: t.title || T('untitled'),
         title: t.title || '',
         onclick: function () {
-          open(t.id);
+          openSheet(t.id);
         }
       });
     }
@@ -2331,7 +2331,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         el('div', { class: 'subhead' }, [T('needsHands'), el('span', { class: 'n', text: String(alerts.length) })])
       );
       var ul = el('ul', { class: 'rows' });
-      (nowAll.alerts ? alerts : alerts.slice(0, NOW_MAX)).forEach(function (x) {
+      (nowExpanded.alerts ? alerts : alerts.slice(0, NOW_MAX)).forEach(function (x) {
         var t = x.t,
           side = x.a.o === 2 ? (prEls(t).length ? prEls(t) : [el('span', { text: T('noPrShort') })]) : [dateChip(t)];
         ul.appendChild(
@@ -2347,8 +2347,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       box.appendChild(ul);
       if (alerts.length > NOW_MAX)
         box.appendChild(
-          moreBtn(!!nowAll.alerts, alerts.length - NOW_MAX, function () {
-            nowAll.alerts = !nowAll.alerts;
+          moreBtn(!!nowExpanded.alerts, alerts.length - NOW_MAX, function () {
+            nowExpanded.alerts = !nowExpanded.alerts;
             renderNow();
           })
         );
@@ -2359,7 +2359,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       return;
     }
     var ul2 = el('ul', { class: 'rows ready' });
-    (nowAll.ready ? rd : rd.slice(0, NOW_MAX)).forEach(function (t) {
+    (nowExpanded.ready ? rd : rd.slice(0, NOW_MAX)).forEach(function (t) {
       var unlocks = tasks
         .filter(function (o) {
           return (o.deps || []).indexOf(t.key) >= 0;
@@ -2391,8 +2391,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             ? el('button', {
                 type: 'button',
                 class: 'btn small',
-                text: T('claim', { p: pname(me) }),
-                title: T('claimTitle', { p: pname(me) }),
+                text: T('claim', { p: personName(me) }),
+                title: T('claimTitle', { p: personName(me) }),
                 onclick: function (e) {
                   claim(t, e.currentTarget);
                 }
@@ -2404,8 +2404,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     box.appendChild(ul2);
     if (rd.length > NOW_MAX)
       box.appendChild(
-        moreBtn(!!nowAll.ready, rd.length - NOW_MAX, function () {
-          nowAll.ready = !nowAll.ready;
+        moreBtn(!!nowExpanded.ready, rd.length - NOW_MAX, function () {
+          nowExpanded.ready = !nowExpanded.ready;
           renderNow();
         })
       );
@@ -2431,7 +2431,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             s.version
           ).then(function (r) {
             if (r === 'stale') return left ? attempt(left - 1) : toast(T('alreadyClaimed'));
-            if (r !== false) toast(T('claimed', { p: pname(me), k: t.key }));
+            if (r !== false) toast(T('claimed', { p: personName(me), k: t.key }));
           });
         });
     }
@@ -2509,13 +2509,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       return;
     }
     ids.forEach(function (id) {
-      var t = byId(id),
+      var t = taskById(id),
         a = act[id],
         m = a && a.msg,
         when = m && m.at && m.at > lastTouch(t) ? m.at : lastTouch(t);
       var line = m
         ? el('div', { class: 'line' }, [
-            who(m.author),
+            personChip(m.author),
             m.kind === 'agent' ? el('span', { class: 'agent-mark', text: T('agent') }) : null,
             m.type && m.type !== 'note' && TYPES.indexOf(m.type) >= 0
               ? el('span', { class: 'type ' + m.type, text: T('ty_' + m.type) })
@@ -2533,11 +2533,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
                 type: 'button',
                 text: t.title || T('untitled'),
                 onclick: function () {
-                  open(t.id);
+                  openSheet(t.id);
                 }
               }),
-              state(st(t)),
-              t.owner ? who(t.owner) : null,
+              statusChip(knownStatus(t)),
+              t.owner ? personChip(t.owner) : null,
               agentMark(t)
             ]),
             line
@@ -2555,13 +2555,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         return t.owner === p.id;
       });
       var openAll = mine.filter(function (t) {
-        return st(t) !== 'done';
+        return knownStatus(t) !== 'done';
       });
       var openList = openAll.filter(match).sort(function (a, b) {
-        return ORDER[st(a)] - ORDER[st(b)] || byDue(a, b);
+        return ORDER[knownStatus(a)] - ORDER[knownStatus(b)] || byDue(a, b);
       });
       var ul = el('ul', { class: 'todo' }),
-        all = filtering() || laneAll[p.id];
+        all = filtering() || laneExpanded[p.id];
       (all ? openList : openList.slice(0, LANE_MAX)).forEach(function (t) {
         var u = unmet(t),
           bits = [t.feature, t.repo];
@@ -2570,14 +2570,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         ul.appendChild(
           el('li', {}, [
             el('span', { class: 't' }, [
-              state(st(t)),
+              statusChip(knownStatus(t)),
               el('span', { class: 'key', text: t.key }),
               el('button', {
                 type: 'button',
                 class: 'link',
                 text: t.title || T('untitled'),
                 onclick: function () {
-                  open(t.id);
+                  openSheet(t.id);
                 }
               }),
               dateChip(t),
@@ -2591,7 +2591,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       // done work stays folded under the lane, newest first, with the day it was finished
       var doneList = mine
         .filter(function (t) {
-          return st(t) === 'done' && match(t);
+          return knownStatus(t) === 'done' && match(t);
         })
         .sort(byDone);
       var foot = doneList.length
@@ -2617,7 +2617,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
                       class: 'link',
                       text: t.title || T('untitled'),
                       onclick: function () {
-                        open(t.id);
+                        openSheet(t.id);
                       }
                     }),
                     dateChip(t)
@@ -2628,7 +2628,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           )
         : T('laneDone', { n: mine.length - openAll.length });
       root.appendChild(
-        el('div', { class: 'lane' + pclass(p.id) }, [
+        el('div', { class: 'lane' + personClass(p.id) }, [
           el('div', { class: 'head' }, [
             el('strong', { text: p.name || p.id }),
             p.id === me && people.length > 1 ? el('span', { class: 'me', text: T('meTag') }) : null,
@@ -2641,8 +2641,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
               ? ul
               : el('p', { class: 'empty', text: openAll.length ? T('laneNoMatch') : T('laneEmpty') }),
           !filtering() && openList.length > LANE_MAX
-            ? moreBtn(!!laneAll[p.id], openList.length - LANE_MAX, function () {
-                laneAll[p.id] = !laneAll[p.id];
+            ? moreBtn(!!laneExpanded[p.id], openList.length - LANE_MAX, function () {
+                laneExpanded[p.id] = !laneExpanded[p.id];
                 renderLanes();
               })
             : null,
@@ -2654,9 +2654,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   function renderTable() {
     var fs = features();
-    if (loaded && feat !== 'all' && fs.indexOf(feat) < 0) feat = 'all';
+    if (loaded && featureFilter !== 'all' && fs.indexOf(featureFilter) < 0) featureFilter = 'all';
     // done work stays out of the table until asked for, except while searching or showing what is new
-    var hideDone = !showDone && !q && !newOnly;
+    var hideDone = !showDone && !searchText && !newOnly;
     var fr = $('filters');
     fr.textContent = '';
     ['all'].concat(fs).forEach(function (f) {
@@ -2669,16 +2669,16 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       )
         .filter(match)
         .filter(function (t) {
-          return !hideDone || st(t) !== 'done';
+          return !hideDone || knownStatus(t) !== 'done';
         }).length;
       fr.appendChild(
         el('button', {
           type: 'button',
           class: 'chip',
-          'aria-pressed': String(feat === f),
+          'aria-pressed': String(featureFilter === f),
           text: (f === 'all' ? T('all') : f) + ' ' + n,
           onclick: function () {
-            feat = f;
+            featureFilter = f;
             write('ab-feature', f);
             renderTable();
             applyCursor();
@@ -2687,7 +2687,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       );
     });
     var doneN = tasks.filter(function (t) {
-      return st(t) === 'done';
+      return knownStatus(t) === 'done';
     }).length;
     if (doneN)
       fr.appendChild(
@@ -2711,7 +2711,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       body.appendChild(el('tr', {}, [el('td', { colspan: '7', class: 'empty', text: failed || T('loading') })]));
       return;
     }
-    (feat === 'all' ? fs : [feat]).forEach(function (f) {
+    (featureFilter === 'all' ? fs : [featureFilter]).forEach(function (f) {
       var all = tasks.filter(function (t) {
         return featOf(t) === f;
       });
@@ -2719,12 +2719,12 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       if (!hits.length) return;
       var list = hideDone
           ? hits.filter(function (t) {
-              return st(t) !== 'done';
+              return knownStatus(t) !== 'done';
             })
           : hits,
         hidden = hits.length - list.length;
       var dn = all.filter(function (t) {
-          return st(t) === 'done';
+          return knownStatus(t) === 'done';
         }).length,
         shut = !!groupFold[f] && !filtering();
       body.appendChild(
@@ -2766,7 +2766,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
               {},
               ds.map(function (k, i) {
                 return el('span', {
-                  class: u.indexOf(k) >= 0 && st(t) !== 'done' ? 'wait' : 'ok',
+                  class: u.indexOf(k) >= 0 && knownStatus(t) !== 'done' ? 'wait' : 'ok',
                   text: (i ? ', ' : '') + k
                 });
               })
@@ -2778,9 +2778,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             {
               class: 'item',
               'data-k': t.id,
-              'aria-current': String(sel === t.id),
+              'aria-current': String(openId === t.id),
               onclick: function () {
-                open(t.id);
+                openSheet(t.id);
               }
             },
             [
@@ -2792,8 +2792,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
                   : null
               ]),
               el('td', { class: 'deps' }, [deps]),
-              el('td', {}, [who(t.owner), ' ', agentMark(t)]),
-              el('td', {}, [state(st(t))]),
+              el('td', {}, [personChip(t.owner), ' ', agentMark(t)]),
+              el('td', {}, [statusChip(knownStatus(t))]),
               el('td', { class: 'date' }, [dateCell(t)]),
               el('td', { class: 'when', text: ago(lastTouch(t)) })
             ]
@@ -2824,7 +2824,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           el('div', { class: 'at' }, [
             el('span', { style: 'display:flex;align-items:center;gap:6px' }, [stamp(n.at), newDot(nw)]),
             el('span', { style: 'display:flex;gap:4px;flex-wrap:wrap' }, [
-              who(n.author),
+              personChip(n.author),
               n.kind === 'agent' ? el('span', { class: 'agent-mark', text: T('agent') }) : null
             ])
           ]),
@@ -2867,7 +2867,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       var ta = el('textarea', {
         id: 'noticeText',
         'aria-label': T('noticeBtn'),
-        placeholder: T('noticePh', { p: pname(me) })
+        placeholder: T('noticePh', { p: personName(me) })
       });
       ta.value = draft;
       var btn = el('button', { type: 'button', class: 'btn primary', text: T('noticeBtn') });
@@ -2942,7 +2942,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     });
   }
   // A text document people keep on the page, read as cards: the project rules (meta/rules, which agents receive when they
-  // start board work) and the project notes (meta/notes: schedule, where things stand, open questions; agents read them
+  // start board work) and the project notes (meta/notes: schedule, where things stand, openSheet questions; agents read them
   // only when they need them). Each subscribes once its section opens; the rules show the older meta/protocol card until saved.
   function textDoc(k, path, legacyPath, tellByDefault) {
     var d = { doc: null, loaded: false, old: null, oldLoaded: !legacyPath, subbed: false, editing: false, draft: null },
@@ -2983,7 +2983,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       var own = d.doc && typeof d.doc.text === 'string' && d.doc.text.trim() ? d.doc : null,
         legacy = !own && d.old && d.old.text ? d.old : null;
       $(k + 'N').textContent = own
-        ? ['rev ' + (own.rev || 1), own.by ? pname(own.by) : '', own.updatedAt ? stamp(own.updatedAt) : '']
+        ? ['rev ' + (own.rev || 1), own.by ? personName(own.by) : '', own.updatedAt ? stamp(own.updatedAt) : '']
             .filter(Boolean)
             .join(' · ')
         : '';
@@ -3096,21 +3096,21 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // the owner as a round initial (alone on a card, with the name elsewhere); nobody's yet: nothing
   function avatar(t, solo) {
     if (!t.owner) return null;
-    var agent = t.claimedBy && t.claimedBy.agent && st(t) !== 'done',
+    var agent = t.claimedBy && t.claimedBy.agent && knownStatus(t) !== 'done',
       live = agent && agentLive(t),
-      name = pname(t.owner);
+      name = personName(t.owner);
     return el(
       'span',
       {
-        class: 'av' + pclass(t.owner) + (agent ? ' agent' : '') + (live ? ' live' : '') + (solo ? ' solo' : ''),
+        class: 'av' + personClass(t.owner) + (agent ? ' agent' : '') + (live ? ' live' : '') + (solo ? ' solo' : ''),
         title: agent ? name + ' · ' + T(live ? 'agentLive' : 'agent') : name
       },
       [el('i', { text: String(name).trim().charAt(0).toUpperCase() }), solo ? null : el('span', { text: name })]
     );
   }
-  // the one thing to know about an open card now, most urgent first; nothing when there is nothing to act on
+  // the one thing to know about an openSheet card now, most urgent first; nothing when there is nothing to act on
   function cardFlag(t) {
-    var s = st(t),
+    var s = knownStatus(t),
       u = unmet(t),
       td = localDay(now()),
       due = dueOf(t),
@@ -3141,7 +3141,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     if (ready(t)) return el('span', { class: 'flag ready', text: T('readyTag') });
     return null;
   }
-  function kcard(t, s) {
+  function kanbanCard(t, s) {
     var meta = [t.feature, t.repo].filter(Boolean).join(' · ');
     return el(
       'button',
@@ -3149,9 +3149,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         type: 'button',
         class: 'card' + (s === 'done' || s === 'archive' ? ' done' : ''),
         'data-k': t.id,
-        'aria-current': String(sel === t.id),
+        'aria-current': String(openId === t.id),
         onclick: function () {
-          open(t.id);
+          openSheet(t.id);
         }
       },
       [
@@ -3166,9 +3166,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     );
   }
   // each column remembers, in this browser, whether it is folded or shows two card columns; the archive starts folded
-  var kcol = readJSON('ab-kcol') || {};
-  // column header icons: one or two card columns, fold or open
-  function icon(kind) {
+  var kanbanColumns = readJSON('ab-kcol') || {};
+  // column header icons: one or two card columns, fold or openSheet
+  function columnIcon(kind) {
     var g = {
       one: [['rect', { x: 3.5, y: 2.5, width: 7, height: 9, rx: 1.5 }]],
       two: [
@@ -3184,7 +3184,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         ['path', { d: 'M2.5 3v8' }]
       ]
     }[kind];
-    return sv(
+    return svgEl(
       'svg',
       {
         width: 14,
@@ -3198,17 +3198,17 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         'aria-hidden': 'true'
       },
       g.map(function (x) {
-        return sv(x[0], x[1]);
+        return svgEl(x[0], x[1]);
       })
     );
   }
   function colState(k) {
-    var c = kcol[k] || {};
+    var c = kanbanColumns[k] || {};
     return { fold: 'fold' in c ? !!c.fold : k === 'archive', two: !!c.two };
   }
-  function setCol(k, patch) {
-    kcol[k] = Object.assign(colState(k), patch);
-    write('ab-kcol', JSON.stringify(kcol));
+  function setColumn(k, patch) {
+    kanbanColumns[k] = Object.assign(colState(k), patch);
+    write('ab-kcol', JSON.stringify(kanbanColumns));
     renderKanban();
   }
   // the board runs from the window's left edge to its right and down to its bottom, so both scrollbars stay in reach
@@ -3264,7 +3264,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         }
       );
   }
-  function archBtn(list) {
+  function archiveButton(list) {
     var b = el('button', {
       type: 'button',
       class: 'colbtn',
@@ -3296,8 +3296,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     return x < y ? 1 : x > y ? -1 : byKey(a, b);
   }
   // the done column and the archive show the latest; a long-lived board keeps the rest behind "more"
-  var KDONE = 30,
-    kAll = {};
+  var DONE_SHOWN = 30,
+    kanbanExpanded = {};
   function renderKanban() {
     var root = $('kanban');
     root.textContent = '';
@@ -3308,15 +3308,15 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       if (arch && !archived.length) return;
       var all = (arch ? archived : tasks)
         .filter(function (t) {
-          return (arch || st(t) === s) && match(t);
+          return (arch || knownStatus(t) === s) && match(t);
         })
         .sort(arch ? byArchived : s === 'done' ? byDone : byKey);
       var cs = colState(s),
-        capped = (s === 'done' || arch) && !kAll[s] && !filtering(),
-        list = capped ? all.slice(0, KDONE) : all;
-      var name = arch ? T('archN') : SL(s),
+        capped = (s === 'done' || arch) && !kanbanExpanded[s] && !filtering(),
+        list = capped ? all.slice(0, DONE_SHOWN) : all;
+      var name = arch ? T('archN') : statusLabel(s),
         tools = el('span', { class: 'tools' });
-      if (s === 'done' && !cs.fold && all.length && writable()) tools.appendChild(archBtn(all));
+      if (s === 'done' && !cs.fold && all.length && writable()) tools.appendChild(archiveButton(all));
       if (!cs.fold)
         tools.appendChild(
           el(
@@ -3329,10 +3329,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
               'aria-label': T(cs.two ? 'colOne' : 'colTwo'),
               onclick: function (e) {
                 e.stopPropagation();
-                setCol(s, { two: !cs.two });
+                setColumn(s, { two: !cs.two });
               }
             },
-            [icon(cs.two ? 'one' : 'two')]
+            [columnIcon(cs.two ? 'one' : 'two')]
           )
         );
       tools.appendChild(
@@ -3346,10 +3346,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             'aria-label': cs.fold ? T('colOpen', { s: name }) : T('colFold'),
             onclick: function (e) {
               e.stopPropagation();
-              setCol(s, { fold: !cs.fold });
+              setColumn(s, { fold: !cs.fold });
             }
           },
-          [icon(cs.fold ? 'open' : 'fold')]
+          [columnIcon(cs.fold ? 'open' : 'fold')]
         )
       );
       var cards = el('div', { class: 'cards' });
@@ -3364,13 +3364,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           );
         list.forEach(function (t) {
           order.push(t.id);
-          cards.appendChild(kcard(t, s));
+          cards.appendChild(kanbanCard(t, s));
         });
-        if (capped || kAll[s])
-          if (all.length > KDONE)
+        if (capped || kanbanExpanded[s])
+          if (all.length > DONE_SHOWN)
             cards.appendChild(
-              moreBtn(!!kAll[s], all.length - KDONE, function () {
-                kAll[s] = !kAll[s];
+              moreBtn(!!kanbanExpanded[s], all.length - DONE_SHOWN, function () {
+                kanbanExpanded[s] = !kanbanExpanded[s];
                 renderKanban();
               })
             );
@@ -3383,13 +3383,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             title: cs.fold ? T('colOpen', { s: name }) : null,
             onclick: cs.fold
               ? function () {
-                  setCol(s, { fold: false });
+                  setColumn(s, { fold: false });
                 }
               : null
           },
           [
             el('h3', {}, [
-              arch ? el('span', { class: 'state', text: name }) : state(s),
+              arch ? el('span', { class: 'state', text: name }) : statusChip(s),
               el('span', { class: 'n', text: String(all.length) }),
               tools
             ]),
@@ -3404,29 +3404,29 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // ---------- dependency graph ----------
   // the graph draws the board's tasks; a dependency in the archive is finished and off the board
-  function gk(k) {
-    var d = byKeyStr(k);
+  function graphTask(k) {
+    var d = taskByKey(k);
     return d && !d.archivedAt ? d : null;
   }
-  var G = { W: 224, H: 98, GX: 68, GY: 12, PAD: 18, TOP: 38 };
+  var GRAPH = { W: 224, H: 98, GX: 68, GY: 12, PAD: 18, TOP: 38 };
   var graphRel = null;
   function graphModel() {
     var ts = tasks.slice().sort(byKey),
       lvl = {},
       busy = {};
-    function L(t) {
+    function level(t) {
       if (lvl[t.id] != null) return lvl[t.id];
       if (busy[t.id]) return 0;
       busy[t.id] = 1;
       var m = -1;
       (t.deps || []).forEach(function (k) {
-        var d = gk(k);
-        if (d) m = Math.max(m, L(d));
+        var d = graphTask(k);
+        if (d) m = Math.max(m, level(d));
       });
       lvl[t.id] = m + 1;
       return lvl[t.id];
     }
-    ts.forEach(L);
+    ts.forEach(level);
     var cols = [];
     ts.forEach(function (t) {
       (cols[lvl[t.id]] = cols[lvl[t.id]] || []).push(t);
@@ -3441,7 +3441,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       else {
         var bc = {};
         c.forEach(function (t) {
-          var ps = (t.deps || []).map(byKeyStr).filter(function (d) {
+          var ps = (t.deps || []).map(taskByKey).filter(function (d) {
             return d && row[d.id] != null;
           });
           bc[t.id] = ps.length
@@ -3463,11 +3463,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       prev = {};
     cols.forEach(function (c) {
       c.forEach(function (t) {
-        var w = st(t) === 'done' ? 0 : 1,
+        var w = knownStatus(t) === 'done' ? 0 : 1,
           b = 0,
           p = null;
         (t.deps || []).forEach(function (k) {
-          var d = gk(k);
+          var d = graphTask(k);
           if (d && best[d.id] > b) {
             b = best[d.id];
             p = d.id;
@@ -3479,14 +3479,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     });
     var end = null;
     ts.forEach(function (t) {
-      if (st(t) !== 'done' && (!end || best[t.id] > best[end])) end = t.id;
+      if (knownStatus(t) !== 'done' && (!end || best[t.id] > best[end])) end = t.id;
     });
     var chain = [];
     for (var x = end; x; x = prev[x]) chain.unshift(x);
     var kids = {};
     ts.forEach(function (t) {
       (t.deps || []).forEach(function (k) {
-        var d = gk(k);
+        var d = graphTask(k);
         if (d) (kids[d.id] = kids[d.id] || []).push(t.id);
       });
     });
@@ -3501,10 +3501,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       return acc;
     }
     function up(id) {
-      var o = byId(id);
+      var o = taskById(id);
       return o
         ? (o.deps || [])
-            .map(byKeyStr)
+            .map(taskByKey)
             .filter(Boolean)
             .map(function (d) {
               return d.id;
@@ -3517,7 +3517,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       lvl: lvl,
       chain: chain.length >= 2 ? chain : [],
       lineOf: function (id) {
-        return byId(id)
+        return taskById(id)
           ? {
               anc: walk(id, up, {}),
               desc: walk(
@@ -3565,7 +3565,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           class: 'path',
           text: m.chain
             .map(function (id) {
-              return byId(id).key;
+              return taskById(id).key;
             })
             .join(' → ')
         })
@@ -3574,7 +3574,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       crit.appendChild(
         el('span', {
           text: tasks.every(function (t) {
-            return st(t) === 'done';
+            return knownStatus(t) === 'done';
           })
             ? T('allDone')
             : T('noChain')
@@ -3585,7 +3585,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     gl.appendChild(el('span', {}, [el('i', { class: 'swatch', style: 'border-color:var(--edge)' }), T('lgWait')]));
     people.forEach(function (p) {
       gl.appendChild(
-        el('span', { class: pclass(p.id).trim() }, [el('i', { style: 'background:var(--pb)' }), p.name || p.id])
+        el('span', { class: personClass(p.id).trim() }, [el('i', { style: 'background:var(--pb)' }), p.name || p.id])
       );
     });
 
@@ -3594,20 +3594,20 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     m.cols.forEach(function (c) {
       maxRows = Math.max(maxRows, c.length);
     });
-    var Wd = G.PAD * 2 + n * G.W + (n - 1) * G.GX,
-      Ht = G.TOP + maxRows * (G.H + G.GY) - G.GY + G.PAD;
+    var Wd = GRAPH.PAD * 2 + n * GRAPH.W + (n - 1) * GRAPH.GX,
+      Ht = GRAPH.TOP + maxRows * (GRAPH.H + GRAPH.GY) - GRAPH.GY + GRAPH.PAD;
     var g = el('div', { class: 'graph', style: 'width:' + Wd + 'px;height:' + Ht + 'px' });
-    function px(t) {
-      return G.PAD + m.lvl[t.id] * (G.W + G.GX);
+    function cardX(t) {
+      return GRAPH.PAD + m.lvl[t.id] * (GRAPH.W + GRAPH.GX);
     }
-    function py(t) {
-      return G.TOP + m.row[t.id] * (G.H + G.GY);
+    function cardY(t) {
+      return GRAPH.TOP + m.row[t.id] * (GRAPH.H + GRAPH.GY);
     }
-    var svg = sv('svg', { width: Wd, height: Ht, viewBox: '0 0 ' + Wd + ' ' + Ht, 'aria-hidden': 'true' });
-    var defs = sv('defs');
+    var svg = svgEl('svg', { width: Wd, height: Ht, viewBox: '0 0 ' + Wd + ' ' + Ht, 'aria-hidden': 'true' });
+    var defs = svgEl('defs');
     ['line', 'met', 'crit', 'hi'].forEach(function (k) {
       defs.appendChild(
-        sv(
+        svgEl(
           'marker',
           {
             id: 'm-' + k,
@@ -3619,7 +3619,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             orient: 'auto-start-reverse',
             markerUnits: 'userSpaceOnUse'
           },
-          [sv('path', { d: 'M0 0 L8 4 L0 8 z', class: 'm-' + k })]
+          [svgEl('path', { d: 'M0 0 L8 4 L0 8 z', class: 'm-' + k })]
         )
       );
     });
@@ -3627,17 +3627,17 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     m.cols.forEach(function (c) {
       c.forEach(function (t) {
         (t.deps || []).forEach(function (k) {
-          var d = gk(k);
+          var d = graphTask(k);
           if (!d) return;
-          var x1 = px(d) + G.W,
-            y1 = py(d) + G.H / 2,
-            x2 = px(t) - 2,
-            y2 = py(t) + G.H / 2,
+          var x1 = cardX(d) + GRAPH.W,
+            y1 = cardY(d) + GRAPH.H / 2,
+            x2 = cardX(t) - 2,
+            y2 = cardY(t) + GRAPH.H / 2,
             cx = Math.max(24, (x2 - x1) / 2);
           var isCrit = critSet[d.id] && critSet[t.id] && m.chain.indexOf(t.id) === m.chain.indexOf(d.id) + 1;
-          var kind = isCrit ? 'crit' : st(d) === 'done' ? 'met' : 'line';
+          var kind = isCrit ? 'crit' : knownStatus(d) === 'done' ? 'met' : 'line';
           svg.appendChild(
-            sv('path', {
+            svgEl('path', {
               d: 'M' + x1 + ' ' + y1 + ' C' + (x1 + cx) + ' ' + y1 + ' ' + (x2 - cx) + ' ' + y2 + ' ' + x2 + ' ' + y2,
               class: 'e' + (kind === 'line' ? '' : ' ' + kind),
               'data-from': d.id,
@@ -3651,10 +3651,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     g.appendChild(svg);
     m.cols.forEach(function (c, ci) {
       var dn = c.filter(function (t) {
-        return st(t) === 'done';
+        return knownStatus(t) === 'done';
       }).length;
       g.appendChild(
-        el('div', { class: 'gcol', style: 'left:' + (G.PAD + ci * (G.W + G.GX)) + 'px;top:12px' }, [
+        el('div', { class: 'gcol', style: 'left:' + (GRAPH.PAD + ci * (GRAPH.W + GRAPH.GX)) + 'px;top:12px' }, [
           T('step', { n: ci + 1 }) + (ci === 0 ? T('stepRoot') : ''),
           el('span', { text: ' · ' + T('doneOf', { d: dn, n: c.length }) })
         ])
@@ -3664,31 +3664,31 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         if (hit) order.push(t.id);
         var u = unmet(t),
           r3 =
-            st(t) === 'done'
-              ? SL('done')
+            knownStatus(t) === 'done'
+              ? statusLabel('done')
               : ready(t)
                 ? T('readyTag')
                 : u.length
                   ? T('waitingDeps', { k: u.join(', ') })
-                  : pname(t.owner) + ' · ' + SL(st(t));
+                  : personName(t.owner) + ' · ' + statusLabel(knownStatus(t));
         g.appendChild(
           el(
             'button',
             {
               type: 'button',
               'data-k': t.id,
-              'aria-current': String(sel === t.id),
+              'aria-current': String(openId === t.id),
               class:
                 'node' +
-                pclass(t.owner) +
+                personClass(t.owner) +
                 ' ' +
-                st(t) +
+                knownStatus(t) +
                 (critSet[t.id] ? ' oncrit' : '') +
                 (filtering() && !hit ? ' nomatch' : ''),
-              style: 'left:' + px(t) + 'px;top:' + py(t) + 'px;width:' + G.W + 'px;height:' + G.H + 'px',
-              'aria-label': t.key + ' ' + (t.title || '') + ', ' + SL(st(t)) + ', ' + pname(t.owner),
+              style: 'left:' + cardX(t) + 'px;top:' + cardY(t) + 'px;width:' + GRAPH.W + 'px;height:' + GRAPH.H + 'px',
+              'aria-label': t.key + ' ' + (t.title || '') + ', ' + statusLabel(knownStatus(t)) + ', ' + personName(t.owner),
               onclick: function () {
-                open(t.id);
+                openSheet(t.id);
               },
               onmouseenter: function () {
                 lineage(t.id);
@@ -3703,7 +3703,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             [
               el('div', { class: 'r1' }, [
                 el('span', { class: 'key', text: t.key }),
-                state(st(t)),
+                statusChip(knownStatus(t)),
                 agentMark(t),
                 newDot(isNew(t))
               ]),
@@ -3789,13 +3789,13 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       } catch (e) {}
     if (view === 'graph') lineage(cursor);
   }
-  function move(step) {
+  function moveCursor(step) {
     if (!order.length) return;
     var i = order.indexOf(cursor);
     i = i < 0 ? (step > 0 ? 0 : order.length - 1) : Math.max(0, Math.min(order.length - 1, i + step));
     cursor = order[i];
     applyCursor(true);
-    if (sel) open(cursor);
+    if (openId) openSheet(cursor);
   }
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
@@ -3803,7 +3803,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         closeSettings();
         return;
       }
-      if (sel) {
+      if (openId) {
         close();
         return;
       }
@@ -3821,27 +3821,27 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === '/') {
       e.preventDefault();
-      if (sel) close();
-      qi.focus();
-      qi.select();
+      if (openId) close();
+      searchInput.focus();
+      searchInput.select();
       return;
     }
     if (e.key === 'j') {
       e.preventDefault();
-      move(1);
+      moveCursor(1);
       return;
     }
     if (e.key === 'k') {
       e.preventDefault();
-      move(-1);
+      moveCursor(-1);
       return;
     }
-    if (e.key === 'Enter' && cursor && !sel && tag !== 'BUTTON' && tag !== 'A') {
+    if (e.key === 'Enter' && cursor && !openId && tag !== 'BUTTON' && tag !== 'A') {
       e.preventDefault();
-      open(cursor);
+      openSheet(cursor);
       return;
     }
-    if (!sel && (e.key === '1' || e.key === '2' || e.key === '3')) {
+    if (!openId && (e.key === '1' || e.key === '2' || e.key === '3')) {
       setView(VIEWS[+e.key - 1]);
       return;
     }
@@ -3855,11 +3855,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   // ---------- detail sheet ----------
   var lastFocus = null;
-  function open(id) {
-    var t = byId(id);
+  function openSheet(id) {
+    var t = taskById(id);
     if (!t) return;
     if (settingsOpen) settingsOpen = false;
-    if (sel !== id) {
+    if (openId !== id) {
       if (unsub) {
         unsub();
         unsub = null;
@@ -3867,12 +3867,12 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       msgs = [];
       msgErr = false;
       openPrevSeen = seen[id] || '';
-      if (unsubDet) {
-        unsubDet();
-        unsubDet = null;
+      if (unsubDetails) {
+        unsubDetails();
+        unsubDetails = null;
       }
-      det = null;
-      sumEditing = false;
+      detailsDoc = null;
+      summaryEditing = false;
       if (db) {
         unsub = db
           .collection('tasks/' + id + '/messages')
@@ -3892,17 +3892,17 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
               renderSheet();
             }
           );
-        unsubDet = db.doc('details/' + id).onSnapshot(
+        unsubDetails = db.doc('details/' + id).onSnapshot(
           function (s) {
-            det = s.exists ? s.data() : null;
+            detailsDoc = s.exists ? s.data() : null;
             renderSheet();
           },
           function () {}
         );
       }
     }
-    if (!sel) lastFocus = document.activeElement;
-    sel = id;
+    if (!openId) lastFocus = document.activeElement;
+    openId = id;
     cursor = id;
     markSeen(id, lastTouch(t));
     try {
@@ -3914,18 +3914,18 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     renderSheet(true);
   }
   function close() {
-    sel = null;
+    openId = null;
     if (unsub) {
       unsub();
       unsub = null;
     }
     msgs = [];
-    if (unsubDet) {
-      unsubDet();
-      unsubDet = null;
+    if (unsubDetails) {
+      unsubDetails();
+      unsubDetails = null;
     }
-    det = null;
-    sumEditing = false;
+    detailsDoc = null;
+    summaryEditing = false;
     try {
       history.replaceState(null, '', location.pathname + location.search);
     } catch (e) {}
@@ -3940,7 +3940,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // ---------- board settings: name, one line, milestone, repositories (people stay with site admins) ----------
   function openSettings() {
     if (!writable()) return;
-    if (sel) close();
+    if (openId) close();
     settingsOpen = true;
     lastFocus = document.activeElement;
     renderSettings();
@@ -4037,17 +4037,17 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   $('setBtn').addEventListener('click', openSettings);
 
   function summaryBlock(t, keep) {
-    var sum = (det && det.summary) || '';
+    var sum = (detailsDoc && detailsDoc.summary) || '';
     var head = el('h3', { style: 'display:flex;gap:8px;align-items:baseline' }, [
       T('summary'),
-      det && det.summaryAt ? el('span', { style: 'font-weight:400', text: stamp(det.summaryAt) }) : null,
-      writable() && !sumEditing
+      detailsDoc && detailsDoc.summaryAt ? el('span', { style: 'font-weight:400', text: stamp(detailsDoc.summaryAt) }) : null,
+      writable() && !summaryEditing
         ? el('button', {
             type: 'button',
             class: 'linkbtn',
             text: sum ? T('edit') : T('write'),
             onclick: function () {
-              sumEditing = true;
+              summaryEditing = true;
               renderSheet();
               var a = $('sumText');
               if (a) a.focus();
@@ -4055,7 +4055,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           })
         : null
     ]);
-    if (!sumEditing)
+    if (!summaryEditing)
       return el('div', { class: 'block' }, [
         head,
         sum
@@ -4069,9 +4069,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       var patch = { summary: ta.value.trim(), summaryAt: now() },
         o = { override: !mayChange(t, me, { summary: patch.summary }, false) };
       ok.disabled = true;
-      (det ? db.doc('details/' + t.id).update(patch, o) : db.doc('details/' + t.id).set(patch, o))
+      (detailsDoc ? db.doc('details/' + t.id).update(patch, o) : db.doc('details/' + t.id).set(patch, o))
         .then(function () {
-          sumEditing = false;
+          summaryEditing = false;
           renderSheet();
         })
         .catch(function (e) {
@@ -4090,7 +4090,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           class: 'btn small',
           text: T('cancel'),
           onclick: function () {
-            sumEditing = false;
+            summaryEditing = false;
             var a = $('sumText');
             if (a) a.value = sum;
             renderSheet();
@@ -4102,7 +4102,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
   function renderSheet(fresh) {
     var root = $('sheetRoot');
-    var t = sel ? byId(sel) : null;
+    var t = openId ? taskById(openId) : null;
     if (!t) {
       root.textContent = '';
       return;
@@ -4124,9 +4124,9 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
     var s = el('select', { id: 'fStatus', 'aria-label': T('f_status') });
     STATUS.forEach(function (x) {
-      s.appendChild(el('option', { value: x, text: SL(x) }));
+      s.appendChild(el('option', { value: x, text: statusLabel(x) }));
     });
-    s.value = st(t);
+    s.value = knownStatus(t);
     s.addEventListener('change', function () {
       change(t, { status: s.value });
     });
@@ -4190,8 +4190,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     s.disabled = o.disabled = br.disabled = pr.disabled = sd.disabled = du.disabled = !writable();
     if (rp) rp.disabled = !writable();
 
-    var spec = (det && det.spec) || t.spec || '',
-      acc = (det && det.acceptance) || t.acceptance || '';
+    var spec = (detailsDoc && detailsDoc.spec) || t.spec || '',
+      acc = (detailsDoc && detailsDoc.acceptance) || t.acceptance || '';
     var u = unmet(t),
       ds = t.deps || [];
     var unlocks = tasks
@@ -4209,17 +4209,17 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             {
               type: 'button',
               onclick: function () {
-                open(d.id);
+                openSheet(d.id);
               }
             },
-            [el('span', { class: 'key', text: d.key }), state(st(d))]
+            [el('span', { class: 'key', text: d.key }), statusChip(knownStatus(d))]
           );
         })
       );
     }
     var depBlock = el('div', { class: 'block' }, [
       el('h3', { text: T('depsBlock') }),
-      ds.length ? depButtons(ds.map(byKeyStr).filter(Boolean)) : el('p', { class: 'muted', text: T('depsNone') })
+      ds.length ? depButtons(ds.map(taskByKey).filter(Boolean)) : el('p', { class: 'muted', text: T('depsNone') })
     ]);
     var unlockBlock = unlocks.length
       ? el('div', { class: 'block' }, [el('h3', { text: T('unlockBlock') }), depButtons(unlocks)])
@@ -4227,7 +4227,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var claimLine = t.claimedBy
       ? el('p', { class: 'muted', style: 'font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center' }, [
           T('claimedBy'),
-          who(t.claimedBy.who),
+          personChip(t.claimedBy.who),
           t.claimedBy.agent ? el('span', { class: 'agent-mark', text: T('agent') }) : null,
           t.claimedBy.session ? el('span', { class: 'key', text: t.claimedBy.session }) : null,
           t.claimedBy.at ? stamp(t.claimedBy.at) : ''
@@ -4243,7 +4243,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       list.appendChild(
         el('div', { class: 'msg' + (ag ? ' agent' : '') + (nw ? ' new' : '') }, [
           el('div', { class: 'h' }, [
-            who(m.author),
+            personChip(m.author),
             ag ? el('span', { class: 'agent-mark', text: T('agent') }) : null,
             el('span', {
               class: 'type ' + (m.type || 'note'),
@@ -4262,16 +4262,16 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center' }, [
           el('span', { class: 'tag', text: t.feature || '' }),
           repoTag(t),
-          state(st(t)),
+          statusChip(knownStatus(t)),
           t.archivedAt
             ? el('span', { class: 'tag', text: T('archivedOn', { d: dayLabel(localDay(t.archivedAt)) }) })
             : null,
-          who(t.owner),
+          personChip(t.owner),
           dateChip(t),
           agentMark(t)
         ]),
         el('h2', { id: 'sheetTitle', text: t.title || T('untitled') }),
-        st(t) !== 'done' && u.length
+        knownStatus(t) !== 'done' && u.length
           ? el('p', { style: 'color:var(--warn);font-size:13.5px', text: T('depsPending', { k: u.join(', ') }) })
           : null,
         actions(t)
@@ -4291,8 +4291,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         sd,
         el('span', { class: 'k', text: T('f_due') }),
         du,
-        st(t) === 'done' && t.doneAt ? el('span', { class: 'k', text: T('f_doneAt') }) : null,
-        st(t) === 'done' && t.doneAt ? el('span', { text: stamp(t.doneAt) }) : null
+        knownStatus(t) === 'done' && t.doneAt ? el('span', { class: 'k', text: T('f_doneAt') }) : null,
+        knownStatus(t) === 'done' && t.doneAt ? el('span', { text: stamp(t.doneAt) }) : null
       ]),
       claimLine,
       prLinks(t).length ? el('div', { class: 'form-row' }, prEls(t)) : null,
@@ -4310,7 +4310,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 
     var comp = null;
     if (writable() && me) {
-      var ta = el('textarea', { id: 'msgText', 'aria-label': T('post'), placeholder: T('msgPh', { p: pname(me) }) });
+      var ta = el('textarea', { id: 'msgText', 'aria-label': T('post'), placeholder: T('msgPh', { p: personName(me) }) });
       ta.value = keep.msgText || '';
       var ty = el('select', { id: 'msgType', 'aria-label': 'type' });
       TYPES.forEach(function (x) {
@@ -4364,7 +4364,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         text: '↑',
         disabled: idx > 0 ? null : '',
         onclick: function () {
-          move(-1);
+          moveCursor(-1);
         }
       }),
       el('button', {
@@ -4374,7 +4374,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         text: '↓',
         disabled: idx >= 0 && idx < order.length - 1 ? null : '',
         onclick: function () {
-          move(1);
+          moveCursor(1);
         }
       })
     ]);
@@ -4403,8 +4403,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   }
 
   // waitingOn (unfinished deps) lets an agent find pickable work with one query: status == todo, waitingOn == [].
-  // While the board is open the page repairs any drift itself. It touches only waitingOn, not updatedAt, so it raises no "new" marker.
-  // Every open board sees the same drift, so each waits a random moment and re-checks the latest snapshot:
+  // While the board is openSheet the page repairs any drift itself. It touches only waitingOn, not updatedAt, so it raises no "new" marker.
+  // Every openSheet board sees the same drift, so each waits a random moment and re-checks the latest snapshot:
   // usually one board fixes it and the rest find nothing to do. A view-only viewer never tries; one the platform said nothing about stops after the first refusal.
   var healing = {},
     healTimer = null,
@@ -4444,7 +4444,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     renderHead();
     renderToolbar();
     renderView();
-    if (sel) renderSheet();
+    if (openId) renderSheet();
   }
 
   function start() {
@@ -4513,7 +4513,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         loaded = true;
         if (first) {
           first = false;
-          // a browser opening the board for the first time treats the current state as seen; only later changes count as new
+          // a browser opening the board for the first time treats the current statusChip as seen; only later changes count as new
           if (!read('ab-seen-init')) {
             tasks.forEach(function (t) {
               markSeen(t.id, lastTouch(t));
@@ -4521,14 +4521,14 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
             write('ab-seen-init', '1');
           }
         }
-        if (sel) {
-          var cur = byId(sel);
+        if (openId) {
+          var cur = taskById(openId);
           if (!cur) close();
-          else markSeen(sel, lastTouch(cur));
+          else markSeen(openId, lastTouch(cur));
         }
         renderAll();
         healWaiting();
-        if (!sel && location.hash.length > 1) {
+        if (!openId && location.hash.length > 1) {
           var h = decodeURIComponent(location.hash.slice(1));
           if (VIEWS.indexOf(h) >= 0) {
             setView(h);
@@ -4536,8 +4536,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
               history.replaceState(null, '', location.pathname + location.search);
             } catch (e) {}
           } else {
-            var t = byKeyStr(h);
-            if (t) open(t.id);
+            var t = taskByKey(h);
+            if (t) openSheet(t.id);
           }
         }
       }
@@ -4586,15 +4586,15 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   window.addEventListener('hashchange', function () {
     var h = decodeURIComponent(location.hash.slice(1));
     if (!h) {
-      if (sel) close();
+      if (openId) close();
       return;
     }
     if (VIEWS.indexOf(h) >= 0) {
       setView(h);
       return;
     }
-    var t = byKeyStr(h);
-    if (t && sel !== t.id) open(t.id);
+    var t = taskByKey(h);
+    if (t && openId !== t.id) openSheet(t.id);
   });
   applyConfig({});
   if (window.claude && window.claude.use) start();
