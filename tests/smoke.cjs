@@ -339,6 +339,21 @@ const meLane = (d) => {
   key('2');
   await tick();
   ok(d.querySelectorAll('.card').length === 4, 'kanban shows every task');
+  // switching views while scrolled past their top: the page scrolls back by what the toolbar hides, once per switch
+  const scrolls = [];
+  w.scrollBy = (x, y) => scrolls.push(y);
+  d.getElementById('toolbar').getBoundingClientRect = () => ({ top: 0, bottom: 50 });
+  d.getElementById('viewDoc').getBoundingClientRect = () => ({ top: -300, bottom: 900 });
+  key('1');
+  await tick();
+  ok(scrolls.join() === '-350', 'a view opened from deep in another scrolls back to its top');
+  key('1');
+  await tick();
+  ok(scrolls.length === 1, 'the same view again does not scroll');
+  d.getElementById('viewKanban').getBoundingClientRect = () => ({ top: 120, bottom: 900 });
+  key('2');
+  await tick();
+  ok(scrolls.length === 1, 'a view whose top shows stays where it is');
   key('j');
   key('Enter');
   await tick();

@@ -2211,10 +2211,20 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   });
   function setView(v) {
     if (VIEWS.indexOf(v) < 0) return;
+    var changed = v !== view;
     view = v;
     write('ab-view', v);
     renderToolbar();
     renderView();
+    if (changed) showViewTop();
+  }
+  // a view opens at its top. Scrolled deep into the document view, the kanban would otherwise start above the window,
+  // and its own scrolling (kept inside the board) could not bring it back.
+  function showViewTop() {
+    var shown = document.querySelector('.view:not([hidden])');
+    if (!shown) return;
+    var hidden = shown.getBoundingClientRect().top - $('toolbar').getBoundingClientRect().bottom;
+    if (hidden < 0) window.scrollBy(0, hidden);
   }
 
   // ---------- document view ----------
@@ -3202,17 +3212,23 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     renderKanban();
   }
   // the board runs from the window's left edge to its right and down to its bottom, so both scrollbars stay in reach
+  // a node spans the window while keeping its content aligned with the page
+  function fullBleed(node, on) {
+    var r = document.querySelector('.page').getBoundingClientRect(),
+      cw = document.documentElement.clientWidth;
+    node.style.marginLeft = on ? -r.left + 'px' : '';
+    node.style.marginRight = on ? -(cw - r.right) + 'px' : '';
+    node.style.paddingLeft = on ? r.left + 'px' : '';
+    node.style.paddingRight = on ? cw - r.right + 'px' : '';
+  }
+  // the kanban fills the window below the toolbar, like a board app; the toolbar spans the window with it, so cards
+  // scrolling under it do not show beside it
   function sizeBoard() {
-    var k = $('kanban');
-    if (!k || view !== 'kanban') return;
-    var pg = document.querySelector('.page'),
-      r = pg.getBoundingClientRect(),
-      cw = document.documentElement.clientWidth,
+    var k = $('kanban'),
       tb = $('toolbar');
-    k.style.marginLeft = -r.left + 'px';
-    k.style.marginRight = -(cw - r.right) + 'px';
-    k.style.paddingLeft = r.left + 'px';
-    k.style.paddingRight = cw - r.right + 'px';
+    if (!k || view !== 'kanban') return;
+    fullBleed(k, true);
+    fullBleed(tb, true);
     var top = getComputedStyle(tb).position === 'sticky' ? tb.offsetHeight : 0;
     k.style.height = Math.max(360, window.innerHeight - top - 12) + 'px';
   }
@@ -3757,7 +3773,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     } else if (view === 'kanban') renderKanban();
     else renderGraph();
     // a hidden view is drawn again when shown, so its elements need not stay around meanwhile
-    if (view !== 'kanban') $('kanban').textContent = '';
+    if (view !== 'kanban') {
+      $('kanban').textContent = '';
+      fullBleed($('toolbar'), false);
+    }
     if (view !== 'graph') {
       $('graphWrap').textContent = '';
       graphRel = null;
