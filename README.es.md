@@ -101,7 +101,7 @@ Las vistas las dibuja el código, nunca un modelo. Los agentes leen solo la part
 </tr>
 </table>
 
-**Mapa de código.** Un tablero autoalojado puede guardar un mapa de los archivos, funciones e imports de cada repositorio. Los agentes consultan `board_map` antes de usar grep, y el tablero avisa cuando dos tareas abiertas tocan el mismo código. Se crea con un solo comando ([Autoalojamiento](#autoalojamiento)). Los tableros artifact de claude.ai todavía no lo tienen.
+**Mapa de código.** Un tablero autoalojado puede guardar un mapa de los archivos, funciones e imports de cada repositorio. Los agentes consultan `board_map` antes de usar grep, y el tablero avisa cuando dos tareas abiertas tocan el mismo código. La página lo dibuja como nodos y enlaces que se abren grupo a grupo y archivo a archivo, con las tareas abiertas del equipo colocadas sobre el código. Se crea con un solo comando ([Autoalojamiento](#autoalojamiento)). Los tableros artifact de claude.ai todavía no lo tienen.
 
 ## Inicio rápido
 
@@ -231,7 +231,7 @@ approval_mode = "approve"
 
 Luego pide al agente "prepara el tablero para este repositorio".
 
-**Mapa de código** (opcional, solo autoalojado). Desde el checkout del repositorio, crea su mapa y súbelo. Vuelve a crearlo después de cambios grandes:
+**Mapa de código** (opcional, solo autoalojado). Un mapa dice qué commit y qué rama describe. Mantenlo al día desde CI o con un hook de git; con `--if-changed` solo se crea cuando el checkout cambió desde el último mapa ([Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current), en la guía de autoalojamiento). Desde el checkout del repositorio, crea su mapa y súbelo:
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api

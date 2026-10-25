@@ -1,4 +1,4 @@
-// The code map's only contact with the file system: which files a checkout has, their text, and its commit.
+// The code map's only contact with the file system: which files a checkout has, their text, and which commit they are.
 // Git's own listing is used when there is one, so .gitignore decides what is left out.
 import { execFile } from 'node:child_process';
 import { lstat, open, readFile, readdir } from 'node:fs/promises';
@@ -86,7 +86,12 @@ export async function readFiles(root, paths) {
   return out;
 }
 
-// outside a git work tree there is no commit, and the index says none
-export async function headCommit(root) {
-  try { return (await scanGit(root, ['rev-parse', 'HEAD'])).trim() || undefined; } catch { return undefined; }
+// Which code the checkout holds: the commit (none outside git or before the first one), its branch (none when the head
+// is detached) and whether the files differ from it, by an edit or by an untracked file listFiles would map. The status
+// takes no lock, so a build running beside the person's own git commands never makes them fail.
+export async function headState(root) {
+  const git = (args) => scanGit(root, args).then((out) => out.trim(), () => undefined);
+  const [commit, branch, status] = await Promise.all([git(['rev-parse', 'HEAD']), git(['rev-parse', '--abbrev-ref', 'HEAD']),
+    git(['--no-optional-locks', 'status', '--porcelain', '--', '.'])]);
+  return { commit: commit || undefined, branch: branch && branch !== 'HEAD' ? branch : undefined, dirty: status === undefined ? undefined : status !== '' };
 }

@@ -32,6 +32,8 @@ const JS_CONT_WORDS = new Set(['in', 'of', 'instanceof', 'as', 'satisfies', 'ext
 // punctuation a value can end on: after it a new line starts a new statement
 const JS_VALUE_END = new Set([')', ']', '}', '\u0001']);
 const JS_CLOSERS = { '(': ')', '[': ']', '{': '}' };
+// the punctuation a type argument list holds besides names and strings (`Map<string, Row[]> | 'none'`)
+const JS_TYPE_ARG = new Set([',', '.', '[', ']', '|', '<', '>']);
 // the closing backtick of a template becomes this, so the next token never reads as a tagged template
 const JS_TEMPLATE_END = '\u0001';
 const JS_TOKEN = /[A-Za-z_$\u0080-\uffff][\w$\u0080-\uffff]*|#[A-Za-z_$][\w$]*|\d[\w.]*|\.\.\.|=>|\?\.(?!\d)|[=!]==?|[<>]=|&&|\|\||\?\?|\S/g;
@@ -150,6 +152,36 @@ function jsSkipAngles(toks, j) {
   return toks.length;
 }
 
+// The `>` that closes a type argument list opening at j, or -1: the list holds only names, strings and JS_TYPE_ARG
+// and closes inside the brackets it opened in, so a comparison (`n < limit && limit > (n)`, `i < n;`) is none.
+function jsTypeArgs(toks, j) {
+  const d = toks[j].d;
+  let n = 0;
+  for (let k = j; k < toks.length; k++) {
+    const t = toks[k];
+    if (t.d < d || t.t !== 'id' && t.t !== 'str' && !(t.t === 'p' && JS_TYPE_ARG.has(t.v))) return -1;
+    if (jsIs(t, '<')) n++;
+    else if (jsIs(t, '>') && --n === 0) return k;
+  }
+  return -1;
+}
+
+// TypeScript type argument lists after a name (`f<T>(`, `Record<K, [A, B]>`): each list's `<` and `>` mapped to
+// each other. After a word like `return`, a `<` opens a JSX tag instead.
+function jsAngles(x) {
+  const { toks } = x;
+  for (let j = 1; j < toks.length; j++) {
+    if (!jsIs(toks[j], '<') || toks[j - 1].t !== 'id' || JS_OPEN_WORDS.has(toks[j - 1].v)) continue;
+    const end = jsTypeArgs(toks, j);
+    if (end < 0) continue;
+    x.angles.set(j, end).set(end, j);
+    j = end;
+  }
+}
+
+// the token a `(` at open follows, past type arguments: `f<T>(` is f's, as `f(` is
+const jsBeforeParen = (x, open) => (x.angles.has(open - 1) ? x.angles.get(open - 1) - 1 : open - 1);
+
 // The bodies (brace indexes) of `(function () { … })()`, `(() => { … })()` and `(function () { … }())` at the top
 // level: a classic script's module wrapper, whose body is its real top level.
 function jsWrappers(toks) {
@@ -221,7 +253,8 @@ function jsExtract(text, path) {
   const toks = jsTokens(code, strings);
   const ts = /\.[mc]?tsx?$/i.test(path);
   const x = { toks, ts, out, defs: new Set(), types: [], exportNames: new Set(), seen: new Map(), aliases: new Map(),
-    modules: new Set(), locals: new Set(), exportBraces: new Set() };
+    modules: new Set(), locals: new Set(), exportBraces: new Set(), angles: new Map() };
+  if (ts) jsAngles(x);
   // the top level, and the body of a top-level `(function () { … })()` that wraps a whole script
   for (const [open, close] of [[-1, toks.length], ...jsWrappers(toks)]) {
     const d = open < 0 ? 0 : toks[open].d + 1, starts = [];
@@ -525,8 +558,8 @@ function jsEnclosing(toks) {
 
 // a call's argument list: after a callee, and not a parameter list (`function f(a)`, `f(a) {`, `(a) =>`)
 function jsCallParen(x, open) {
-  const { toks } = x, p = jsAt(toks, open - 1), after = jsAt(toks, jsMatch(toks, open) + 1);
-  if (jsIs(after, '{') || jsIs(after, '=>') || x.defs.has(open - 1)) return false;
+  const { toks } = x, after = jsAt(toks, jsMatch(toks, open) + 1), callee = jsBeforeParen(x, open), p = jsAt(toks, callee);
+  if (jsIs(after, '{') || jsIs(after, '=>') || x.defs.has(callee)) return false;
   if (p.t === 'id') return !JS_RESERVED.has(p.v) || p.v === 'super';
   return jsIs(p, ')') || jsIs(p, ']') || jsIs(p, '?.') || p.v === JS_TEMPLATE_END;
 }
@@ -543,9 +576,21 @@ function jsLiteral(x, encl, open) {
   }
   if (p.t === 'id') return p.v === 'return';
   if (p.t !== 'p') return false;
-  if (toks[open].v === '[') return !JS_VALUE_END.has(p.v);
+  if (toks[open].v === '[') return !JS_VALUE_END.has(p.v) && !(x.ts && jsTupleType(toks, open));
   if (x.ts && p.v === ':') return false;
   return ['=', '(', ',', '[', ':', '?', '&&', '||', '??'].includes(p.v);
+}
+
+// A `[` right after the `:` of a declared name (`let last: [A, B] | null`) or of a return type (`): [A, B] {`) opens
+// a tuple type. A return type runs on to the function's body; a ternary's `: [b]` does not.
+function jsTupleType(toks, open) {
+  if (!jsIs(jsAt(toks, open - 1), ':')) return false;
+  const before = jsAt(toks, open - 2);
+  if (before.t === 'id') return ['const', 'let', 'var'].includes(jsAt(toks, open - 3).v);
+  if (!jsIs(before, ')')) return false;
+  let k = jsMatch(toks, open) + 1;
+  while (jsAt(toks, k).t === 'id' || ['|', '&', '.', '[', ']'].some((v) => jsIs(jsAt(toks, k), v))) k++;
+  return jsIs(jsAt(toks, k), '{') || jsIs(jsAt(toks, k), '=>');
 }
 
 // Whether the bare name at j is used as a value: passed as an argument, put in an array or an object literal,
@@ -604,10 +649,10 @@ function jsScopes(x) {
       continue;
     }
     if (!jsIs(t, '(')) continue;
-    const close = jsMatch(toks, j), after = jsAt(toks, close + 1), p = jsAt(toks, j - 1);
+    const close = jsMatch(toks, j), after = jsAt(toks, close + 1), name = jsBeforeParen(x, j), p = jsAt(toks, name);
     let body = null;
     if (jsIs(after, '=>')) body = jsArrowBody(toks, close + 2, t.d);
-    else if (p.v === 'function' || jsAt(toks, j - 2).v === 'function' || defs.has(j - 1)
+    else if (p.v === 'function' || jsAt(toks, name - 1).v === 'function' || defs.has(name)
       || jsIs(after, '{') && p.t === 'id' && !control.has(p.v)) {
       // a TypeScript return type may sit between the parameters and the body
       let open = close + 1;
@@ -640,6 +685,8 @@ function jsRefs(x, jsx) {
   for (let j = 0; j < toks.length; j++) {
     while (r < types.length && types[r][1] <= j) r++;
     if (r < types.length && types[r][0] <= j) { j = types[r][1] - 1; continue; }
+    // a type argument list names types, as a type declaration does
+    if (x.angles.get(j) > j) { j = x.angles.get(j); continue; }
     const t = toks[j], prev = jsAt(toks, j - 1), next = jsAt(toks, j + 1);
     if (jsx && jsIs(t, '<') && next.t === 'id' && /^[A-Z]/.test(next.v) && jsJsxHere(prev)) {
       const after = jsAt(toks, j + 2);
@@ -656,7 +703,9 @@ function jsRefs(x, jsx) {
     }
     if (defs.has(j)) continue;
     const member = jsIs(prev, '.') || jsIs(prev, '?.');
-    const call = jsIs(next, '(') || jsIs(next, '`') || jsIs(next, '?.') && jsIs(jsAt(toks, j + 2), '(');
+    // what follows the name and its type arguments: `f<T>(` calls f as `f(` does
+    const paren = jsIs(next, '<') && x.angles.has(j + 1) ? x.angles.get(j + 1) + 1 : j + 1;
+    const call = jsIs(jsAt(toks, paren), '(') || jsIs(jsAt(toks, paren), '`') || jsIs(next, '?.') && jsIs(jsAt(toks, j + 2), '(');
     if (!call) {
       if (!member && bound.has(t.v) && jsUseAt(x, encl, j) && !shadowed(j, t.v)) refs.push({ name: t.v, line: t.line, use: true });
       continue;
@@ -665,7 +714,7 @@ function jsRefs(x, jsx) {
     const recv = member ? jsAt(toks, j - 2) : JS_NONE;
     if (member && recv.t === 'id' && JS_GLOBALS.has(recv.v) && !jsIs(jsAt(toks, j - 3), '.') && !x.modules.has(recv.v)) continue;
     // `name(args) {` in an object literal defines a method; it calls nothing
-    if (jsIs(next, '(') && jsIs(jsAt(toks, jsMatch(toks, j + 1) + 1), '{')) continue;
+    if (jsIs(jsAt(toks, paren), '(') && jsIs(jsAt(toks, jsMatch(toks, paren) + 1), '{')) continue;
     const ref = { name: t.v, line: t.line };
     const bare = !jsIs(jsAt(toks, j - 3), '.') && !jsIs(jsAt(toks, j - 3), '?.');
     // `ns.a(` on a whole imported module calls that module's a, not a method

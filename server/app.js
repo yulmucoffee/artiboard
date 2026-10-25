@@ -12,7 +12,8 @@ import { addMember, connectLines, removeMember, setProfile, titleOf } from './me
 import { defaultPage, pageHeaders, renderPage } from './page.js';
 
 const PUBLIC = fileURLToPath(new URL('./public/', import.meta.url));
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css',
+  '.svg': 'image/svg+xml', '.json': 'application/json' };
 const SECURITY = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -87,7 +88,7 @@ function sameOrigin(req) {
 }
 
 export function makeApp({ store, cfg }) {
-  const { setMap } = makeFlow(store);
+  const { mapsMeta, setMap } = makeFlow(store);
   const streams = new Map();
   const secure = cfg.boardUrl.startsWith('https:');
   const sessionCookie = (sid, maxAge) => `ab_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
@@ -252,10 +253,12 @@ export function makeApp({ store, cfg }) {
         }
         return send(res, 200, await store.overview());
       }
-      // a code map from the build script, written as the member who sent it, so the store's rules apply (a viewer cannot)
+      // a code map from the build script, written as the member who sent it, so the store's rules apply (a viewer cannot);
+      // anyone signed in reads which code each map describes, which the script asks before it builds
       const up = /^p\/([a-z0-9][a-z0-9-]{0,39})\/map$/.exec(name);
       if (up) {
-        if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, { Allow: 'POST' });
+        if (req.method === 'GET') return send(res, 200, await mapsMeta(up[1]));
+        if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, { Allow: 'GET, POST' });
         return send(res, 200, await setMap(member, up[1], (await body(req, MAX_MAP_BODY)) || {}));
       }
       const m = /^p\/([a-z0-9][a-z0-9-]{0,39})\/(read|batch|events)$/.exec(name);

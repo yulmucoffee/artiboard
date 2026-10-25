@@ -313,11 +313,17 @@ function graphInside(g, nameOrPath, opts = {}) {
     (id) => `${id} calls and uses nothing in the map`);
 }
 
+// Which code a map describes, as the parts of a line: branch@commit (just @commit off a branch) and whether the
+// checkout had changes no commit holds. A map built outside git says neither.
+export function mapSource(ix) {
+  return [ix.commit ? `${ix.branch || ''}@${String(ix.commit).slice(0, 7)}` : '', ix.dirty === true ? 'uncommitted changes' : ''].filter(Boolean);
+}
+
 function graphOverview(g, { limit = 10 } = {}) {
   const ix = g.index, c = ix.counts || {};
   const built = [ix.builtAt ? `built ${String(ix.builtAt).slice(5, 10)}` : '', ix.by ? `by ${ix.by}` : ''].filter(Boolean).join(' ');
   const lines = [[ix.repo || 'code map', `${c.files || 0} files`, `${c.symbols || 0} symbols`, `${c.edges || 0} edges`,
-    `${c.docs || 0} docs`, built].filter(Boolean).join(' · ')];
+    `${c.docs || 0} docs`, built, ...mapSource(ix)].filter(Boolean).join(' · ')];
   const langs = Object.entries(ix.langs || {}).sort((a, b) => b[1] - a[1] || graphCmp(a[0], b[0]));
   if (langs.length) lines.push(`langs: ${langs.map(([l, n]) => `${l} ${n}`).join(' · ')}`);
   const communities = ix.communities || [], god = ix.god || [];
@@ -440,13 +446,30 @@ export function communityLinks(nodes, edges) {
     .sort((x, y) => y[2] - x[2] || x[0] - y[0] || x[1] - y[1]).slice(0, GRAPH_LINKS);
 }
 
-// the file and doc ids of one community, by path; found once per community
+// the file and doc ids of one community, by path, found once; files of no community (a map with more than 40
+// communities leaves the smallest without one) are under -1
 function graphFiles(g, c) {
   if (!g.byCommunity) {
     g.byCommunity = new Map();
-    for (const id of g.ids) { const n = g.nodes.get(id); if ((n.k === 'file' || n.k === 'doc') && Number.isInteger(n.c)) graphPush(g.byCommunity, n.c, id); }
+    for (const id of g.ids) { const n = g.nodes.get(id); if (n.k === 'file' || n.k === 'doc') graphPush(g.byCommunity, Number.isInteger(n.c) ? n.c : -1, id); }
   }
   return g.byCommunity.get(c) || [];
+}
+
+// the names a search box offers as it is typed: the name itself first, then names that start with it, then names and
+// paths that hold it; the most connected first within each, and doc sections after every code name
+function graphSearch(g, q, limit = 10) {
+  const s = String(q == null ? '' : q).trim().toLowerCase();
+  if (!s) return [];
+  const tiers = [[], [], [], []];
+  for (const id of g.ids) {
+    const n = g.nodes.get(id), name = String(n.n || '').toLowerCase(), short = graphShort(n).toLowerCase(), path = id.toLowerCase();
+    const tier = name === s || short === s || path === s ? 0 : name.startsWith(s) || short.startsWith(s) ? 1
+      : name.includes(s) || (n.k !== 'sym' && path.includes(s)) ? 2 : -1;
+    if (tier >= 0) tiers[n.k === 'sec' ? 3 : tier].push(id);
+  }
+  const order = (a, b) => graphDeg(g, b) - graphDeg(g, a) || graphCmp(a, b);
+  return tiers.flatMap((t) => t.sort(order)).slice(0, limit);
 }
 
 export function loadGraph(index, chunks) {
@@ -492,6 +515,7 @@ export function loadGraph(index, chunks) {
     // what the page's graph view reads: the nodes a name may mean, one node, its edges, a file's symbols, a
     // community's files, and the communities with the links between them
     find: (q) => graphFind(g, q),
+    search: (q, limit) => graphSearch(g, q, limit),
     node: (id) => g.nodes.get(id) || null,
     edges: (id) => ({ out: g.out.get(id) || [], in: g.in.get(id) || [] }),
     degree: (id) => graphDeg(g, id),

@@ -16,6 +16,7 @@
   --p3:#6D28D9; --p3-bar:#8B5CF6; --p3-soft:#F0EAFD;
   --p4:#0F766E; --p4-bar:#14A39A; --p4-soft:#DEF3F1;
   --p5:#BE185D; --p5-bar:#E64B8B; --p5-soft:#FCE7F0;
+  --c6:#CA8A04; --c7:#64748B;
   --warn:#B45309; --warn-soft:#FDF1E1; --danger:#DC2626; --danger-soft:#FDECEC;
   --agent:#7C3AED; --agent-soft:#F1EBFE;
   --s-todo:#A1A1AA; --s-doing:#3B82F6; --s-review:#8B5CF6; --s-blocked:#EF4444; --s-done:#22A35A;
@@ -33,6 +34,7 @@
   --p3:#C4B1FA; --p3-bar:#9D7BF5; --p3-soft:#251E3C;
   --p4:#74D3CC; --p4-bar:#2DB3A9; --p4-soft:#102927;
   --p5:#F59BC0; --p5-bar:#E7639A; --p5-soft:#371826;
+  --c6:#E2B93B; --c7:#94A3B8;
   --warn:#F0B35C; --warn-soft:#30230F; --danger:#F87171; --danger-soft:#3A1B1B;
   --agent:#C4B1FA; --agent-soft:#261F3A;
   --s-todo:#63636B; --s-doing:#5B8DF6; --s-review:#9D7BF5; --s-blocked:#F87171; --s-done:#3FB872;
@@ -47,6 +49,7 @@
   --p3:#C4B1FA; --p3-bar:#9D7BF5; --p3-soft:#251E3C;
   --p4:#74D3CC; --p4-bar:#2DB3A9; --p4-soft:#102927;
   --p5:#F59BC0; --p5-bar:#E7639A; --p5-soft:#371826;
+  --c6:#E2B93B; --c7:#94A3B8;
   --warn:#F0B35C; --warn-soft:#30230F; --danger:#F87171; --danger-soft:#3A1B1B;
   --agent:#C4B1FA; --agent-soft:#261F3A;
   --s-todo:#63636B; --s-doing:#5B8DF6; --s-review:#9D7BF5; --s-blocked:#F87171; --s-done:#3FB872;
@@ -425,9 +428,82 @@ td.what .overlap{margin-left:8px}
 .overlaps button{background:none;border:0;padding:0;text-align:left;color:var(--warn);font-size:13px;overflow-wrap:anywhere}
 .overlaps button:hover{text-decoration:underline;text-underline-offset:3px}
 .code .form-row input{flex:1 1 200px}
-.rule .mapsearch{width:100%;margin-top:4px}
 .maplines{font-family:var(--f-mono);font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text2)}
 .maplines:empty{display:none}
+.maplines button{display:block;width:100%;text-align:left;background:none;border:0;padding:0;font:inherit;color:var(--accent);white-space:pre-wrap;overflow-wrap:anywhere}
+.maplines button:hover{text-decoration:underline;text-underline-offset:3px}
+/* code map: the picture */
+.cmaps{display:grid;gap:14px}
+.cmap{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.cmap-head{display:flex;flex-direction:column;gap:3px}
+.cmap-head h3{display:flex;gap:10px;align-items:baseline;overflow-wrap:anywhere}
+.cmap-head .num{font-family:var(--f-mono);font-weight:500;color:var(--muted)}
+.cmap-head p{font-size:13px;color:var(--text2);display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.cmap-dirty{display:inline-block;padding:0 7px;border-radius:99px;background:var(--warn-soft);color:var(--warn);font-size:11.5px;font-weight:600}
+.cmap-cmd{display:block;font-family:var(--f-mono);font-size:12px;background:var(--sunk);border-radius:6px;padding:6px 10px;overflow-wrap:anywhere;user-select:all;color:var(--text2)}
+.cmap-none{display:flex;flex-direction:column;gap:8px}
+.cmap-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.cmap-tools .mapsearch{flex:1 1 220px}
+.cmap-found{display:grid;gap:1px}
+.cmap-found:empty{display:none}
+.cmap-hit{background:none;border:0;padding:4px 6px;text-align:left;border-radius:6px;font-size:13px;display:flex;gap:8px;align-items:baseline;min-width:0;color:var(--ink)}
+.cmap-hit:hover{background:var(--sunk)}
+.cmap-hit span{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumb{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;font-size:12.5px;color:var(--muted);min-height:26px}
+.crumb button{background:none;border:0;padding:2px 5px;color:var(--accent);font-size:12.5px;border-radius:4px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumb button:hover{background:var(--sunk)}
+.crumb b{color:var(--ink);font-weight:600;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumb .zoom{margin-left:auto;display:inline-flex;gap:3px}
+.crumb .zoom button{color:var(--text2);min-width:26px;min-height:24px;text-align:center;border:1px solid var(--line);padding:0 6px;font-size:13px;line-height:1}
+.cmap-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.cmap-pane{display:flex;flex-direction:column;gap:8px;min-width:0}
+.cmap-svg{position:relative;border:1px solid var(--line-soft);border-radius:8px;background:var(--bg);overflow:hidden;min-height:120px}
+.cmap-svg .empty{padding:14px}
+.cmap-pic{display:block;width:100%;height:440px;touch-action:pan-y;cursor:grab;user-select:none;-webkit-user-select:none}
+.cmap-pic:active{cursor:grabbing}
+.cmap-pic:focus-visible{outline-offset:-2px}
+.cmap-pic .e{fill:none;stroke:var(--edge);stroke-linecap:round;transition:opacity .12s}
+.cmap-pic .e.calls{stroke-dasharray:4 3}
+.cmap-pic .e.uses,.cmap-pic .e.mentions{stroke-dasharray:1.5 3}
+.cmap-pic .e.mentions{opacity:.55}
+.cmap-pic .e.defines,.cmap-pic .e.contains{stroke:var(--line-soft)}
+.cmap-pic .e.extends{stroke:var(--text2)}
+.cmap-pic .e.hi{stroke:var(--ink)}
+.cmap-pic.focus .e:not(.hi){opacity:.15}
+.cmap-pic.focus .cnode:not(.hi){opacity:.3}
+.cmap-pic marker path{fill:var(--edge)}
+.cmap-pic marker.hi path{fill:var(--ink)}
+.cnode{cursor:pointer;transition:opacity .12s;outline:none}
+.cnode .shape{fill:var(--ck,var(--edge));stroke:var(--surface);stroke-width:1.5}
+.cnode.k-group .shape{fill-opacity:.88}
+.cnode.port .shape{fill:var(--surface);stroke:var(--ck,var(--edge));stroke-width:2;stroke-dasharray:3 2}
+.cnode.k-sym .shape{fill-opacity:.85}
+.cnode.k-doc .shape{fill:var(--surface);stroke:var(--ck,var(--muted));stroke-width:1.75}
+.cnode.faded{opacity:.45}
+.cnode.sel .shape{stroke:var(--ink);stroke-width:2.5}
+.cnode:focus-visible .shape{stroke:var(--accent);stroke-width:2.5}
+.cnode .lbl{font-size:11px;fill:var(--text2);paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.cnode.k-group .lbl{font-size:12px;font-weight:600;fill:var(--ink)}
+.cnode.port .lbl{font-weight:500;fill:var(--muted)}
+.cnode.center .lbl,.cnode.sel .lbl{font-weight:600;fill:var(--ink)}
+.cnode .ring{fill:none;stroke:var(--pb,var(--warn));stroke-width:2}
+.cnode .badge{font-size:9.5px;font-weight:700;fill:var(--pc,var(--warn));paint-order:stroke;stroke:var(--bg);stroke-width:3px;pointer-events:none}
+.ck0{--ck:var(--p0-bar)} .ck1{--ck:var(--p1-bar)} .ck2{--ck:var(--p2-bar)} .ck3{--ck:var(--p3-bar)} .ck4{--ck:var(--p4-bar)} .ck5{--ck:var(--p5-bar)} .ck6{--ck:var(--c6)} .ck7{--ck:var(--c7)}
+.cmap-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);align-items:center}
+.cmap-legend span{display:inline-flex;align-items:center;gap:5px}
+.cmap-legend svg .shape{fill:var(--muted)} .cmap-legend svg .shape.doc{fill:none;stroke:var(--muted);stroke-width:1.5}
+.cmap-legend svg .e{stroke:var(--muted);stroke-width:1.5} .cmap-legend svg .e.calls{stroke-dasharray:4 3} .cmap-legend svg .e.uses{stroke-dasharray:1.5 3} .cmap-legend svg .e.defines{stroke:var(--edge)}
+.cmap-legend .cmap-hint{flex-basis:100%;color:var(--muted)}
+.cmap-detail{display:flex;flex-direction:column;gap:8px;min-width:0;font-size:13px}
+.cmap-detail .cmap-title{font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.cmap-detail .muted{font-size:12.5px;overflow-wrap:anywhere}
+.cmap-detail .btn{align-self:flex-start}
+.cmap-tasks{display:flex;flex-wrap:wrap;gap:6px}
+.cmap-task{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-height:24px;padding:0 8px;border:1px solid var(--line);border-left:3px solid var(--pb,var(--edge));border-radius:6px;background:var(--surface);font-size:12px;color:var(--text2);overflow:hidden}
+.cmap-task b{font-family:var(--f-mono);font-weight:600;color:var(--ink)}
+.cmap-task span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:899px){.cmap-body{grid-template-columns:1fr}}
+@media (max-width:560px){.cmap-pic{height:320px}.cmap{padding:12px 14px}}
 
 @media (max-width:560px){
   body{font-size:14px;padding-block:20px 56px}
@@ -437,7 +513,7 @@ td.what .overlap{margin-left:8px}
   .feed li,.activity li{grid-template-columns:1fr}
   .feed .at{flex-direction:row;flex-wrap:wrap;align-items:center}
 }
-@media (prefers-reduced-motion:reduce){.node,.graph path.e{transition:none}.agent-mark.live::before{animation:none}}
+@media (prefers-reduced-motion:reduce){.node,.graph path.e,.cnode,.cmap-pic .e{transition:none}.agent-mark.live::before{animation:none}}
 </style>
 
 <div class="page">
@@ -683,10 +759,40 @@ td.what .overlap{margin-left:8px}
       codemapNone: 'No code map yet.',
       codemapCounts: '{f} files · {s} symbols · {e} edges · {d} docs',
       codemapBuilt: 'built {t} by {p}',
-      codemapCommunity: '{name} · {n} files · {top}',
-      codemapGod: 'Most connected: {list}',
+      codemapGod: 'Most connected',
       codemapSearch: 'Find a name: a file, a function, a class',
       codemapFail: 'Could not load the map ({e})',
+      codemapHow: 'Build one from a checkout of the repository:',
+      codemapDirty: 'uncommitted changes',
+      codemapRebuild: 'Rebuild',
+      codemapSearchNone: 'Nothing named {q}',
+      codemapGroups: 'All groups',
+      codemapOther: 'other files',
+      codemapEmpty: 'Nothing to draw here.',
+      codemapZoomIn: 'Zoom in',
+      codemapZoomOut: 'Zoom out',
+      codemapFit: 'Fit',
+      codemapPicture: 'Code map: {n} nodes, {e} links',
+      codemapKindGroup: 'group',
+      codemapKindFile: 'file',
+      codemapKindFn: 'function',
+      codemapKindType: 'class or type',
+      codemapKindDoc: 'doc',
+      codemapEdgeLinks: 'links',
+      codemapEdgeImports: 'imports',
+      codemapEdgeCalls: 'calls',
+      codemapEdgeExtends: 'extends',
+      codemapEdgeUses: 'uses or mentions',
+      codemapEdgeDefines: 'defines',
+      codemapHidden: '{n} more not shown',
+      codemapHint:
+        'Click a node to read about it, again to open it. Esc goes up. Drag to pan; ⌘ or Ctrl + wheel zooms.',
+      codemapOverview: 'Groups of files that belong together',
+      codemapOverviewHint:
+        'Thicker links mean more imports and calls between two groups. Open a group to see its files, a file to see its symbols.',
+      codemapOpen: 'Open',
+      codemapFiles: '{n} files',
+      codemapTasks: 'Open tasks touching this',
       touches: 'Code',
       f_touches: 'Touches',
       touchesNone: 'No code named yet. Agents name the files they change here, and so can you.',
@@ -971,10 +1077,40 @@ td.what .overlap{margin-left:8px}
       codemapNone: '아직 코드 지도가 없어요.',
       codemapCounts: '파일 {f} · 심볼 {s} · 연결 {e} · 문서 {d}',
       codemapBuilt: '{t}에 {p}(이)가 만듦',
-      codemapCommunity: '{name} · 파일 {n}개 · {top}',
-      codemapGod: '가장 많이 이어진 것: {list}',
+      codemapGod: '가장 많이 이어진 것',
       codemapSearch: '이름 찾기: 파일, 함수, 클래스',
       codemapFail: '코드 지도를 불러오지 못했어요 ({e})',
+      codemapHow: '저장소 체크아웃에서 만들어요:',
+      codemapDirty: '커밋 안 된 변경 포함',
+      codemapRebuild: '다시 만들기',
+      codemapSearchNone: '{q}라는 이름이 없어요',
+      codemapGroups: '전체 묶음',
+      codemapOther: '그 밖의 파일',
+      codemapEmpty: '그릴 것이 없어요.',
+      codemapZoomIn: '확대',
+      codemapZoomOut: '축소',
+      codemapFit: '맞춤',
+      codemapPicture: '코드 지도: 노드 {n}개, 연결 {e}개',
+      codemapKindGroup: '묶음',
+      codemapKindFile: '파일',
+      codemapKindFn: '함수',
+      codemapKindType: '클래스·타입',
+      codemapKindDoc: '문서',
+      codemapEdgeLinks: '연결',
+      codemapEdgeImports: 'import',
+      codemapEdgeCalls: '호출',
+      codemapEdgeExtends: '상속',
+      codemapEdgeUses: '사용·언급',
+      codemapEdgeDefines: '정의',
+      codemapHidden: '{n}개는 그리지 않음',
+      codemapHint:
+        '노드를 누르면 설명이, 한 번 더 누르면 안이 열려요. Esc로 위로. 끌어서 이동, ⌘ 또는 Ctrl + 휠로 확대·축소.',
+      codemapOverview: '함께 움직이는 파일 묶음',
+      codemapOverviewHint:
+        '선이 굵을수록 두 묶음 사이에 import와 호출이 많아요. 묶음을 열면 파일이, 파일을 열면 심볼이 보여요.',
+      codemapOpen: '열기',
+      codemapFiles: '파일 {n}개',
+      codemapTasks: '여기를 건드리는 열린 태스크',
       touches: '코드',
       f_touches: '건드리는 코드',
       touchesNone: '아직 적힌 코드가 없어요. 에이전트는 바꾸는 파일을 여기에 적고, 사람도 적을 수 있어요.',
@@ -1537,11 +1673,17 @@ td.what .overlap{margin-left:8px}
       (id) => `${id} calls and uses nothing in the map`);
   }
 
+  // Which code a map describes, as the parts of a line: branch@commit (just @commit off a branch) and whether the
+  // checkout had changes no commit holds. A map built outside git says neither.
+  function mapSource(ix) {
+    return [ix.commit ? `${ix.branch || ''}@${String(ix.commit).slice(0, 7)}` : '', ix.dirty === true ? 'uncommitted changes' : ''].filter(Boolean);
+  }
+
   function graphOverview(g, { limit = 10 } = {}) {
     const ix = g.index, c = ix.counts || {};
     const built = [ix.builtAt ? `built ${String(ix.builtAt).slice(5, 10)}` : '', ix.by ? `by ${ix.by}` : ''].filter(Boolean).join(' ');
     const lines = [[ix.repo || 'code map', `${c.files || 0} files`, `${c.symbols || 0} symbols`, `${c.edges || 0} edges`,
-      `${c.docs || 0} docs`, built].filter(Boolean).join(' · ')];
+      `${c.docs || 0} docs`, built, ...mapSource(ix)].filter(Boolean).join(' · ')];
     const langs = Object.entries(ix.langs || {}).sort((a, b) => b[1] - a[1] || graphCmp(a[0], b[0]));
     if (langs.length) lines.push(`langs: ${langs.map(([l, n]) => `${l} ${n}`).join(' · ')}`);
     const communities = ix.communities || [], god = ix.god || [];
@@ -1664,13 +1806,30 @@ td.what .overlap{margin-left:8px}
       .sort((x, y) => y[2] - x[2] || x[0] - y[0] || x[1] - y[1]).slice(0, GRAPH_LINKS);
   }
 
-  // the file and doc ids of one community, by path; found once per community
+  // the file and doc ids of one community, by path, found once; files of no community (a map with more than 40
+  // communities leaves the smallest without one) are under -1
   function graphFiles(g, c) {
     if (!g.byCommunity) {
       g.byCommunity = new Map();
-      for (const id of g.ids) { const n = g.nodes.get(id); if ((n.k === 'file' || n.k === 'doc') && Number.isInteger(n.c)) graphPush(g.byCommunity, n.c, id); }
+      for (const id of g.ids) { const n = g.nodes.get(id); if (n.k === 'file' || n.k === 'doc') graphPush(g.byCommunity, Number.isInteger(n.c) ? n.c : -1, id); }
     }
     return g.byCommunity.get(c) || [];
+  }
+
+  // the names a search box offers as it is typed: the name itself first, then names that start with it, then names and
+  // paths that hold it; the most connected first within each, and doc sections after every code name
+  function graphSearch(g, q, limit = 10) {
+    const s = String(q == null ? '' : q).trim().toLowerCase();
+    if (!s) return [];
+    const tiers = [[], [], [], []];
+    for (const id of g.ids) {
+      const n = g.nodes.get(id), name = String(n.n || '').toLowerCase(), short = graphShort(n).toLowerCase(), path = id.toLowerCase();
+      const tier = name === s || short === s || path === s ? 0 : name.startsWith(s) || short.startsWith(s) ? 1
+        : name.includes(s) || (n.k !== 'sym' && path.includes(s)) ? 2 : -1;
+      if (tier >= 0) tiers[n.k === 'sec' ? 3 : tier].push(id);
+    }
+    const order = (a, b) => graphDeg(g, b) - graphDeg(g, a) || graphCmp(a, b);
+    return tiers.flatMap((t) => t.sort(order)).slice(0, limit);
   }
 
   function loadGraph(index, chunks) {
@@ -1716,6 +1875,7 @@ td.what .overlap{margin-left:8px}
       // what the page's graph view reads: the nodes a name may mean, one node, its edges, a file's symbols, a
       // community's files, and the communities with the links between them
       find: (q) => graphFind(g, q),
+      search: (q, limit) => graphSearch(g, q, limit),
       node: (id) => g.nodes.get(id) || null,
       edges: (id) => ({ out: g.out.get(id) || [], in: g.in.get(id) || [] }),
       degree: (id) => graphDeg(g, id),
@@ -3855,8 +4015,7 @@ td.what .overlap{margin-left:8px}
   // read the first time someone searches it.
   var maps = null,
     mapsWatched = false,
-    mapCards = {},
-    GROUPS_SHOWN = 8;
+    mapCards = {};
   function watchMaps() {
     // the flag goes up first: a snapshot may arrive before onSnapshot returns
     if (!db || mapsWatched) return;
@@ -3906,133 +4065,1326 @@ td.what .overlap{margin-left:8px}
       return;
     }
     watchMaps();
-    // a search being typed keeps its box; its results redraw on their own
-    if (typing && typing.classList && typing.classList.contains('mapsearch') && body.contains(typing)) return;
+    // a search being typed keeps its box; the picture under it is painted again in place
+    if (typing && typing.classList && typing.classList.contains('mapsearch') && body.contains(typing)) {
+      (maps || []).forEach(function (map) {
+        if (mapCards[map.key] && mapCards[map.key].box) paintMap(map, mapCards[map.key]);
+      });
+      return;
+    }
     body.textContent = '';
     if (!maps) body.appendChild(el('p', { class: 'empty', text: failed || T('loading') }));
-    else if (!maps.length) body.appendChild(el('p', { class: 'empty', text: T('codemapNone') }));
-    else body.appendChild(el('div', { class: 'rules' }, maps.map(mapCard)));
+    else if (!maps.length) body.appendChild(noMapYet());
+    else body.appendChild(el('div', { class: 'cmaps' }, maps.map(mapCard)));
   }
-  // one repository's map: how big, when and by whom it was built, its groups of files, the most connected names,
-  // and a search that explains a name
+  // the command that builds a map of this project on this site; nothing on a board that is not a site
+  function buildCommand(repo) {
+    var m = /^\/p\/([^/]+)/.exec(location.pathname);
+    return m
+      ? 'node ~/.claude/skills/artiboard/scripts/codemap.mjs --site ' +
+          location.origin +
+          ' --project ' +
+          m[1] +
+          ' --repo ' +
+          repo +
+          ' --if-changed'
+      : '';
+  }
+  function noMapYet() {
+    var rs = repoList(),
+      cmd = buildCommand(rs.length === 1 ? rs[0].repo : 'owner/name');
+    return el('div', { class: 'cmap-none' }, [
+      el('p', { class: 'empty', text: T('codemapNone') }),
+      cmd ? el('p', { class: 'empty', text: T('codemapHow') }) : null,
+      cmd ? el('code', { class: 'cmap-cmd', text: cmd }) : null
+    ]);
+  }
+
+  // ---------- code map view ----------
+  // The map as a picture: nodes and the links between them, one level at a time. The groups come from the index
+  // alone; opening a group, a file or a symbol reads the map's chunks once. The same graph module answers here and in
+  // board_map, so what a person sees is what an agent is told.
+  var CMAP = { MAX_NODES: 150, FILE_SYMS: 48, PORTS: 10, HOP2: 30, HUB: 25, STEPS: 240, PAD: 26, SIDE: 316 };
+  // which kind of edge a file-to-file line takes when several join the same two files
+  var CMAP_RANK = { imports: 5, extends: 4, calls: 3, uses: 2, mentions: 1, defines: 0, contains: 0, links: 0 };
+  var CMAP_ARROWS = { imports: 1, calls: 1, extends: 1, uses: 1 };
+  var CMAP_TYPES = { class: 1, type: 1, interface: 1, struct: 1, enum: 1, trait: 1, table: 1, protocol: 1, record: 1 };
+
+  // one repository's map: who built it from which commit, a search, the picture with its crumbs, and what is selected
   function mapCard(map) {
     var index = map.index,
-      counts = index.counts && typeof index.counts === 'object' ? index.counts : {},
-      groups = mapList(index.communities).filter(function (group) {
-        return group && typeof group === 'object';
-      }),
-      god = mapList(index.god).filter(mapText);
-    var card = (mapCards[map.key] = mapCards[map.key] || {
-      query: '',
-      graph: null,
-      builtAt: null,
-      loading: false,
-      error: '',
-      results: null,
-      allGroups: false
-    });
-    var input = el('input', {
+      card = (mapCards[map.key] = mapCards[map.key] || {
+        query: '',
+        graph: null,
+        builtAt: null,
+        loading: false,
+        error: '',
+        trail: [{ kind: 'groups' }],
+        selected: null,
+        view: null,
+        layout: null,
+        scene: null,
+        showCmd: false
+      });
+    // a rebuilt map is read again when something needs it; the picture starts over at the groups
+    if (card.graph && card.builtAt !== index.builtAt) {
+      card.graph = null;
+      card.layout = null;
+      card.trail = [{ kind: 'groups' }];
+      card.selected = null;
+    }
+    card.input = el('input', {
       type: 'text',
       class: 'mapsearch',
       spellcheck: 'false',
       placeholder: T('codemapSearch'),
       'aria-label': T('codemapSearch')
     });
-    input.value = card.query;
-    input.addEventListener('input', function () {
-      card.query = input.value.trim();
+    card.input.value = card.query;
+    card.input.addEventListener('input', function () {
+      card.query = card.input.value.trim();
       searchMap(map, card);
     });
-    card.results = el('div', { class: 'maplines' });
-    showMapLines(card);
-    var built = [
-      T('codemapCounts', {
-        f: mapCount(counts.files),
-        s: mapCount(counts.symbols),
-        e: mapCount(counts.edges),
-        d: mapCount(counts.docs)
-      }),
-      mapText(index.builtAt) ? T('codemapBuilt', { t: stamp(index.builtAt), p: personName(mapText(index.by)) }) : '',
-      mapText(index.commit).slice(0, 7)
-    ];
-    return el('div', { class: 'rule' }, [
+    card.input.addEventListener('keydown', function (e) {
+      var first = card.results.querySelector('.cmap-hit');
+      if (e.key === 'Enter' && first) {
+        e.preventDefault();
+        first.click();
+      } else if (e.key === 'Escape' && card.query) {
+        e.stopPropagation();
+        card.input.value = '';
+        card.query = '';
+        showFound(map, card);
+      }
+    });
+    card.results = el('div', { class: 'cmap-found' });
+    card.crumb = el('div', { class: 'crumb' });
+    card.svgWrap = el('div', { class: 'cmap-svg' });
+    card.legend = el('div', { class: 'cmap-legend' });
+    card.detail = el('div', { class: 'cmap-detail', 'aria-live': 'polite' });
+    card.box = el('div', { class: 'cmap' }, [
+      mapHead(map, card),
+      el('div', { class: 'cmap-tools' }, [card.input]),
+      card.results,
+      card.crumb,
+      el('div', { class: 'cmap-body' }, [el('div', { class: 'cmap-pane' }, [card.svgWrap, card.legend]), card.detail])
+    ]);
+    // the chunks are read when the picture needs them: an older map without links, or open work to place on it
+    if (!card.graph && !card.loading && db && (!Array.isArray(index.links) || openTouched().length)) loadMap(map, card);
+    showFound(map, card);
+    paintMap(map, card);
+    return card.box;
+  }
+  function mapHead(map, card) {
+    var index = map.index,
+      counts = index.counts && typeof index.counts === 'object' ? index.counts : {},
+      sha = mapText(index.commit).slice(0, 7),
+      at = sha ? mapText(index.branch) + '@' + sha : '',
+      built = [
+        mapText(index.builtAt) ? T('codemapBuilt', { t: ago(index.builtAt), p: personName(mapText(index.by)) }) : '',
+        at
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      cmd = buildCommand(mapText(index.repo) || map.key);
+    return el('div', { class: 'cmap-head' }, [
       el('h3', {}, [
         mapText(index.label) ? el('span', { class: 'num', text: index.label }) : null,
         mapText(index.repo) || map.key
       ]),
-      el('p', { text: built.filter(Boolean).join(' · ') }),
-      groups.length
-        ? el(
-            'ul',
-            {},
-            (card.allGroups ? groups : groups.slice(0, GROUPS_SHOWN)).map(function (group) {
-              var top = mapList(group.top)
-                .filter(mapText)
-                .slice(0, 3)
-                .map(function (id) {
-                  return id.split('/').pop();
-                });
-              return el('li', {
-                text: T('codemapCommunity', { name: mapText(group.name), n: mapCount(group.n), top: top.join(', ') })
-              });
+      el('p', {
+        text: T('codemapCounts', {
+          f: mapCount(counts.files),
+          s: mapCount(counts.symbols),
+          e: mapCount(counts.edges),
+          d: mapCount(counts.docs)
+        })
+      }),
+      el('p', { class: 'cmap-built', title: mapText(index.commit) }, [
+        built,
+        index.dirty === true ? el('span', { class: 'cmap-dirty', text: T('codemapDirty') }) : null,
+        cmd
+          ? el('button', {
+              type: 'button',
+              class: 'linkbtn',
+              text: T('codemapRebuild'),
+              onclick: function () {
+                card.showCmd = !card.showCmd;
+                renderCodemap();
+              }
             })
-          )
-        : null,
-      groups.length > GROUPS_SHOWN
-        ? moreBtn(card.allGroups, groups.length - GROUPS_SHOWN, function () {
-            card.allGroups = !card.allGroups;
-            renderCodemap();
-          })
-        : null,
-      god.length ? el('p', { text: T('codemapGod', { list: god.join(' · ') }) }) : null,
-      input,
-      card.results
+          : null
+      ]),
+      card.showCmd && cmd ? el('code', { class: 'cmap-cmd', text: cmd }) : null
     ]);
   }
-  // the first search of a map reads its chunks in one read; the graph stays while the map is the same build
-  function searchMap(map, card) {
+  // the map's chunks in one read; the graph stays while the map is the same build
+  function loadMap(map, card) {
     var index = map.index;
-    if (card.query && !card.loading && (!card.graph || card.builtAt !== index.builtAt)) {
-      card.loading = true;
-      card.error = '';
-      db.collection('map/' + map.key + '/chunks')
-        .get()
-        .then(function (snapshot) {
-          var chunks = snapshot.docs
-            .filter(function (doc) {
-              return +doc.id < index.chunks;
-            })
-            .sort(function (a, b) {
-              return a.id - b.id;
-            })
-            .map(function (doc) {
-              return doc.data();
-            });
-          card.graph = loadGraph(index, chunks);
-          card.builtAt = index.builtAt;
-        })
-        .catch(function (e) {
-          card.error = T('codemapFail', { e: errText(e) });
-        })
-        .then(function () {
-          card.loading = false;
-          findOverlaps();
-          renderAll();
-          showMapLines(card);
-        });
-    }
-    showMapLines(card);
+    card.loading = true;
+    card.error = '';
+    db.collection('map/' + map.key + '/chunks')
+      .get()
+      .then(function (snapshot) {
+        var chunks = snapshot.docs
+          .filter(function (doc) {
+            return +doc.id < index.chunks;
+          })
+          .sort(function (a, b) {
+            return a.id - b.id;
+          })
+          .map(function (doc) {
+            return doc.data();
+          });
+        card.graph = loadGraph(index, chunks);
+        card.builtAt = index.builtAt;
+        card.layout = null;
+      })
+      .catch(function (e) {
+        card.error = T('codemapFail', { e: errText(e) });
+      })
+      .then(function () {
+        card.loading = false;
+        findOverlaps();
+        renderAll();
+        if (card.box) showFound(map, card);
+      });
   }
-  function showMapLines(card) {
+  function searchMap(map, card) {
+    if (card.query && !card.graph && !card.loading && db) loadMap(map, card);
+    showFound(map, card);
+  }
+  // the names a search matches, each a button that takes the picture there
+  function showFound(map, card) {
     var out = card.results;
     out.textContent = '';
     if (!card.query) return;
-    // asked as board_map asks it, so the page and the tools answer alike
-    var lines = card.error ? [card.error] : card.graph ? card.graph.explain(card.query, {}).lines : [T('loading')];
-    lines.forEach(function (line) {
-      out.appendChild(el('div', { text: line }));
+    if (card.error) {
+      out.appendChild(el('div', { class: 'empty', text: card.error }));
+      return;
+    }
+    if (!card.graph) {
+      out.appendChild(el('div', { class: 'empty', text: T('loading') }));
+      return;
+    }
+    var ids = card.graph.search(card.query, 10);
+    if (!ids.length) {
+      out.appendChild(el('div', { class: 'empty', text: T('codemapSearchNone', { q: card.query }) }));
+      return;
+    }
+    ids.forEach(function (id) {
+      var n = card.graph.node(id);
+      out.appendChild(
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'cmap-hit',
+            onclick: function () {
+              card.input.value = '';
+              card.query = '';
+              out.textContent = '';
+              goTo(map, card, id);
+            }
+          },
+          [el('b', { text: n.n }), el('span', { text: nodeKind(n) + ' · ' + nodeWhere(n) })]
+        )
+      );
     });
   }
+  function nodeKind(n) {
+    return n.k === 'sym' || n.k === 'sec' ? n.t || n.k : n.k;
+  }
+  function nodeWhere(n) {
+    return n.l ? n.f + ':' + n.l : n.f || '';
+  }
+  // the open tasks that name code, placed on the picture
+  function openTouched() {
+    return tasks.filter(function (t) {
+      return !!holderOf(t) && knownStatus(t) !== 'done' && touchesOf(t).length > 0;
+    });
+  }
+
+  // ---- levels: where the picture is, as a trail from the groups down to one symbol ----
+  function levelOf(card) {
+    return card.trail[card.trail.length - 1];
+  }
+  function levelKey(level) {
+    return level.kind + ':' + (level.kind === 'group' ? level.c : level.id || '');
+  }
+  function levelCenter(level) {
+    return level.kind === 'group' ? 'c:' + level.c : level.kind === 'groups' ? null : level.id;
+  }
+  function communityOf(index, c) {
+    var found = mapList(index.communities).filter(function (g) {
+      return g && typeof g === 'object' && g.c === c;
+    })[0];
+    return found || (c === -1 ? { c: -1, name: T('codemapOther'), n: 0, top: [] } : null);
+  }
+  function levelLabel(map, card, level) {
+    if (level.kind === 'groups') return T('codemapGroups');
+    if (level.kind === 'group') return mapText((communityOf(map.index, level.c) || {}).name) || String(level.c);
+    var n = card.graph && card.graph.node(level.id);
+    return n ? n.n : level.id;
+  }
+  // the trail to a node: its group, its file, then itself when it is a symbol
+  function goTo(map, card, id) {
+    var trail = [{ kind: 'groups' }];
+    if (id.slice(0, 2) === 'c:') trail.push({ kind: 'group', c: +id.slice(2) });
+    else {
+      var n = card.graph && card.graph.node(id);
+      if (!n) return;
+      trail.push({ kind: 'group', c: typeof n.c === 'number' ? n.c : -1 });
+      if (n.k === 'file' || n.k === 'doc') trail.push({ kind: 'file', id: id });
+      else {
+        if (n.f && card.graph.node(n.f)) trail.push({ kind: 'file', id: n.f });
+        trail.push({ kind: 'sym', id: id });
+      }
+    }
+    card.trail = trail;
+    card.selected = null;
+    card.view = null;
+    paintMap(map, card);
+  }
+  function drill(map, card, id) {
+    var level = levelOf(card);
+    if (levelCenter(level) === id) return;
+    if (id.slice(0, 2) === 'c:') {
+      card.trail = [{ kind: 'groups' }, { kind: 'group', c: +id.slice(2) }];
+    } else {
+      var n = card.graph && card.graph.node(id);
+      if (!n) return;
+      card.trail.push(n.k === 'file' || n.k === 'doc' ? { kind: 'file', id: id } : { kind: 'sym', id: id });
+    }
+    card.selected = null;
+    card.view = null;
+    paintMap(map, card);
+  }
+  function goUp(map, card, depth) {
+    if (card.trail.length <= 1) return;
+    card.trail = card.trail.slice(0, depth);
+    card.selected = null;
+    card.view = null;
+    paintMap(map, card);
+  }
+
+  // ---- scenes: the nodes and edges one level shows ----
+  function sceneNode(id, label, kind, c, size) {
+    return { id: id, label: label, kind: kind, c: c, size: size, tasks: [], center: false, faded: false };
+  }
+  // edges joined by their ends and kind, the strongest kind kept, with how many they stand for
+  function edgeBag() {
+    var bag = {};
+    return {
+      add: function (a, b, type) {
+        if (a === b) return;
+        var key = a + '\n' + b,
+          had = bag[key];
+        if (!had) bag[key] = { a: a, b: b, type: type, w: 1 };
+        else {
+          had.w++;
+          if (CMAP_RANK[type] > CMAP_RANK[had.type]) had.type = type;
+        }
+      },
+      list: function () {
+        return Object.keys(bag).map(function (k) {
+          return bag[k];
+        });
+      }
+    };
+  }
+  // the communities, sized by their files, joined by how many code edges cross between them
+  function sceneGroups(index, graph) {
+    var groups = graph ? graph.groups() : { communities: mapList(index.communities), links: mapList(index.links) },
+      list = groups.communities.filter(function (g) {
+        return g && typeof g === 'object' && typeof g.c === 'number' && typeof g.name === 'string';
+      }),
+      most = 1,
+      ids = {};
+    list.forEach(function (g) {
+      most = Math.max(most, mapCount(g.n));
+    });
+    var nodes = list.map(function (g) {
+      ids['c:' + g.c] = 1;
+      return sceneNode('c:' + g.c, g.name, 'group', g.c, mapCount(g.n) / most);
+    });
+    var loose = graph ? graph.files(-1).length : 0;
+    if (loose) {
+      ids['c:-1'] = 1;
+      nodes.push(sceneNode('c:-1', T('codemapOther'), 'group', -1, loose / most));
+    }
+    var edges = groups.links
+      .filter(function (l) {
+        return Array.isArray(l) && ids['c:' + l[0]] && ids['c:' + l[1]] && l[0] !== l[1] && mapCount(l[2]) > 0;
+      })
+      .map(function (l) {
+        return { a: 'c:' + l[0], b: 'c:' + l[1], type: 'links', w: l[2] };
+      });
+    return { nodes: nodes, edges: edges, hidden: 0 };
+  }
+  // a file's weight on the picture: how connected it and its symbols are
+  function groupKey(n) {
+    return 'c:' + (n && typeof n.c === 'number' ? n.c : -1);
+  }
+  function fileWeight(graph, f) {
+    var w = graph.degree(f);
+    graph.inFile(f).forEach(function (id) {
+      w += graph.degree(id);
+    });
+    return w;
+  }
+  function heaviest(graph, files, max) {
+    var weighed = files.map(function (f) {
+      return { id: f, w: fileWeight(graph, f) };
+    });
+    weighed.sort(function (x, y) {
+      return y.w - x.w || (x.id < y.id ? -1 : 1);
+    });
+    return weighed.slice(0, max);
+  }
+  function fileNode(graph, f, w, most) {
+    var n = graph.node(f);
+    return sceneNode(f, n.n, n.k === 'doc' ? 'doc' : 'file', typeof n.c === 'number' ? n.c : -1, w / most);
+  }
+  // one group's files, joined file to file, with the other groups they reach as ports around them
+  function sceneGroup(graph, index, c) {
+    var files = graph.files(c),
+      kept = heaviest(graph, files, CMAP.MAX_NODES - CMAP.PORTS),
+      inside = {},
+      most = Math.max(1, kept.length ? kept[0].w : 1),
+      bag = edgeBag(),
+      ports = {};
+    kept.forEach(function (k) {
+      inside[k.id] = 1;
+    });
+    var nodes = kept.map(function (k) {
+      return fileNode(graph, k.id, k.w, most);
+    });
+    kept.forEach(function (k) {
+      [k.id].concat(graph.inFile(k.id)).forEach(function (id) {
+        var es = graph.edges(id);
+        es.out.forEach(function (e) {
+          var to = graph.node(e.to),
+            tf = (to && to.f) || e.to;
+          if (tf === k.id || e.type === 'defines' || e.type === 'contains') return;
+          if (inside[tf]) bag.add(k.id, tf, e.type);
+          else if (to && to.c !== c) ports[groupKey(to)] = (ports[groupKey(to)] || 0) + 1;
+        });
+        es.in.forEach(function (e) {
+          var from = graph.node(e.from),
+            ff = (from && from.f) || e.from;
+          if (ff === k.id || inside[ff] || e.type === 'defines' || e.type === 'contains') return;
+          if (from && from.c !== c) ports[groupKey(from)] = (ports[groupKey(from)] || 0) + 1;
+        });
+      });
+    });
+    var edges = bag.list();
+    Object.keys(ports)
+      .sort(function (x, y) {
+        return ports[y] - ports[x] || (x < y ? -1 : 1);
+      })
+      .slice(0, CMAP.PORTS)
+      .forEach(function (pid) {
+        var g = communityOf(index, +pid.slice(2));
+        if (!g) return;
+        var port = sceneNode(pid, mapText(g.name), 'group', g.c, 0.15);
+        port.port = true;
+        nodes.push(port);
+        // one line from the group's busiest file toward each port says where the links go
+        kept.forEach(function (k) {
+          var links = 0;
+          [k.id].concat(graph.inFile(k.id)).forEach(function (id) {
+            var es = graph.edges(id);
+            es.out.forEach(function (e) {
+              var to = graph.node(e.to);
+              if (to && groupKey(to) === pid && !inside[to.f || e.to]) links++;
+            });
+            es.in.forEach(function (e) {
+              var from = graph.node(e.from);
+              if (from && groupKey(from) === pid && !inside[from.f || e.from]) links++;
+            });
+          });
+          if (links) edges.push({ a: k.id, b: pid, type: 'links', w: links });
+        });
+      });
+    return { nodes: nodes, edges: edges, hidden: files.length - kept.length };
+  }
+  // a file in the middle, its symbols around it, and the files it imports, that import it, that call into it
+  function sceneFile(graph, id) {
+    var f = graph.node(id),
+      syms = graph.inFile(id),
+      bag = edgeBag(),
+      near = {},
+      most = 1;
+    var nodes = [sceneNode(id, f.n, f.k === 'doc' ? 'doc' : 'file', typeof f.c === 'number' ? f.c : -1, 1)];
+    nodes[0].center = true;
+    var kept = syms.map(function (s) {
+      return { id: s, w: graph.degree(s) };
+    });
+    kept.sort(function (x, y) {
+      return y.w - x.w || (x.id < y.id ? -1 : 1);
+    });
+    var hidden = Math.max(0, kept.length - CMAP.FILE_SYMS);
+    kept = kept.slice(0, CMAP.FILE_SYMS);
+    kept.forEach(function (k) {
+      most = Math.max(most, k.w);
+    });
+    var own = {};
+    own[id] = 1;
+    kept.forEach(function (k) {
+      own[k.id] = 1;
+      var n = graph.node(k.id);
+      nodes.push(sceneNode(k.id, n.n, 'sym', typeof n.c === 'number' ? n.c : -1, k.w / most));
+      bag.add(id, k.id, 'defines');
+    });
+    function touch(other, type, out, from) {
+      var n = graph.node(other),
+        of = (n && n.f) || other;
+      if (own[of] || !graph.node(of)) return;
+      near[of] = (near[of] || 0) + 1;
+      if (out) bag.add(from, of, type);
+      else bag.add(of, from, type);
+    }
+    Object.keys(own).forEach(function (x) {
+      var es = graph.edges(x);
+      es.out.forEach(function (e) {
+        if (e.type !== 'defines' && e.type !== 'contains') touch(e.to, e.type, true, x);
+      });
+      es.in.forEach(function (e) {
+        if (e.type !== 'defines' && e.type !== 'contains') touch(e.from, e.type, false, x);
+      });
+    });
+    var room = CMAP.MAX_NODES - nodes.length,
+      files = Object.keys(near).sort(function (x, y) {
+        return near[y] - near[x] || (x < y ? -1 : 1);
+      });
+    hidden += Math.max(0, files.length - room);
+    var shown = {};
+    files.slice(0, room).forEach(function (of) {
+      shown[of] = 1;
+      nodes.push(fileNode(graph, of, near[of], Math.max(1, near[files[0]])));
+    });
+    var edges = bag.list().filter(function (e) {
+      return (own[e.a] || shown[e.a]) && (own[e.b] || shown[e.b]);
+    });
+    return { nodes: nodes, edges: edges, hidden: hidden };
+  }
+  // a symbol with everything one step away; two steps through calls when that stays small, drawn fainter
+  function sceneSymbol(graph, id) {
+    var s = graph.node(id),
+      seen = {},
+      list = [],
+      most = 1;
+    function take(nid, faded) {
+      if (seen[nid]) return;
+      var n = graph.node(nid);
+      if (!n) return;
+      seen[nid] = faded ? 2 : 1;
+      var node = sceneNode(
+        nid,
+        n.n,
+        n.k === 'sym' || n.k === 'sec' ? (n.k === 'sec' ? 'doc' : 'sym') : n.k === 'doc' ? 'doc' : 'file',
+        typeof n.c === 'number' ? n.c : -1,
+        graph.degree(nid)
+      );
+      node.faded = !!faded;
+      most = Math.max(most, node.size);
+      list.push(node);
+    }
+    take(id);
+    list[0].center = true;
+    var hop = [],
+      es = graph.edges(id);
+    es.out.forEach(function (e) {
+      take(e.to);
+      hop.push(e.to);
+    });
+    es.in.forEach(function (e) {
+      take(e.from);
+      hop.push(e.from);
+    });
+    var near = list.length;
+    if (near < CMAP.HOP2) {
+      hop.forEach(function (nid) {
+        var n = graph.node(nid);
+        if (!n || n.k !== 'sym' || graph.degree(nid) > CMAP.HUB) return;
+        var more = graph.edges(nid);
+        more.out.concat(more.in).forEach(function (e) {
+          if (CMAP_ARROWS[e.type] && list.length < near + CMAP.HOP2) take(e.from === nid ? e.to : e.from, true);
+        });
+      });
+    }
+    list.forEach(function (n) {
+      n.size = n.size / most;
+    });
+    // lines between two second-step nodes say nothing about this symbol and would cover the picture
+    var bag = edgeBag();
+    list.forEach(function (n) {
+      var edges = graph.edges(n.id);
+      edges.out.forEach(function (e) {
+        if (seen[e.to] && !(n.faded && seen[e.to] === 2)) bag.add(n.id, e.to, e.type);
+      });
+    });
+    return { nodes: list, edges: bag.list(), hidden: 0 };
+  }
+  function sceneOf(map, card, level) {
+    var graph = card.graph;
+    if (level.kind === 'groups') return sceneGroups(map.index, graph);
+    if (!graph) return null;
+    if (level.kind === 'group') return sceneGroup(graph, map.index, level.c);
+    if (!graph.node(level.id)) return { nodes: [], edges: [], hidden: 0 };
+    return level.kind === 'file' ? sceneFile(graph, level.id) : sceneSymbol(graph, level.id);
+  }
+  // the open tasks that touch a node, its file or its group
+  function markTasks(scene, graph) {
+    var byId = {};
+    if (graph)
+      openTouched().forEach(function (t) {
+        touchesOf(t).forEach(function (touch) {
+          graph.find(touch).forEach(function (id) {
+            var n = graph.node(id);
+            [id, n.f, groupKey(n)].forEach(function (k) {
+              if (!k) return;
+              var list = (byId[k] = byId[k] || []);
+              if (list.indexOf(t) < 0) list.push(t);
+            });
+          });
+        });
+      });
+    scene.nodes.forEach(function (n) {
+      n.tasks = (byId[n.id] || []).slice().sort(byKey);
+    });
+  }
+
+  // ---- layout: a force-directed picture, the same for the same scene ----
+  function nodeRadius(n) {
+    var s = Math.sqrt(Math.max(0, Math.min(1, n.size)));
+    if (n.kind === 'group') return n.port ? 7 : 9 + 15 * s;
+    if (n.kind === 'sym') return 3.5 + 3.5 * s;
+    return 5 + 6 * s;
+  }
+  function layoutScene(scene, W, H) {
+    var ns = scene.nodes,
+      at = {},
+      deg = {},
+      r = {},
+      room = {};
+    ns.forEach(function (node, i) {
+      at[node.id] = i;
+      r[node.id] = nodeRadius(node);
+      // the room a node keeps: its circle and the name under or beside it
+      room[node.id] =
+        node.kind === 'group' && !node.port
+          ? Math.max(r[node.id] + 14, Math.min(64, 3.4 * node.label.length))
+          : r[node.id] + 5;
+    });
+    var links = [];
+    scene.edges.forEach(function (e) {
+      if (at[e.a] == null || at[e.b] == null || e.a === e.b) return;
+      deg[e.a] = (deg[e.a] || 0) + 1;
+      deg[e.b] = (deg[e.b] || 0) + 1;
+      links.push([e.a, e.b, 1 + 0.2 * Math.log(e.w || 1)]);
+    });
+    // nodes with a link settle by force; nodes without one stand on rings around them, so a lone file never
+    // flings the rest into a corner
+    var linked = ns.filter(function (n) {
+        return deg[n.id] || n.center;
+      }),
+      alone = ns.filter(function (n) {
+        return !deg[n.id] && !n.center;
+      }),
+      pos = {},
+      n = linked.length;
+    linked.forEach(function (node, i) {
+      // the center node sits still; the rest start on a spiral, so the same scene always lays out the same way
+      var d = 18 * Math.sqrt(i + 1),
+        ang = i * 2.399963;
+      pos[node.id] = node.center ? [0, 0] : [d * Math.cos(ang), d * Math.sin(ang)];
+    });
+    var k = Math.sqrt((W * H) / Math.max(4, n)),
+      reach = 3 * k,
+      temp = Math.max(W, H) / 8,
+      cool = temp / (CMAP.STEPS + 1),
+      disp = {};
+    for (var step = 0; step < CMAP.STEPS && n > 1; step++) {
+      linked.forEach(function (node) {
+        disp[node.id] = [-pos[node.id][0] * 0.02, -pos[node.id][1] * 0.02];
+      });
+      for (var i = 0; i < n; i++)
+        for (var j = i + 1; j < n; j++) {
+          var p = pos[linked[i].id],
+            q = pos[linked[j].id],
+            dx = p[0] - q[0],
+            dy = p[1] - q[1],
+            d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+          if (d > reach) continue;
+          var gap = Math.max(d - room[linked[i].id] - room[linked[j].id], 1),
+            f = (k * k) / gap / d;
+          disp[linked[i].id][0] += dx * f;
+          disp[linked[i].id][1] += dy * f;
+          disp[linked[j].id][0] -= dx * f;
+          disp[linked[j].id][1] -= dy * f;
+        }
+      links.forEach(function (l) {
+        var p = pos[l[0]],
+          q = pos[l[1]],
+          dx = p[0] - q[0],
+          dy = p[1] - q[1],
+          d = Math.sqrt(dx * dx + dy * dy) || 0.01,
+          f = (((d * d) / k) * l[2] * 0.4) / d;
+        disp[l[0]][0] -= dx * f;
+        disp[l[0]][1] -= dy * f;
+        disp[l[1]][0] += dx * f;
+        disp[l[1]][1] += dy * f;
+      });
+      linked.forEach(function (node) {
+        if (node.center) return;
+        var v = disp[node.id],
+          len = Math.sqrt(v[0] * v[0] + v[1] * v[1]) || 0.01,
+          m = Math.min(len, temp) / len;
+        pos[node.id][0] += v[0] * m;
+        pos[node.id][1] += v[1] * m;
+      });
+      temp -= cool;
+    }
+    var box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    function grow(id) {
+      box.minX = Math.min(box.minX, pos[id][0] - r[id]);
+      box.maxX = Math.max(box.maxX, pos[id][0] + r[id]);
+      box.minY = Math.min(box.minY, pos[id][1] - r[id]);
+      box.maxY = Math.max(box.maxY, pos[id][1] + r[id]);
+    }
+    linked.forEach(function (node) {
+      grow(node.id);
+    });
+    if (!linked.length) box = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    var cx = (box.minX + box.maxX) / 2,
+      cy = (box.minY + box.maxY) / 2,
+      ring = Math.max(box.maxX - box.minX, box.maxY - box.minY) / 2 + 64,
+      left = alone.slice();
+    while (left.length) {
+      var room = Math.max(1, Math.floor((2 * Math.PI * ring) / 26)),
+        row = left.splice(0, room);
+      row.forEach(function (node, i) {
+        var ang = -Math.PI / 2 + (i * 2 * Math.PI) / row.length;
+        pos[node.id] = [cx + ring * Math.cos(ang), cy + ring * Math.sin(ang)];
+        grow(node.id);
+      });
+      ring += 30;
+    }
+    // fit into W × H with a margin; a tall or wide picture is stretched a little rather than left small
+    var spanX = Math.max(1, box.maxX - box.minX),
+      spanY = Math.max(1, box.maxY - box.minY),
+      fitX = Math.min((W - 2 * CMAP.PAD) / spanX, 2),
+      fitY = Math.min((H - 2 * CMAP.PAD) / spanY, 2),
+      scaleX = Math.min(fitX, fitY * 1.6),
+      scaleY = Math.min(fitY, fitX * 1.6),
+      offX = (W - spanX * scaleX) / 2 - box.minX * scaleX,
+      offY = (H - spanY * scaleY) / 2 - box.minY * scaleY,
+      out = { W: W, H: H, pos: {}, r: {}, left: {} },
+      middle = linked.filter(function (node) {
+        return node.center;
+      })[0];
+    ns.forEach(function (node) {
+      out.pos[node.id] = [pos[node.id][0] * scaleX + offX, pos[node.id][1] * scaleY + offY];
+      out.r[node.id] = r[node.id];
+      out.left[node.id] =
+        !node.center && pos[node.id][0] < (middle ? pos[middle.id][0] : (box.minX + box.maxX) / 2) - 1;
+    });
+    // names keep their size while the picture shrinks, so the fit is tried twice more with them in it
+    for (var pass = 0; pass < 2; pass++) {
+      var all = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      ns.forEach(function (node) {
+        var b = labelBox(node, out),
+          p = out.pos[node.id],
+          rr = out.r[node.id];
+        all.minX = Math.min(all.minX, p[0] - rr, b[0]);
+        all.maxX = Math.max(all.maxX, p[0] + rr, b[2]);
+        all.minY = Math.min(all.minY, p[1] - rr, b[1]);
+        all.maxY = Math.max(all.maxY, p[1] + rr, b[3]);
+      });
+      var again = Math.min(1, (W - 2 * CMAP.PAD) / (all.maxX - all.minX), (H - 2 * CMAP.PAD) / (all.maxY - all.minY)),
+        cx2 = (all.minX + all.maxX) / 2,
+        cy2 = (all.minY + all.maxY) / 2;
+      ns.forEach(function (node) {
+        var p = out.pos[node.id];
+        out.pos[node.id] = [(p[0] - cx2) * again + W / 2, (p[1] - cy2) * again + H / 2];
+      });
+    }
+    return out;
+  }
+
+  // ---- painting ----
+  function paintMap(map, card) {
+    var level = levelOf(card),
+      scene = sceneOf(map, card, level),
+      body = $('codemapBody'),
+      bodyW = (body && body.clientWidth) || 960,
+      W = Math.max(320, bodyW - 38 - (bodyW >= 900 ? CMAP.SIDE : 0)),
+      H = W < 560 ? 320 : 440;
+    card.scene = scene;
+    paintCrumb(map, card);
+    card.svgWrap.textContent = '';
+    if (!scene && !card.graph && !card.loading && !card.error && db) loadMap(map, card);
+    if (!scene) card.svgWrap.appendChild(el('p', { class: 'empty', text: card.error || T('loading') }));
+    else if (!scene.nodes.length) card.svgWrap.appendChild(el('p', { class: 'empty', text: T('codemapEmpty') }));
+    else {
+      markTasks(scene, card.graph);
+      var key = levelKey(level) + '|' + card.builtAt + '|' + W + '|' + scene.nodes.length;
+      if (!card.layout || card.layout.key !== key) {
+        card.layout = layoutScene(scene, W, H);
+        card.layout.key = key;
+        card.view = null;
+      }
+      if (
+        card.selected &&
+        !scene.nodes.some(function (n) {
+          return n.id === card.selected;
+        })
+      )
+        card.selected = null;
+      card.svgWrap.appendChild(drawScene(map, card, scene, card.layout));
+    }
+    paintLegend(card, scene);
+    paintDetail(map, card);
+  }
+  function paintCrumb(map, card) {
+    var out = card.crumb;
+    out.textContent = '';
+    card.trail.forEach(function (level, i) {
+      var last = i === card.trail.length - 1,
+        label = levelLabel(map, card, level);
+      if (i) out.appendChild(el('span', { class: 'sep', text: '›' }));
+      out.appendChild(
+        last
+          ? el('b', { text: label, title: level.id || label })
+          : el('button', {
+              type: 'button',
+              text: label,
+              title: level.id || label,
+              onclick: function () {
+                goUp(map, card, i + 1);
+              }
+            })
+      );
+    });
+    var zoom = el('span', { class: 'zoom' }, [
+      zoomBtn(card, '−', T('codemapZoomOut'), 1 / 1.3),
+      zoomBtn(card, '+', T('codemapZoomIn'), 1.3),
+      zoomBtn(card, '⤢', T('codemapFit'), 0)
+    ]);
+    out.appendChild(zoom);
+  }
+  function zoomBtn(card, glyph, label, factor) {
+    return el('button', {
+      type: 'button',
+      text: glyph,
+      title: label,
+      'aria-label': label,
+      onclick: function () {
+        if (!card.layout) return;
+        if (!factor) card.view = null;
+        else {
+          var v = viewOf(card);
+          zoomView(card, factor, v.x + v.w / 2, v.y + v.h / 2);
+        }
+        applyView(card);
+      }
+    });
+  }
+  function viewOf(card) {
+    return card.view || { x: 0, y: 0, w: card.layout.W, h: card.layout.H };
+  }
+  function zoomView(card, factor, px, py) {
+    var v = viewOf(card),
+      w = Math.max(card.layout.W / 8, Math.min(card.layout.W * 3, v.w / factor)),
+      f = v.w / w;
+    card.view = { x: px - (px - v.x) / f, y: py - (py - v.y) / f, w: w, h: v.h / f };
+  }
+  function applyView(card) {
+    var v = viewOf(card);
+    if (card.svg) card.svg.setAttribute('viewBox', v.x + ' ' + v.y + ' ' + v.w + ' ' + v.h);
+  }
+  // where a pointer is, in the picture's own coordinates
+  function pointAt(card, e) {
+    var rect = card.svg.getBoundingClientRect(),
+      v = viewOf(card);
+    if (!rect.width || !rect.height) return [v.x, v.y];
+    var scale = Math.min(rect.width / v.w, rect.height / v.h),
+      ox = (rect.width - v.w * scale) / 2,
+      oy = (rect.height - v.h * scale) / 2;
+    return [v.x + (e.clientX - rect.left - ox) / scale, v.y + (e.clientY - rect.top - oy) / scale];
+  }
+  function shapeFor(n, r) {
+    if (n.kind === 'doc')
+      return svgEl('path', { class: 'shape', d: 'M0 ' + -r + 'L' + r + ' 0L0 ' + r + 'L' + -r + ' 0Z' });
+    if (n.kind === 'sym' && n.t && CMAP_TYPES[n.t]) {
+      return svgEl('rect', { class: 'shape', x: -r, y: -r, width: 2 * r, height: 2 * r, rx: 1.5 });
+    }
+    return svgEl('circle', { class: 'shape', r: r });
+  }
+  function labelText(n) {
+    return n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label;
+  }
+  // Which names get written: every node's when there is room, else the center, the selected one, the touched ones
+  // and the largest first, each only where it runs into no node or name already placed. A hidden name is still the
+  // node's title.
+  // where a node's name is drawn: under a group's circle, beside anything else; about 6 px a character
+  function labelBox(n, lay) {
+    var p = lay.pos[n.id],
+      r = lay.r[n.id],
+      w = labelText(n).length * (n.kind === 'group' && !n.port ? 6.6 : 6);
+    if (n.kind === 'group' && !n.port) return [p[0] - w / 2, p[1] + r + 2, p[0] + w / 2, p[1] + r + 16];
+    return lay.left[n.id]
+      ? [p[0] - r - 4 - w, p[1] - 7, p[0] - r - 3, p[1] + 7]
+      : [p[0] + r + 3, p[1] - 7, p[0] + r + 4 + w, p[1] + 7];
+  }
+  function boxesMeet(list, b) {
+    return list.some(function (o) {
+      return b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1];
+    });
+  }
+  // Which names get written: the center, the selected, the touched and the three largest nodes always (short of
+  // another name), the rest only where they run into no node or name already placed. A hidden name is still the
+  // node's title.
+  function labelRoom(scene, lay, selected) {
+    var nodes = [],
+      names = [],
+      labeled = {};
+    scene.nodes.forEach(function (n) {
+      var p = lay.pos[n.id],
+        r = lay.r[n.id];
+      nodes.push([p[0] - r, p[1] - r, p[0] + r, p[1] + r]);
+    });
+    var rank = function (n) {
+      return (n.center ? 8 : 0) + (n.id === selected ? 4 : 0) + (n.tasks.length ? 2 : 0) + n.size;
+    };
+    scene.nodes
+      .slice()
+      .sort(function (x, y) {
+        return rank(y) - rank(x) || (x.id < y.id ? -1 : 1);
+      })
+      .forEach(function (n, i) {
+        var box = labelBox(n, lay),
+          must = n.center || n.id === selected || n.tasks.length > 0 || i < 3;
+        if (!must && scene.nodes.length > CMAP.MAX_NODES / 2 && n.size < 0.15) return;
+        if (boxesMeet(must ? names : nodes.concat(names), box)) return;
+        labeled[n.id] = 1;
+        names.push(box);
+      });
+    return labeled;
+  }
+  function drawScene(map, card, scene, lay) {
+    var markerId = 'cm-' + map.key.replace(/[^A-Za-z0-9_-]/g, '_'),
+      graph = card.graph,
+      adj = {},
+      nodeEls = {},
+      edgeEls = [],
+      v = viewOf(card),
+      maxW = 1;
+    scene.edges.forEach(function (e) {
+      maxW = Math.max(maxW, e.w || 1);
+      (adj[e.a] = adj[e.a] || {})[e.b] = 1;
+      (adj[e.b] = adj[e.b] || {})[e.a] = 1;
+    });
+    var svg = svgEl('svg', {
+      class: 'cmap-pic',
+      viewBox: v.x + ' ' + v.y + ' ' + v.w + ' ' + v.h,
+      role: 'img',
+      tabindex: '0',
+      'aria-label': T('codemapPicture', { n: scene.nodes.length, e: scene.edges.length })
+    });
+    card.svg = svg;
+    var defs = svgEl('defs');
+    ['', 'hi'].forEach(function (k) {
+      defs.appendChild(
+        svgEl(
+          'marker',
+          {
+            id: markerId + (k ? '-hi' : ''),
+            class: k,
+            viewBox: '0 0 8 8',
+            refX: '7',
+            refY: '4',
+            markerWidth: '7',
+            markerHeight: '7',
+            markerUnits: 'userSpaceOnUse',
+            orient: 'auto'
+          },
+          [svgEl('path', { d: 'M0 0.5L7 4L0 7.5Z' })]
+        )
+      );
+    });
+    svg.appendChild(defs);
+    var gEdges = svgEl('g', { class: 'edges' }),
+      gNodes = svgEl('g', { class: 'nodes' });
+    scene.edges.forEach(function (e) {
+      var a = lay.pos[e.a],
+        b = lay.pos[e.b];
+      if (!a || !b) return;
+      var dx = b[0] - a[0],
+        dy = b[1] - a[1],
+        d = Math.sqrt(dx * dx + dy * dy) || 1,
+        ra = lay.r[e.a] + 1,
+        rb = lay.r[e.b] + (CMAP_ARROWS[e.type] ? 4 : 1),
+        line = svgEl('line', {
+          class: 'e ' + e.type,
+          x1: a[0] + (dx / d) * ra,
+          y1: a[1] + (dy / d) * ra,
+          x2: b[0] - (dx / d) * rb,
+          y2: b[1] - (dy / d) * rb,
+          'stroke-width': (1 + (2.5 * Math.log(1 + (e.w || 1))) / Math.log(1 + maxW)).toFixed(2)
+        });
+      if (CMAP_ARROWS[e.type]) line.setAttribute('marker-end', 'url(#' + markerId + ')');
+      line.appendChild(
+        svgEl('title', {}, [document.createTextNode(e.a + ' —' + e.type + (e.w > 1 ? ' ×' + e.w : '') + '→ ' + e.b)])
+      );
+      edgeEls.push({ el: line, a: e.a, b: e.b, arrow: !!CMAP_ARROWS[e.type] });
+      gEdges.appendChild(line);
+    });
+    var labeled = labelRoom(scene, lay, card.selected);
+    scene.nodes.forEach(function (n) {
+      var p = lay.pos[n.id],
+        r = lay.r[n.id],
+        node = graph && graph.node(n.id),
+        kind = n.kind === 'group' ? T('codemapKindGroup') : node ? nodeKind(node) : n.kind;
+      n.t = node && node.t;
+      var g = svgEl('g', {
+        class:
+          'cnode k-' +
+          n.kind +
+          ' ck' +
+          (((n.c % 8) + 8) % 8) +
+          (n.center ? ' center' : '') +
+          (n.faded ? ' faded' : '') +
+          (n.port ? ' port' : '') +
+          (card.selected === n.id ? ' sel' : '') +
+          (n.tasks.length ? ' touched' : ''),
+        transform: 'translate(' + p[0].toFixed(1) + ' ' + p[1].toFixed(1) + ')',
+        tabindex: '0',
+        role: 'button',
+        'data-id': n.id,
+        'aria-label': n.label + ' · ' + kind
+      });
+      g.appendChild(
+        svgEl('title', {}, [
+          document.createTextNode(n.id === n.label ? n.label + ' · ' + kind : n.label + ' · ' + kind + ' · ' + n.id)
+        ])
+      );
+      if (n.tasks.length) {
+        var ring = svgEl('circle', { class: 'ring' + personClass(holderOf(n.tasks[0])), r: r + 3.5 });
+        g.appendChild(ring);
+      }
+      g.appendChild(shapeFor(n, r));
+      if (n.tasks.length) {
+        g.appendChild(
+          svgEl('text', { class: 'badge' + personClass(holderOf(n.tasks[0])), x: r + 2, y: -r - 2 }, [
+            document.createTextNode(n.tasks.length > 1 ? n.tasks[0].key + ' +' + (n.tasks.length - 1) : n.tasks[0].key)
+          ])
+        );
+      }
+      if (labeled[n.id]) {
+        var text = labelText(n),
+          under = n.kind === 'group' && !n.port;
+        g.appendChild(
+          svgEl(
+            'text',
+            under
+              ? { class: 'lbl', x: 0, y: r + 12, 'text-anchor': 'middle' }
+              : lay.left[n.id]
+                ? { class: 'lbl', x: -r - 4, dy: '.35em', 'text-anchor': 'end' }
+                : { class: 'lbl', x: r + 4, dy: '.35em' },
+            [document.createTextNode(text)]
+          )
+        );
+      }
+      function light(on) {
+        svg.classList.toggle('focus', on);
+        Object.keys(nodeEls).forEach(function (id) {
+          nodeEls[id].classList.toggle('hi', on && (id === n.id || !!(adj[n.id] && adj[n.id][id])));
+        });
+        edgeEls.forEach(function (x) {
+          var hi = on && (x.a === n.id || x.b === n.id);
+          x.el.classList.toggle('hi', hi);
+          if (x.arrow) x.el.setAttribute('marker-end', 'url(#' + markerId + (hi ? '-hi' : '') + ')');
+        });
+      }
+      g.addEventListener('mouseenter', function () {
+        light(true);
+      });
+      g.addEventListener('mouseleave', function () {
+        light(false);
+      });
+      g.addEventListener('focus', function () {
+        light(true);
+      });
+      g.addEventListener('blur', function () {
+        light(false);
+      });
+      g.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (card.dragged) return;
+        if (card.selected === n.id) drill(map, card, n.id);
+        else {
+          card.selected = n.id;
+          Object.keys(nodeEls).forEach(function (id) {
+            nodeEls[id].classList.toggle('sel', id === n.id);
+          });
+          paintDetail(map, card);
+        }
+      });
+      g.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (card.selected === n.id) drill(map, card, n.id);
+          else {
+            card.selected = n.id;
+            Object.keys(nodeEls).forEach(function (id) {
+              nodeEls[id].classList.toggle('sel', id === n.id);
+            });
+            paintDetail(map, card);
+          }
+        }
+      });
+      nodeEls[n.id] = g;
+      gNodes.appendChild(g);
+    });
+    svg.appendChild(gEdges);
+    svg.appendChild(gNodes);
+    // drag pans, ⌘/Ctrl + wheel (a trackpad pinch too) zooms, a click on the background clears the selection
+    var drag = null;
+    svg.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      drag = { x: e.clientX, y: e.clientY, view: viewOf(card), moved: false };
+      card.dragged = false;
+      if (svg.setPointerCapture) svg.setPointerCapture(e.pointerId);
+    });
+    svg.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var rect = svg.getBoundingClientRect(),
+        v = drag.view,
+        scale = rect.width && rect.height ? Math.min(rect.width / v.w, rect.height / v.h) : 1,
+        dx = (e.clientX - drag.x) / scale,
+        dy = (e.clientY - drag.y) / scale;
+      if (!drag.moved && Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 4) return;
+      drag.moved = true;
+      card.dragged = true;
+      card.view = { x: v.x - dx, y: v.y - dy, w: v.w, h: v.h };
+      applyView(card);
+    });
+    function endDrag() {
+      drag = null;
+      setTimeout(function () {
+        card.dragged = false;
+      }, 0);
+    }
+    svg.addEventListener('pointerup', endDrag);
+    svg.addEventListener('pointercancel', endDrag);
+    svg.addEventListener('click', function () {
+      if (card.dragged || !card.selected) return;
+      card.selected = null;
+      Object.keys(nodeEls).forEach(function (id) {
+        nodeEls[id].classList.remove('sel');
+      });
+      paintDetail(map, card);
+    });
+    svg.addEventListener(
+      'wheel',
+      function (e) {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        var p = pointAt(card, e);
+        zoomView(card, e.deltaY < 0 ? 1.15 : 1 / 1.15, p[0], p[1]);
+        applyView(card);
+      },
+      { passive: false }
+    );
+    svg.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && card.trail.length > 1) {
+        e.stopPropagation();
+        goUp(map, card, card.trail.length - 1);
+        if (card.svg) card.svg.focus();
+      }
+    });
+    return svg;
+  }
+  function legendGlyph(kind) {
+    var s = svgEl('svg', { width: '14', height: '14', viewBox: '-7 -7 14 14', 'aria-hidden': 'true' });
+    if (kind === 'file') s.appendChild(svgEl('circle', { r: '5.5', class: 'shape' }));
+    else if (kind === 'fn') s.appendChild(svgEl('circle', { r: '3.5', class: 'shape' }));
+    else if (kind === 'type')
+      s.appendChild(svgEl('rect', { x: '-4', y: '-4', width: '8', height: '8', rx: '1', class: 'shape' }));
+    else if (kind === 'doc') s.appendChild(svgEl('path', { d: 'M0 -5.5L5.5 0L0 5.5L-5.5 0Z', class: 'shape doc' }));
+    else s.appendChild(svgEl('line', { x1: '-7', y1: '0', x2: '7', y2: '0', class: 'e ' + kind }));
+    return s;
+  }
+  function paintLegend(card, scene) {
+    var out = card.legend;
+    out.textContent = '';
+    if (!scene || !scene.nodes.length) return;
+    var kinds = {},
+      types = {};
+    scene.nodes.forEach(function (n) {
+      kinds[n.kind === 'sym' ? (n.t && CMAP_TYPES[n.t] ? 'type' : 'fn') : n.kind] = 1;
+    });
+    scene.edges.forEach(function (e) {
+      types[
+        e.type === 'uses' || e.type === 'mentions'
+          ? 'uses'
+          : e.type === 'defines' || e.type === 'contains'
+            ? 'defines'
+            : e.type
+      ] = 1;
+    });
+    var items = [
+      ['file', 'codemapKindFile'],
+      ['fn', 'codemapKindFn'],
+      ['type', 'codemapKindType'],
+      ['doc', 'codemapKindDoc'],
+      ['links', 'codemapEdgeLinks'],
+      ['imports', 'codemapEdgeImports'],
+      ['calls', 'codemapEdgeCalls'],
+      ['extends', 'codemapEdgeExtends'],
+      ['uses', 'codemapEdgeUses'],
+      ['defines', 'codemapEdgeDefines']
+    ];
+    items.forEach(function (it) {
+      if (!kinds[it[0]] && !types[it[0]]) return;
+      out.appendChild(el('span', {}, [legendGlyph(it[0]), T(it[1])]));
+    });
+    if (scene.hidden) out.appendChild(el('span', { text: T('codemapHidden', { n: scene.hidden }) }));
+    out.appendChild(el('span', { class: 'cmap-hint', text: T('codemapHint') }));
+  }
+  // one line of an answer as board_map prints it, made a button when it names something on the map
+  function mapLine(map, card, line) {
+    var m = /^ {2}(\S+)(?: \[[xi]\])?(?: ·.*)?$/.exec(line),
+      id = m && m[1];
+    return id && card.graph && card.graph.node(id)
+      ? el('button', {
+          type: 'button',
+          text: line,
+          onclick: function () {
+            goTo(map, card, id);
+          }
+        })
+      : el('div', { text: line });
+  }
+  function taskChip(t) {
+    return el(
+      'button',
+      {
+        type: 'button',
+        class: 'cmap-task' + personClass(holderOf(t)),
+        onclick: function () {
+          openSheet(t.id);
+        }
+      },
+      [el('b', { text: t.key }), el('span', { text: personName(holderOf(t)) })]
+    );
+  }
+  function paintDetail(map, card) {
+    var out = card.detail,
+      index = map.index,
+      graph = card.graph,
+      level = levelOf(card),
+      scene = card.scene,
+      id = card.selected || levelCenter(level),
+      node = null;
+    out.textContent = '';
+    if (!id) {
+      // nothing picked at the top: the most connected names are the way in
+      var god = mapList(index.god).filter(mapText).slice(0, 10);
+      out.appendChild(el('p', { class: 'cmap-title', text: T('codemapOverview') }));
+      out.appendChild(el('p', { class: 'muted', text: T('codemapOverviewHint') }));
+      if (god.length) {
+        out.appendChild(el('p', { class: 'muted', text: T('codemapGod') }));
+        out.appendChild(
+          el(
+            'div',
+            { class: 'cmap-tasks' },
+            god.map(function (gid) {
+              return el('button', {
+                type: 'button',
+                class: 'cmap-task',
+                text: gid,
+                onclick: function () {
+                  if (graph) goTo(map, card, gid);
+                }
+              });
+            })
+          )
+        );
+      }
+      return;
+    }
+    if (scene)
+      scene.nodes.forEach(function (n) {
+        if (n.id === id) node = n;
+      });
+    var canOpen = levelCenter(level) !== id,
+      open = canOpen
+        ? el('button', {
+            type: 'button',
+            class: 'btn small',
+            text: T('codemapOpen'),
+            onclick: function () {
+              drill(map, card, id);
+            }
+          })
+        : null;
+    if (id.slice(0, 2) === 'c:') {
+      var g = communityOf(index, +id.slice(2)) || {},
+        top = mapList(g.top).filter(mapText);
+      out.appendChild(el('p', { class: 'cmap-title', text: mapText(g.name) || id }));
+      out.appendChild(
+        el('p', {
+          class: 'muted',
+          text: T('codemapFiles', { n: graph ? graph.files(+id.slice(2)).length : mapCount(g.n) })
+        })
+      );
+      if (top.length)
+        out.appendChild(
+          el(
+            'div',
+            { class: 'maplines' },
+            top.map(function (tid) {
+              return mapLine(map, card, '  ' + tid);
+            })
+          )
+        );
+    } else if (!graph) out.appendChild(el('p', { class: 'empty', text: card.error || T('loading') }));
+    else {
+      var n = graph.node(id);
+      if (!n) out.appendChild(el('p', { class: 'empty', text: T('codemapEmpty') }));
+      else {
+        var lines = (n.k === 'file' || n.k === 'doc' ? graph.file(id, {}) : graph.explain(id, {})).lines;
+        out.appendChild(el('p', { class: 'cmap-title', text: n.n }));
+        out.appendChild(el('p', { class: 'muted', text: nodeKind(n) + ' · ' + nodeWhere(n) }));
+        out.appendChild(
+          el(
+            'div',
+            { class: 'maplines' },
+            lines.slice(1).map(function (line) {
+              return mapLine(map, card, line);
+            })
+          )
+        );
+      }
+    }
+    if (node && node.tasks.length) {
+      out.appendChild(el('p', { class: 'muted', text: T('codemapTasks') }));
+      out.appendChild(el('div', { class: 'cmap-tasks' }, node.tasks.map(taskChip)));
+    }
+    if (open) out.appendChild(open);
+  }
+  var cmapResize = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(cmapResize);
+    cmapResize = setTimeout(function () {
+      if (view === 'doc' && !folded('codemap') && maps && maps.length) renderCodemap();
+    }, 150);
+  });
 
   // ---------- kanban ----------
   // the owner as a round initial (alone on a card, with the name elsewhere); nobody's yet: nothing
