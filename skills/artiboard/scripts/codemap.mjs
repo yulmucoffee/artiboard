@@ -4800,7 +4800,8 @@ async function mapRepo(root, opts = {}) {
 
 // ---- uploader ----
 // node codemap.mjs --site https://board.example --project P --repo owner/name [--root DIR] [--label L] [--token abt_…]
-// The token comes from --token or ARTIBOARD_TOKEN. Nothing but names, paths and line numbers leaves the machine.
+// The token comes from --token or ARTIBOARD_TOKEN. What leaves the machine: paths, names, line numbers, each symbol's
+// declaration line (a constant's without its value) and the comment above it. No bodies.
 async function codemapMain(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i++) if (argv[i].startsWith('--')) args[argv[i].slice(2)] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
@@ -4811,9 +4812,10 @@ async function codemapMain(argv) {
   const root = args.root && args.root !== true ? args.root : process.cwd();
   const started = Date.now();
   const { index, chunks } = await mapRepo(root, { repo, label: args.label && args.label !== true ? args.label : undefined });
-  // gzip: a map's JSON is large and hosts cap request bodies; the server inflates it
+  // gzipped bytes as an octet stream: a map's JSON is large and hosts cap request bodies, and a host that parses
+  // JSON bodies itself would choke on compressed JSON; the server inflates what starts with the gzip magic bytes
   const res = await fetch(`${site}/api/p/${encodeURIComponent(project)}/map`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', Authorization: `Bearer ${token}` },
+    method: 'POST', headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` },
     body: gzipSync(JSON.stringify({ repo, index, chunks })),
   });
   const body = await res.json().catch(() => ({}));

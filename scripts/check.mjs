@@ -8,6 +8,8 @@ const steps = [
   ['READMEs share one shape', 'node', ['scripts/readme-shape.mjs']],
   ['the page carries the current task rules', 'node', ['scripts/inline-rules.mjs', '--check']],
   ['the page scripts keep their shape', 'node', ['scripts/page-shape.mjs', '--check']],
+  ['the page carries the current code map graph', 'node', ['scripts/inline-graph.mjs', '--check']],
+  ['the skill script is built from the current code map modules', 'node', ['scripts/inline-codemap.mjs', '--check']],
   ['the demo still builds from the current page', 'node', ['examples/build-demo.cjs', '--check']],
   ['server, MCP and changelog tests', 'npm', ['test', '--silent']],
   ['the board page in a browser-like DOM', 'node', ['tests/smoke.cjs']],
