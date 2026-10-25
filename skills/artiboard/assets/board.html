@@ -1251,6 +1251,8 @@ td.what .overlap{margin-left:8px}
   const graphPush = (map, key, v) => { const list = map.get(key); if (list) list.push(v); else map.set(key, [v]); };
   const graphKind = (n) => (n.k === 'sym' || n.k === 'sec' ? n.t || n.k : n.k);
   const graphWhere = (n) => (n.l ? `${n.f}:${n.l}` : n.f);
+  // a symbol's declaration after its line, shortened for list lines
+  const graphSig = (n, max = 80) => (n.s ? ` · ${n.s.length > max ? `${n.s.slice(0, max - 1)}…` : n.s}` : '');
   const graphDeg = (g, id) => g.degree.get(id) || 0;
   const graphByDegree = (g) => (a, b) => graphDeg(g, b) - graphDeg(g, a) || graphCmp(a, b);
   const graphByLine = (g) => (a, b) => (g.nodes.get(a).l || 0) - (g.nodes.get(b).l || 0) || graphCmp(a, b);
@@ -1268,10 +1270,11 @@ td.what .overlap{margin-left:8px}
     return deg;
   }
 
-  // up to limit items as lines, then how many were left out
-  function graphList(lines, items, limit, line) {
+  // Up to limit items as lines, then how many were left out; with more, also the limit that shows them all (rounded
+  // up to ten), since an agent that is not told does not ask.
+  function graphList(lines, items, limit, line, more) {
     for (const it of items.slice(0, limit)) lines.push(line(it));
-    if (items.length > limit) lines.push(`  … ${items.length - limit} more`);
+    if (items.length > limit) lines.push(`  … ${items.length - limit} more${more ? ` (limit ${Math.ceil(items.length / 10) * 10})` : ''}`);
   }
 
   function graphCommunity(g, n) {
@@ -1316,17 +1319,20 @@ td.what .overlap{margin-left:8px}
     return `${n.n} · ${graphKind(n)} · ${graphWhere(n)}${c ? ` · community ${c}` : ''} · degree ${graphDeg(g, n.i)}`;
   }
 
-  function graphExplain(g, name, { limit = 12 } = {}) {
+  function graphExplain(g, name, { limit = 30 } = {}) {
     const hit = graphOne(g, name);
     if (!hit.id) return hit;
     const n = g.nodes.get(hit.id), lines = [graphHead(g, n)];
+    // what it takes and what it is for, so the answer needs no trip to the file
+    if (n.s) lines.push(n.s);
+    if (n.d) lines.push(`// ${n.d}`);
     for (const [label, dir, type] of GRAPH_GROUPS) {
       const other = (e) => (dir === 'out' ? e.to : e.from);
       const order = GRAPH_STRUCTURE[type] ? graphByLine(g) : graphByDegree(g);
       const es = (g[dir].get(n.i) || []).filter((e) => e.type === type).sort((a, b) => order(other(a), other(b)));
       if (!es.length) continue;
       lines.push(`${label}:`);
-      graphList(lines, es, limit, (e) => `  ${other(e)} [${e.conf}]`);
+      graphList(lines, es, limit, (e) => `  ${other(e)} [${e.conf}]`, true);
     }
     return { lines, id: n.i };
   }
@@ -1344,7 +1350,7 @@ td.what .overlap{margin-left:8px}
     return [...ends].sort((a, b) => graphCmp(a[0], b[0]));
   }
 
-  function graphFile(g, path, { limit = 20 } = {}) {
+  function graphFile(g, path, { limit = 30 } = {}) {
     const files = [...new Set(graphFind(g, path).map((id) => g.nodes.get(id).f))].filter((f) => g.nodes.has(f));
     if (files.length !== 1) return files.length ? graphOne(g, path) : { lines: [`not in the map: ${path}`], missing: true };
     const f = g.nodes.get(files[0]), all = g.files.get(f.i) || [f.i];
@@ -1354,14 +1360,14 @@ td.what .overlap{margin-left:8px}
     const lines = [`${f.i} · ${f.k}${c ? ` · community ${c}` : ''} · ${inner.length} ${what} · imported by ${importers.length}`];
     if (inner.length) {
       lines.push(`${what}:`);
-      graphList(lines, inner, limit, (id) => { const n = g.nodes.get(id); return `  ${n.n} ${graphKind(n)} ${n.l}`; });
+      graphList(lines, inner, limit, (id) => { const n = g.nodes.get(id); return `  ${n.n} ${graphKind(n)} ${n.l}${graphSig(n)}`; }, true);
     }
     const groups = [['imports', graphEnds(g, [f.i], 'out', 'imports')], ['imported by', importers],
       ['mentions', graphEnds(g, all, 'out', 'mentions')], ['mentioned in', graphEnds(g, all, 'in', 'mentions')]];
     for (const [label, ends] of groups) {
       if (!ends.length) continue;
       lines.push(`${label}:`);
-      graphList(lines, ends, limit, ([id, conf]) => `  ${id} [${conf}]`);
+      graphList(lines, ends, limit, ([id, conf]) => `  ${id} [${conf}]`, true);
     }
     return { lines, id: f.i, symbols: inner };
   }
@@ -1466,7 +1472,7 @@ td.what .overlap{margin-left:8px}
     const symbolCount = (id) => (g.files.get(id) || []).filter((s) => g.nodes.get(s).k === 'sym').length;
     const show = {
       files: (id) => { const c = graphCommunity(g, g.nodes.get(id)); return `  ${id} · ${symbolCount(id)} symbols${c ? ` · ${c}` : ''}`; },
-      symbols: (id) => { const n = g.nodes.get(id); return `  ${id} · ${graphKind(n)} · ${n.l}`; },
+      symbols: (id) => { const n = g.nodes.get(id); return `  ${id} · ${graphKind(n)} · ${n.l}${graphSig(n)}`; },
       docs: (id) => { const n = g.nodes.get(id); return n.k === 'doc' ? `  ${id} · doc` : `  ${id} · ${graphKind(n)} · ${n.l}`; },
     };
     const lines = [];
@@ -1504,14 +1510,10 @@ td.what .overlap{margin-left:8px}
     const total = levels.reduce((s, l) => s + l.length, 0);
     if (!total) return { lines: [`nothing depends on ${hit.id}`], levels: [] };
     const lines = [`impact of ${hit.id}: ${total} dependents within ${depth} steps`];
-    let room = limit;
     levels.forEach((level, d) => {
-      if (room <= 0) return;
       lines.push(`depth ${d + 1}:`);
-      for (const e of level.slice(0, room)) lines.push(`  ${e.from} [${e.conf}] ${e.type}`);
-      room -= level.length;
+      graphList(lines, level, limit, (e) => `  ${e.from} [${e.conf}] ${e.type}`, true);
     });
-    if (room < 0) lines.push(`  … ${-room} more`);
     return { lines, levels: levels.map((l) => l.map((e) => e.from)) };
   }
 

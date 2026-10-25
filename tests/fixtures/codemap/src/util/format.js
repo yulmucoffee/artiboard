@@ -6,7 +6,7 @@ import { parseAmount } from './parse.js';
 const LABEL = 'class Fake extends Store {}';
 
 export const CURRENCY = 'EUR';
-
+/** Prices as "3.00 EUR". */
 export function formatPrice(value) {
   const amount = parseAmount(value);
   return `${amount.toFixed(2)} ${CURRENCY}`;

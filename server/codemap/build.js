@@ -61,6 +61,7 @@ function buildExtract(b, files) {
     try { x = lang.extract(text, p) || {}; } catch { x = {}; }
     const lines = text.split('\n');
     b.last.set(p, lines.length - (lines[lines.length - 1] === '' ? 1 : 0));
+    b.lines.set(p, lines);
     const list = (v) => (Array.isArray(v) ? v.filter((o) => o && typeof o === 'object') : []);
     b.lang.set(p, lang);
     b.parsed.set(p, { symbols: list(x.symbols), imports: list(x.imports), refs: list(x.refs), extends: list(x.extends) });
@@ -80,6 +81,11 @@ function buildSymbols(b) {
       if (b.nodes.has(id)) continue;
       const node = { i: id, k: doc ? 'sec' : 'sym', n: s.name, f: p, l: s.line, t: s.kind };
       if (!doc && s.exported !== false) node.e = 1;
+      if (!doc) {
+        const sig = buildSig(b.lines.get(p), s.line, s.kind, b.lang.get(p)), about = buildDoc(b.lines.get(p), s.line);
+        if (sig) node.s = sig;
+        if (about) node.d = about;
+      }
       b.nodes.set(id, node);
       buildEdge(b, p, id, doc ? 'contains' : 'defines', 'x');
       // a function nested in another ('makeFlow.post') is reached through its scope only: `xs.map(` is not makeFlow.map
@@ -94,6 +100,70 @@ function buildSymbols(b) {
     buildEnds(list, b.last.get(p));
     b.syms.set(p, list);
   }
+}
+
+const buildCut = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+// kinds whose declaration is followed by a body, cut off from the signature
+const BUILD_BODIES = new Set(['fn', 'class', 'method', 'module']);
+
+// The declaration as written, on one line of at most 120 characters: for a function, class or method its line (and
+// the next ones while its brackets are open) up to the body (`{`, `=>`, Python's `:`); for the rest the line itself
+// less a trailing `{`, `(`, `[`, `=` or `;`. Strings are kept whole; a line comment ends it.
+function buildSig(lines, line, kind, lang) {
+  const body = BUILD_BODIES.has(kind), py = lang.id === 'python';
+  const hash = py || lang.id === 'ruby', dashes = lang.id === 'sql';
+  let out = '', depth = 0, quote = '';
+  const done = () => buildCut(out.replace(/\s+/g, ' ').trim().replace(/[\s{([=;,]+$/, ''), 120);
+  for (let k = line - 1; k < Math.min(lines.length, line + 7); k++) {
+    const raw = lines[k];
+    for (let i = 0; i < raw.length; i++) {
+      const c = raw[i], spaced = i === 0 || /\s/.test(raw[i - 1]);
+      if (quote) {
+        out += c;
+        if (c === '\\') out += raw[++i] || '';
+        else if (c === quote) quote = '';
+        continue;
+      }
+      if (c === '"' || c === "'" || c === '`') { quote = c; out += c; continue; }
+      if (spaced && (c === '/' && raw[i + 1] === '/' || hash && c === '#' || dashes && c === '-' && raw[i + 1] === '-')) return done();
+      if (c === '(' || c === '[' || c === '{') {
+        if (c === '{' && body && !depth) return done();
+        depth++;
+      } else if (c === ')' || c === ']' || c === '}') depth = Math.max(0, depth - 1);
+      else if (body && !depth && (c === '=' && raw[i + 1] === '>' || py && c === ':')) return done();
+      out += c;
+    }
+    if (!body || !depth) break;
+    out += ' ';
+  }
+  return done();
+}
+
+// The comment just above a symbol, one line of at most 160 characters: `//`, `#`, `--`, `/* … */` and `/** … */`
+// lines (decorators between them and the symbol skipped), markers and leading `*` dropped; else a Python docstring's
+// first line below it. None when the line above is blank or code.
+function buildDoc(lines, line) {
+  const parts = [];
+  let k = line - 2;
+  while (k >= 0 && /^\s*(@|#\[)/.test(lines[k])) k--;
+  for (;;) {
+    if (k >= 0 && /\*\/\s*$/.test(lines[k])) {
+      let top = k;
+      while (top > 0 && !lines[top].includes('/*')) top--;
+      if (!/^\s*\/\*/.test(lines[top])) break;
+      parts.unshift(...lines.slice(top, k + 1).map((l) => l.replace(/^\s*\/\*+|\*+\/\s*$/g, '').replace(/^\s*\*(?!\/)\s?/, '')));
+      k = top - 1;
+    } else if (k >= 0 && /^\s*(\/\/|#(\s|#|$)|--(\s|-|$))/.test(lines[k])) {
+      parts.unshift(lines[k].replace(/^\s*(\/\/+|#+|--+)/, ''));
+      k--;
+    } else break;
+  }
+  let text = parts.join(' ').replace(/\s+/g, ' ').trim();
+  if (!text) {
+    const m = /^[rRuUbB]?("""|''')(.*)$/.exec((lines[line] || '').trim());
+    if (m) text = (m[2] || (lines[line + 1] || '')).replace(/("""|''').*$/, '').trim();
+  }
+  return buildCut(text, 160);
 }
 
 // A language that gives no end: a symbol runs to the line before the next symbol, or to the file's last line. Ending
@@ -239,13 +309,13 @@ function buildRefs(b) {
   }
 }
 
-// a path written in a doc: as written from the repo root, then from the doc's folder ('x'); else the one file whose
-// path ends so ('i')
+// a path written in a doc: from the doc's folder, as its links are, then from the repo root ('x'); else the one file
+// whose path ends so ('i')
 function buildPathMention(b, doc, written) {
   const p = written.replace(/[#?:].*$/, '').replace(/^\.\//, '');
-  if (b.has.has(p)) return [p, 'x'];
   const rel = buildNormalize(`${buildDir(doc)}/${p}`);
   if (rel && b.has.has(rel)) return [rel, 'x'];
+  if (b.has.has(p)) return [p, 'x'];
   const tail = `/${p.replace(/^(\.\.?\/)+/, '')}`;
   const hits = (b.bases.get(buildBase(p)) || []).filter((f) => `/${f}`.endsWith(tail));
   return hits.length === 1 ? [hits[0], 'i'] : null;
@@ -296,9 +366,9 @@ function buildPropagate(adj, label, take) {
 }
 
 // A group's name: the deepest folder at least 60% of its files are in, else the folder most are in when 40% are,
-// else its busiest code file. Tests do not name a group that has other files.
-function buildName(members, lead) {
-  const own = members.filter((f) => !buildIsTest(f));
+// else its busiest code file. Tests and docs (followers) do not name a group that has other files.
+function buildName(members, lead, follows) {
+  const own = members.filter((f) => !follows(f));
   const named = own.length ? own : members, held = new Map();
   for (const f of named) {
     const parts = buildDir(f).split('/').filter(Boolean);
@@ -311,30 +381,33 @@ function buildName(members, lead) {
   return most && most[1] * 10 >= named.length * 4 ? most[0] : buildBase(lead);
 }
 
-// Communities of files over imports and mentions. Code and docs vote among themselves; a test file then joins the
-// group whose files it imports most (a test that imports half the repo would otherwise glue it together), and tests
-// that import no code (a fixture tree) vote among themselves. Groups under 3 files join the group they have most
-// links to, or the group holding most files of their top folder. Returns the communities, largest first.
+// Communities of files over imports and mentions. Code votes among itself; then each test, doc or file of no language
+// joins the group whose code it imports or mentions most (a test that imports half the repo, or a README that names
+// every folder, would otherwise glue them together), and those that reach no code (a fixture tree) vote among
+// themselves. Groups under 3 files join the group they have most links to (code by code links), or a group mostly in
+// their top folder. Returns the communities, largest first.
 function buildCommunities(b, degree) {
   const files = [...b.nodes.values()].filter((n) => n.k === 'file' || n.k === 'doc').map((n) => n.i).sort(buildCmp);
   const at = new Map(files.map((f, i) => [f, i]));
-  const adj = files.map(() => new Map()), imports = files.map(() => new Map());
+  const adj = files.map(() => new Map()), outs = files.map(() => new Map());
   for (const [from, to, type] of b.edges.values()) {
     if (type !== 'imports' && type !== 'mentions') continue;
     const x = at.get(b.nodes.get(from).f), y = at.get(b.nodes.get(to).f);
     if (x === y) continue;
     adj[x].set(y, (adj[x].get(y) || 0) + 1);
     adj[y].set(x, (adj[y].get(x) || 0) + 1);
-    if (type === 'imports') imports[x].set(y, (imports[x].get(y) || 0) + 1);
+    outs[x].set(y, (outs[x].get(y) || 0) + 1);
   }
-  const test = files.map(buildIsTest), label = files.map(() => null);
-  buildPropagate(adj, label, test.map((t) => !t));
+  // only code votes: tests, docs and files of no language (package.json, an image) follow what reaches them
+  const follows = (f) => buildIsTest(f) || b.nodes.get(f).k === 'doc' || !b.lang.has(f);
+  const follower = files.map(follows), label = files.map(() => null);
+  buildPropagate(adj, label, follower.map((t) => !t));
   const sizes = new Map();
   label.forEach((l) => { if (l !== null) sizes.set(l, (sizes.get(l) || 0) + 1); });
-  test.forEach((t, i) => {
+  follower.forEach((t, i) => {
     if (!t) return;
     const tally = new Map();
-    for (const [j, w] of imports[i]) if (!test[j]) tally.set(label[j], (tally.get(label[j]) || 0) + w);
+    for (const [j, w] of outs[i]) if (!follower[j]) tally.set(label[j], (tally.get(label[j]) || 0) + w);
     let pick = null;
     for (const [l, w] of tally) if (pick === null || w > tally.get(pick) || w === tally.get(pick) && (sizes.get(l) > sizes.get(pick) || sizes.get(l) === sizes.get(pick) && l < pick)) pick = l;
     label[i] = pick;
@@ -353,8 +426,9 @@ function buildCommunities(b, degree) {
     for (const l of [...groups.keys()].sort((x, y) => x - y)) {
       const g = groups.get(l);
       if (!g || g.length >= BUILD_SMALL) continue;
-      const touch = new Map();
-      for (const i of g) for (const [j, w] of adj[i]) if (label[j] !== l) touch.set(label[j], (touch.get(label[j]) || 0) + w);
+      // a group with code in it goes where its code links, not where a doc that names it went
+      const code = g.some((i) => !follower[i]), touch = new Map();
+      for (const i of g) for (const [j, w] of adj[i]) if (label[j] !== l && (!code || !follower[j])) touch.set(label[j], (touch.get(label[j]) || 0) + w);
       let into = null;
       for (const [t, w] of touch) if (into === null || w > touch.get(into) || w === touch.get(into) && larger(t, into)) into = t;
       if (into !== null) { merge(l, into); again = true; }
@@ -363,13 +437,26 @@ function buildCommunities(b, degree) {
   for (const l of [...groups.keys()].sort((x, y) => x - y)) {
     const g = groups.get(l);
     if (!g || g.length >= BUILD_SMALL) continue;
+    // a group mostly in that folder, or another small one there: a lone script does not join a group that merely
+    // holds one script
     const dir = buildTopDir(files[Math.min(...g)]);
     let into = null, most = 0;
     for (const [t, members] of groups) {
       if (t === l) continue;
       const n = members.filter((i) => buildTopDir(files[i]) === dir).length;
+      if (n * 2 < members.length && members.length >= BUILD_SMALL) continue;
       if (n > most || n && n === most && larger(t, into)) { into = t; most = n; }
     }
+    if (into !== null) merge(l, into);
+  }
+  // still alone (code no code reaches, in a folder of its own): where any link goes
+  for (const l of [...groups.keys()].sort((x, y) => x - y)) {
+    const g = groups.get(l);
+    if (!g || g.length >= BUILD_SMALL) continue;
+    const touch = new Map();
+    for (const i of g) for (const [j, w] of adj[i]) if (label[j] !== l) touch.set(label[j], (touch.get(label[j]) || 0) + w);
+    let into = null;
+    for (const [t, w] of touch) if (into === null || w > touch.get(into) || w === touch.get(into) && larger(t, into)) into = t;
     if (into !== null) merge(l, into);
   }
   const deg = (id) => degree.get(id) || 0;
@@ -377,11 +464,10 @@ function buildCommunities(b, degree) {
   const list = [...groups.values()].map((g) => {
     const members = g.map((i) => files[i]).sort(buildCmp);
     const ids = members.concat(...members.map((f) => (b.syms.get(f) || []).filter((s) => b.nodes.get(s.id).k === 'sym').map((s) => s.id)));
-    // the file that names a group is code when it has any: a README links to everything, a test imports everything
-    const rank = (f) => (b.nodes.get(f).k === 'doc' ? 2 : buildIsTest(f) ? 1 : 0);
-    const lead = members.slice().sort((x, y) => rank(x) - rank(y) || byDegree(x, y))[0];
-    const top = ids.sort((x, y) => buildIsTest(b.nodes.get(x).f) - buildIsTest(b.nodes.get(y).f) || byDegree(x, y)).slice(0, BUILD_TOP);
-    return { members, lead, name: buildName(members, lead), n: members.length, top };
+    // the file that names a group, and its top nodes, are code first: a README links to everything, a test imports it
+    const lead = members.slice().sort((x, y) => follows(x) - follows(y) || byDegree(x, y))[0];
+    const top = ids.sort((x, y) => follows(b.nodes.get(x).f) - follows(b.nodes.get(y).f) || byDegree(x, y)).slice(0, BUILD_TOP);
+    return { members, lead, name: buildName(members, lead, follows), n: members.length, top };
   });
   list.sort((x, y) => y.n - x.n || buildCmp(x.name, y.name) || buildCmp(x.members[0], y.members[0]));
   // two communities in one folder: each also says its most connected file, then a number if that is not enough
@@ -427,7 +513,7 @@ export function buildGraph(files, opts = {}) {
   const b = {
     paths, has: new Set(paths), bases: new Map(), lang: new Map(), parsed: new Map(), nodes: new Map(), edges: new Map(),
     syms: new Map(), byName: new Map(), byLast: new Map(), imports: new Map(), outside: new Map(), stems: new Map(),
-    last: new Map(), langFor: opts.langFor || langFor,
+    last: new Map(), lines: new Map(), langFor: opts.langFor || langFor,
   };
   for (const p of paths) buildPush(b.bases, buildBase(p), p);
   buildExtract(b, files);

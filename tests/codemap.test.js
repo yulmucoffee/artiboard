@@ -371,12 +371,12 @@ test('build: imports resolve (cycle included), calls resolve through imports and
     ['README.md#api', 'README.md#cart', 'README.md#shop', 'docs/guide.md#guide', 'docs/guide.md#paying', 'docs/guide.md#paying@7'],
     'the second "Paying" section gets its line in its id');
   const nodes = new Map(allNodes(built).map((n) => [n.i, n]));
-  assert.deepEqual(nodes.get('src/cart.ts#Cart'), { i: 'src/cart.ts#Cart', k: 'sym', n: 'Cart', f: 'src/cart.ts', l: 17, t: 'class', e: 1, c: 0 });
-  assert.deepEqual(nodes.get('src/index.js#app'), { i: 'src/index.js#app', k: 'sym', n: 'app', f: 'src/index.js', l: 9, t: 'const', c: 1 }, 'not exported');
-  assert.deepEqual(nodes.get('docs/guide.md#paying@7'), { i: 'docs/guide.md#paying@7', k: 'sec', n: 'Paying', f: 'docs/guide.md', l: 7, t: 'h2', c: 0 });
-  assert.deepEqual(nodes.get('package.json'), { i: 'package.json', k: 'file', n: 'package.json', f: 'package.json', l: 0, c: 0 },
+  assert.deepEqual(nodes.get('src/cart.ts#Cart'), { i: 'src/cart.ts#Cart', k: 'sym', n: 'Cart', f: 'src/cart.ts', l: 17, t: 'class', e: 1, c: 1, s: 'export class Cart extends Store<CartItem>' });
+  assert.deepEqual(nodes.get('src/index.js#app'), { i: 'src/index.js#app', k: 'sym', n: 'app', f: 'src/index.js', l: 9, t: 'const', c: 0, s: 'const app = express()' }, 'not exported');
+  assert.deepEqual(nodes.get('docs/guide.md#paying@7'), { i: 'docs/guide.md#paying@7', k: 'sec', n: 'Paying', f: 'docs/guide.md', l: 7, t: 'h2', c: 2 });
+  assert.deepEqual(nodes.get('package.json'), { i: 'package.json', k: 'file', n: 'package.json', f: 'package.json', l: 0, c: 1 },
     'a file with no language is on the map because the README mentions it');
-  assert.deepEqual(nodes.get('README.md'), { i: 'README.md', k: 'doc', n: 'README.md', f: 'README.md', l: 0, c: 0 });
+  assert.deepEqual(nodes.get('README.md'), { i: 'README.md', k: 'doc', n: 'README.md', f: 'README.md', l: 0, c: 1 });
   assert.equal(nodes.size, 12 + 28 + 6);
   assert.deepEqual(built.index.counts, { files: 10, symbols: 28, edges: 79, docs: 2 });
   assert.deepEqual(built.index.langs, { js: 9, md: 2 });
@@ -385,17 +385,41 @@ test('build: imports resolve (cycle included), calls resolve through imports and
   assert.equal(built.index.by, 'ana');
 });
 
-test('build: communities by weighted label propagation, small ones merged, named by folder or by their busiest file', () => {
-  // src/util is 2 files and joins the larger of the two groups it links to as much; orphan.js links to nothing and
-  // joins the group with most files under src/. 6 of the first group's 9 files are under src/, all 3 of the second's:
-  // both are "src", so each also says its busiest file.
+test('build: communities: code votes, docs and other files follow, small groups merge, groups are named by folder', () => {
+  // Code alone: {client, api/index}, {Badge, index}, {cart, store}, {format, parse}, {orphan}. The README mentions cart
+  // and store 3 times and joins them; the guide names client and applyDiscount once each and joins the lower label,
+  // client's; package.json, reached only from the README, follows it. {Badge, index} has more code links to
+  // {format, parse} than elsewhere; orphan.js, linked to nothing, joins the group with most files under src/.
+  // Two groups are mostly under src/, so each also says its busiest code file.
   assert.deepEqual(built.index.communities, [
-    { c: 0, name: 'src (format.js)', n: 9, top: ['src/util/format.js', 'src/api/client.js', 'src/api/client.js#fetchCart', 'src/cart.ts', 'src/util/format.js#formatPrice'] },
-    { c: 1, name: 'src (index.js)', n: 3, top: ['src/index.js', 'src/index.js#main', 'src/api/index.js', 'src/components/Badge.jsx', 'src/components/Badge.jsx#Badge'] },
-  ]);
+    { c: 0, name: 'src (index.js)', n: 5, top: ['src/index.js', 'src/index.js#main', 'src/util/format.js', 'src/util/format.js#formatPrice', 'src/util/format.js#formatLine'] },
+    { c: 1, name: 'src (cart.ts)', n: 4, top: ['src/cart.ts', 'src/cart.ts#Cart', 'src/cart.ts#Cart.add', 'src/cart.ts#applyDiscount', 'src/cart.ts#Cart.label'] },
+    { c: 2, name: 'src/api', n: 3, top: ['src/api/client.js', 'src/api/client.js#fetchCart', 'src/api/index.js', 'src/api/index.js#VERSION', 'docs/guide.md'] },
+  ], 'a group\'s docs come after its code in its top');
   const c = new Map(allNodes(built).map((n) => [n.i, n.c]));
-  for (const f of ['src/api/index.js', 'src/components/Badge.jsx', 'src/index.js', 'src/index.js#main']) assert.equal(c.get(f), 1, f);
-  for (const f of ['README.md', 'README.md#cart', 'src/legacy/orphan.js', 'src/util/parse.js#parseAmount']) assert.equal(c.get(f), 0, f);
+  for (const f of ['src/components/Badge.jsx', 'src/index.js#main', 'src/legacy/orphan.js', 'src/util/parse.js#parseAmount']) assert.equal(c.get(f), 0, f);
+  for (const f of ['README.md', 'README.md#cart', 'package.json', 'src/store.ts']) assert.equal(c.get(f), 1, f);
+  for (const f of ['docs/guide.md', 'docs/guide.md#paying', 'src/api/index.js']) assert.equal(c.get(f), 2, f);
+});
+
+test('build: a doc naming code in several folders does not glue it together; lone scripts make their folder\'s group', () => {
+  // what this repository showed: a benchmark imports two server files (a triangle), and a guide names it, them, the
+  // scripts that import nothing, and a shell script
+  const b = buildGraph(new Map([
+    ['GUIDE.md', 'Run tools/a.js, tools/b.js, tools/c.js or tools/run.sh; tools/bench.js times srv/store.js and srv/rules.js. See notes/x.js.\n'],
+    ['notes/x.js', ''], ['srv/rules.js', ''], ['srv/store.js', "import './rules.js';\n"],
+    ['tools/a.js', ''], ['tools/b.js', ''], ['tools/bench.js', "import '../srv/store.js';\nimport '../srv/rules.js';\n"], ['tools/c.js', ''],
+    ['tools/run.sh', 'echo hi\n'],
+    ['a/guide.md', 'Read notes.md.\n'], ['a/notes.md', '# Notes\n'], ['notes.md', '# Root notes\n'],
+  ]), {});
+  const groups = b.index.communities.map(({ name, n, top }) => ({ name, n, top }));
+  assert.deepEqual(groups.slice(0, 2), [
+    { name: 'srv', n: 6, top: ['srv/rules.js', 'srv/store.js', 'tools/bench.js', 'notes/x.js', 'GUIDE.md'] },
+    { name: 'tools', n: 3, top: ['tools/a.js', 'tools/b.js', 'tools/c.js'] },
+  ], 'the guide follows the triangle it names most; tools/a, b and c link to no code and group by folder; notes/x.js, alone in '
+    + 'its folder, goes where its one link goes; run.sh follows the guide');
+  assert.deepEqual(allEdges(b).filter((e) => e[0] === 'a/guide.md'), [['a/guide.md', 'a/notes.md', 'mentions', 'x']],
+    'a doc\'s path is read from its own folder first, as its links are');
 });
 
 test('build: test files follow the code they import most, take no part in naming and are not among the most connected', () => {
@@ -479,12 +503,14 @@ test('build: a group whose files share no folder is named by its busiest code fi
   const b = buildGraph(new Map([
     ['GUIDE.md', 'See docs/n.md.\n'],
     ['README.md', 'See docs/n.md.\n'],
-    ['a/x.js', "import '../b/y.js';\n"],
-    ['b/y.js', 'export const y = 1;\n'],
-    ['docs/n.md', 'Read a/x.js and b/y.js.\n'],
+    ['a/x.js', "import '../b/y.js';\nimport '../c/z.js';\n"],
+    ['b/y.js', ''],
+    ['c/z.js', ''],
+    ['docs/n.md', 'Read a/x.js, b/y.js and c/z.js.\n'],
   ]), {});
-  // a/x.js and b/y.js (2 links each) form a group of 2 and join the docs' group, which they link to twice
-  assert.deepEqual(b.index.communities, [{ c: 0, name: 'x.js', n: 5, top: ['docs/n.md', 'a/x.js', 'b/y.js', 'GUIDE.md', 'README.md'] }]);
+  // x, y, z vote into one group (a third of the code in each folder); n.md follows it and the two docs that name only
+  // n.md follow it there. n.md has 5 links to x.js's 3, but code names a group and comes first in its top.
+  assert.deepEqual(b.index.communities, [{ c: 0, name: 'x.js', n: 6, top: ['a/x.js', 'b/y.js', 'c/z.js', 'docs/n.md', 'GUIDE.md'] }]);
 });
 
 test('build: a symbol given without an end runs to the next symbol at its nesting or shallower, or to the last line', () => {
@@ -506,6 +532,87 @@ test('build: a symbol given without an end runs to the next symbol at its nestin
     ['x.fake#after', 'x.fake#top', 'calls', 'x'],
     ['x.fake#top', 'x.fake#Box', 'calls', 'x'],
   ]);
+});
+
+test('build: a symbol carries its declaration as written and the comment right above it', () => {
+  const node = (b, id) => { const n = allNodes(b).find((x) => x.i === id); return [n.s, n.d]; };
+  assert.deepEqual(node(built, 'src/util/format.js#formatPrice'), ['export function formatPrice(value)', 'Prices as "3.00 EUR".'], 'a /** */ block above');
+  assert.deepEqual(node(built, 'src/util/format.js#LABEL'), ["const LABEL = 'class Fake extends Store {}'",
+    'function ghost() {} was removed; this comment must not become a symbol class Phantom {}'], 'a const keeps its value; the comment is two lines, a // and a /* */');
+  assert.deepEqual(node(built, 'src/util/format.js#CURRENCY'), ["export const CURRENCY = 'EUR'", undefined], 'a blank line above: no doc');
+  assert.deepEqual(node(built, 'src/store.ts#Store'), ['export abstract class Store<T extends Record>', undefined]);
+  assert.deepEqual(node(built, 'src/store.ts#Store.save'), ['save(item: T): void', undefined]);
+  assert.deepEqual(node(built, 'src/cart.ts#Cart.label'), ['label = ()', undefined], 'an arrow field, cut at =>');
+  const src = [
+    '// Days look like 2026-10-25.', // 1
+    'export const DAY = /^\\d{4}-\\d\\d-\\d\\d$/;', // 2
+    '', // 3
+    '/**', // 4
+    ' * Formats a day for a line.', // 5
+    ' * @param d a day', // 6
+    ' */', // 7
+    "export const short = (d) => (DAY.test(d) ? d.slice(5) : '');", // 8
+    '// a note about nothing below', // 9
+    '', // 10
+    'export class Store extends Base {', // 11
+    '  // keeps one thing', // 12
+    '  save(item, { force = false } = {}) {', // 13
+    '    return item;', // 14
+    '  }', // 15
+    '}', // 16
+    'export function makeFlow(store) {', // 17
+    '  /* the everyday post */', // 18
+    '  async function post(member, project, {', // 19
+    '    task, text,', // 20
+    '  }) {', // 21
+    '    return store.save(task, { text });', // 22
+    '  }', // 23
+    '  return { post };', // 24
+    '}', // 25
+    "const SEP = ' // ';", // 26
+    'const LIMIT = 3; // at most', // 27
+  ].join('\n') + '\n';
+  const b = buildGraph(new Map([['sig.js', src]]), {});
+  assert.deepEqual(node(b, 'sig.js#DAY'), ['export const DAY = /^\\d{4}-\\d\\d-\\d\\d$/', 'Days look like 2026-10-25.'], 'braces in a regex are not a body');
+  assert.deepEqual(node(b, 'sig.js#short'), ['export const short = (d)', 'Formats a day for a line. @param d a day'], 'an arrow const, under a JSDoc block');
+  assert.deepEqual(node(b, 'sig.js#Store'), ['export class Store extends Base', undefined], 'a comment, then a blank line: no doc');
+  assert.deepEqual(node(b, 'sig.js#Store.save'), ['save(item, { force = false } = {})', 'keeps one thing'], 'braces inside the parameters stay');
+  assert.deepEqual(node(b, 'sig.js#makeFlow'), ['export function makeFlow(store)', undefined]);
+  assert.deepEqual(node(b, 'sig.js#makeFlow.post'), ['async function post(member, project, { task, text, })', 'the everyday post'],
+    'a nested function whose parameters run over three lines');
+  assert.deepEqual(node(b, 'sig.js#SEP'), ["const SEP = ' // '", undefined], 'a string is kept whole');
+  assert.deepEqual(node(b, 'sig.js#LIMIT'), ['const LIMIT = 3', undefined], 'a comment after the code is not part of it');
+  const g = loadGraph(b.index, b.chunks);
+  assert.deepEqual(g.explain('makeFlow.post').lines.slice(0, 3), ['makeFlow.post · fn · sig.js:19 · community sig.js · degree 2',
+    'async function post(member, project, { task, text, })', '// the everyday post'], 'used by makeFlow; store.save( guessed as Store.save');
+});
+
+test('build: signatures and comments in other languages: a Python # comment and docstring, a SQL -- comment', () => {
+  const py = [
+    '# Records an entry and returns the new ids.', // 1
+    'def record(self, entry: Entry) -> list[int]:', // 2
+    '    return []', // 3
+    '', // 4
+    'class Ledger(Base):', // 5
+    '    """Keeps entries in order."""', // 6
+    '    def total(self):  # sums', // 7
+    '        return 0', // 8
+  ].join('\n') + '\n';
+  const sql = '-- Invoices, one per order.\nCREATE TABLE invoices (\n  id int\n);\n';
+  // made-up languages that give these symbols, so only the build's reading of the lines is tested
+  const lang = (id, symbols) => ({ id, exts: [], resolve: () => null, extract: () => ({ symbols, imports: [], refs: [], extends: [] }) });
+  const langs = {
+    'ledger.py': lang('python', [{ name: 'record', kind: 'fn', line: 2 }, { name: 'Ledger', kind: 'class', line: 5 }, { name: 'Ledger.total', kind: 'method', line: 7 }]),
+    'billing.sql': lang('sql', [{ name: 'invoices', kind: 'table', line: 2 }]),
+  };
+  const b = buildGraph(new Map([['ledger.py', py], ['billing.sql', sql]]), { langFor: (p) => langs[p] || null });
+  const seen = Object.fromEntries(allNodes(b).filter((n) => n.k === 'sym').map((n) => [n.i, [n.s, n.d]]));
+  assert.deepEqual(seen, {
+    'billing.sql#invoices': ['CREATE TABLE invoices', 'Invoices, one per order.'],
+    'ledger.py#Ledger': ['class Ledger(Base)', 'Keeps entries in order.'],
+    'ledger.py#Ledger.total': ['def total(self)', undefined],
+    'ledger.py#record': ['def record(self, entry: Entry) -> list[int]', 'Records an entry and returns the new ids.'],
+  }, 'the colon off; the docstring when nothing is above; a docstring line above is code, not a comment');
 });
 
 test('build: chunks keep under chunkBytes, nodes in id order, each edge with its from node', () => {
@@ -570,7 +677,8 @@ test('mapRepo scans, reads and builds, with the commit when there is one', async
 
 test('explain: one node and its connections, grouped; ambiguous and unknown names say so', () => {
   assert.deepEqual(G.explain('Cart').lines, [
-    'Cart · class · src/cart.ts:17 · community src (format.js) · degree 4',
+    'Cart · class · src/cart.ts:17 · community src (cart.ts) · degree 4',
+    'export class Cart extends Store<CartItem>',
     'called by:',
     '  src/index.js#main [x]',
     '  src/api/client.js#fetchCart [x]',
@@ -582,7 +690,7 @@ test('explain: one node and its connections, grouped; ambiguous and unknown name
   assert.equal(G.explain('cart').id, 'src/cart.ts#Cart', 'any case; the code wins over the README section of that name');
   assert.equal(G.explain('save').id, 'src/store.ts#Store.save', 'a method by its own name');
   assert.deepEqual(G.explain('src/util/parse.js').lines, [
-    'parse.js · file · src/util/parse.js · community src (format.js) · degree 2',
+    'parse.js · file · src/util/parse.js · community src (index.js) · degree 2',
     'defines:',
     '  src/util/parse.js#parseAmount [x]',
     'imports:',
@@ -597,24 +705,42 @@ test('explain: one node and its connections, grouped; ambiguous and unknown name
   assert.deepEqual(G.explain('total').ambiguous, ['src/cart.ts#Cart.total', 'src/store.ts#Store.total']);
   assert.deepEqual(G.explain('nope'), { lines: ['not in the map: nope'], missing: true });
   assert.deepEqual(G.explain('src/legacy/orphan.js#formatPrice').lines, [
-    'formatPrice · fn · src/legacy/orphan.js:2 · community src (format.js) · degree 1',
+    'formatPrice · fn · src/legacy/orphan.js:2 · community src (index.js) · degree 1',
+    'export function formatPrice(cents)',
+    '// Old pricing code nobody imports any more; it keeps a second formatPrice.',
     'used by:',
     '  src/legacy/orphan.js#Ledger.record [x]',
   ]);
   const capped = G.explain('src/cart.ts', { limit: 2 }).lines;
-  assert.deepEqual(capped.slice(0, 5), ['cart.ts · file · src/cart.ts · community src (format.js) · degree 5', 'defines:',
-    '  src/cart.ts#Price [x]', '  src/cart.ts#Currency [x]', '  … 6 more'], 'definitions in line order, capped');
+  assert.deepEqual(capped.slice(0, 5), ['cart.ts · file · src/cart.ts · community src (cart.ts) · degree 5', 'defines:',
+    '  src/cart.ts#Price [x]', '  src/cart.ts#Currency [x]', '  … 6 more (limit 10)'], 'definitions in line order, capped, saying how to see them all');
+});
+
+test('explain, file and impact show 30 per group by default, and say which limit shows the rest', () => {
+  const k35 = Array.from({ length: 35 }, (_, k) => k);
+  const b = buildGraph(new Map([
+    ['m.js', k35.map((k) => `export function f${k}() {}`).join('\n') + '\n'],
+    ['u.js', `import { f0 } from './m.js';\n${k35.map((k) => `export function u${k}() { return f0(); }`).join('\n')}\n`],
+  ]), {});
+  const g = loadGraph(b.index, b.chunks);
+  const ex = g.explain('m.js').lines;
+  assert.deepEqual([ex[1], ex[2], ex[31], ex[32]], ['defines:', '  m.js#f0 [x]', '  m.js#f29 [x]', '  … 5 more (limit 40)']);
+  const fl = g.file('m.js').lines;
+  assert.deepEqual([fl[1], fl[31], fl[32]], ['symbols:', '  f29 fn 30 · export function f29()', '  … 5 more (limit 40)']);
+  const im = g.impact('m.js#f0').lines;
+  assert.deepEqual([im[0], im[1], im.length, im[32]], ['impact of m.js#f0: 35 dependents within 2 steps', 'depth 1:', 33, '  … 5 more (limit 40)']);
+  assert.equal(g.explain('m.js', { limit: 40 }).lines.length, 2 + 35 + 2, 'every definition, and the importer');
 });
 
 test('file: a file\'s symbols, imports, importers and mentions; a doc\'s sections', () => {
   assert.deepEqual(G.file('src/util/format.js').lines, [
-    'src/util/format.js · file · community src (format.js) · 5 symbols · imported by 5',
+    'src/util/format.js · file · community src (index.js) · 5 symbols · imported by 5',
     'symbols:',
-    '  LABEL const 6',
-    '  CURRENCY const 8',
-    '  formatPrice fn 10',
-    '  formatLine fn 15',
-    '  shout fn 19',
+    "  LABEL const 6 · const LABEL = 'class Fake extends Store {}'",
+    "  CURRENCY const 8 · export const CURRENCY = 'EUR'",
+    '  formatPrice fn 10 · export function formatPrice(value)',
+    '  formatLine fn 15 · export function formatLine(item)',
+    '  shout fn 19 · function shout(text)',
     'imports:',
     '  src/util/parse.js [x]',
     'imported by:',
@@ -625,7 +751,7 @@ test('file: a file\'s symbols, imports, importers and mentions; a doc\'s section
     '  src/util/parse.js [x]',
   ]);
   assert.deepEqual(G.file('docs/guide.md').lines, [
-    'docs/guide.md · doc · community src (format.js) · 3 sections · imported by 0',
+    'docs/guide.md · doc · community src/api · 3 sections · imported by 0',
     'sections:',
     '  Guide h1 1',
     '  Paying h2 3',
@@ -666,25 +792,25 @@ test('query: words score names, path parts and text, weighted by connections; ne
   const q = G.query('Where do we parse an amount?');
   assert.deepEqual(q.lines, [
     'files:',
-    '  src/util/parse.js · 1 symbols · src (format.js)',
-    '  src/util/format.js · 5 symbols · src (format.js)',
+    '  src/util/parse.js · 1 symbols · src (index.js)',
+    '  src/util/format.js · 5 symbols · src (index.js)',
     'symbols:',
-    '  src/util/parse.js#parseAmount · fn · 4',
-    '  src/util/format.js#formatPrice · fn · 10',
+    '  src/util/parse.js#parseAmount · fn · 4 · export function parseAmount(value)',
+    '  src/util/format.js#formatPrice · fn · 10 · export function formatPrice(value)',
   ]);
   assert.deepEqual(q.symbols, ['src/util/parse.js#parseAmount', 'src/util/format.js#formatPrice']);
   assert.deepEqual(G.query('Where do we parse an amount?', { limit: 2 }).lines,
-    ['files:', '  src/util/parse.js · 1 symbols · src (format.js)', 'symbols:', '  src/util/parse.js#parseAmount · fn · 4']);
+    ['files:', '  src/util/parse.js · 1 symbols · src (index.js)', 'symbols:', '  src/util/parse.js#parseAmount · fn · 4 · export function parseAmount(value)']);
   assert.deepEqual(G.query('and the zzz'), { lines: ['nothing in the map matches: and the zzz'], missing: true });
   // 'cart' matches 8 nodes (more than 5, and 4 times or more the 1 'discount' matches): common. Only applyDiscount
   // matches 'discount'; its neighbors come at a quarter of its score
   assert.deepEqual(G.query('cart discount').lines, [
     'files:',
-    '  src/cart.ts · 8 symbols · src (format.js)',
+    '  src/cart.ts · 8 symbols · src (cart.ts)',
     'symbols:',
-    '  src/cart.ts#applyDiscount · fn · 30',
-    '  src/cart.ts#Cart.total · method · 23',
-    '  src/index.js#main · fn · 11',
+    '  src/cart.ts#applyDiscount · fn · 30 · export function applyDiscount(cart: Cart, rate: number)',
+    '  src/cart.ts#Cart.total · method · 23 · total(): number',
+    '  src/index.js#main · fn · 11 · export async function main(id)',
     'docs:',
     '  docs/guide.md#paying · h2 · 3',
   ], 'Cart, fetchCart and the README\'s Cart section match only the common word');
@@ -705,8 +831,8 @@ test('query: tests come after the code they test, and docs make a group of four 
     '  lib/sort.js · 1 symbols · lib',
     '  tests/sort.test.js · 1 symbols · lib',
     'symbols:',
-    '  lib/sort.js#sortItems · fn · 1',
-    '  tests/sort.test.js#sort · fn · 2',
+    '  lib/sort.js#sortItems · fn · 1 · export function sortItems(a)',
+    '  tests/sort.test.js#sort · fn · 2 · function sort()',
     'docs:',
     '  docs/a.md#sorting · h1 · 1',
     '  docs/b.md#sorting · h1 · 1',
@@ -733,7 +859,7 @@ test('impact: dependents by depth; a file\'s own symbols are not its dependents'
     '  src/util/format.js#formatLine [x] calls',
   ];
   assert.deepEqual(G.impact('src/util/parse.js').lines, lines);
-  assert.deepEqual(G.impact('src/util/parse.js', { limit: 5 }).lines, [...lines.slice(0, 8), '  … 6 more']);
+  assert.deepEqual(G.impact('src/util/parse.js', { limit: 5 }).lines, [...lines.slice(0, 10), '  … 4 more (limit 10)'], 'capped per depth');
   assert.deepEqual(G.impact('src/util/parse.js', { depth: 1 }).levels, [['src/util/format.js', 'src/util/format.js#formatPrice']]);
   assert.deepEqual(G.impact('Store').lines, ['impact of src/store.ts#Store: 3 dependents within 2 steps', 'depth 1:',
     '  src/cart.ts#Cart [x] extends', 'depth 2:', '  src/api/client.js#fetchCart [x] calls', '  src/index.js#main [x] calls']);
@@ -744,15 +870,16 @@ test('impact: dependents by depth; a file\'s own symbols are not its dependents'
 
 test('overview: counts, languages, communities and the most connected nodes', () => {
   const lines = G.overview().lines;
-  assert.deepEqual(lines.slice(0, 5), [
+  assert.deepEqual(lines.slice(0, 6), [
     `acme/shop · 10 files · 28 symbols · 79 edges · 2 docs · built ${built.index.builtAt.slice(5, 10)} by ana`,
     'langs: js 9 · md 2',
     'communities:',
-    '  src (format.js) · 9 files · src/util/format.js, src/api/client.js, src/api/client.js#fetchCart',
-    '  src (index.js) · 3 files · src/index.js, src/index.js#main, src/api/index.js',
+    '  src (index.js) · 5 files · src/index.js, src/index.js#main, src/util/format.js',
+    '  src (cart.ts) · 4 files · src/cart.ts, src/cart.ts#Cart, src/cart.ts#Cart.add',
+    '  src/api · 3 files · src/api/client.js, src/api/client.js#fetchCart, src/api/index.js',
   ]);
-  assert.deepEqual(lines.slice(5, 8), ['most connected:', '  src/index.js · file · degree 7', '  src/index.js#main · fn · degree 6']);
-  assert.equal(lines.length, 5 + 1 + 10 + 1);
+  assert.deepEqual(lines.slice(6, 9), ['most connected:', '  src/index.js · file · degree 7', '  src/index.js#main · fn · degree 6']);
+  assert.equal(lines.length, 6 + 1 + 10 + 1);
   assert.equal(lines[lines.length - 1], '  … 10 more');
   assert.deepEqual(loadGraph(built.index, []).overview({ limit: 1 }).lines.slice(-3), ['most connected:', '  src/index.js', '  … 19 more'],
     'the index alone is enough for an overview');
@@ -787,10 +914,10 @@ test('context: a task\'s touches, the paths its text names and the symbols it na
     touches: ['src/store.ts'],
   };
   const lines = [
-    'src/store.ts · 5 symbols · imported by 1 · src (format.js)',
-    'src/util/format.js · 5 symbols · imported by 5 · src (format.js) · formatPrice',
-    'src/cart.ts · 8 symbols · imported by 2 · src (format.js) · Cart, applyDiscount',
-    'src/legacy/orphan.js · 3 symbols · imported by 0 · src (format.js) · formatPrice',
+    'src/store.ts · 5 symbols · imported by 1 · src (cart.ts)',
+    'src/util/format.js · 5 symbols · imported by 5 · src (index.js) · formatPrice',
+    'src/cart.ts · 8 symbols · imported by 2 · src (cart.ts) · Cart, applyDiscount',
+    'src/legacy/orphan.js · 3 symbols · imported by 0 · src (index.js) · formatPrice',
   ];
   assert.deepEqual(G.context(task).lines, lines, 'parse.js alone is not a path; formatPrice is in two files');
   assert.deepEqual(G.context(task, { limit: 2 }).lines, lines.slice(0, 2));
