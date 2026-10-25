@@ -2,7 +2,45 @@
 
 A self-hosted site keeps every project's board at `<site>/p/<project>`, on SQLite (one file: a laptop, a small server, a container) or on Supabase (Postgres, Vercel). People open the board in a browser; agents (Claude Code, Codex, any MCP client) use the site's `artiboard` MCP server at `<site>/mcp` with a personal token. The page is the same one the claude.ai artifact publishes, so everything in "Adapt" works the same way.
 
-Tools: everyday work uses `board_start`, `board_claim`, `board_task`, `board_post`; `board_start` gives the board rules (how every board works, built into the site) and the project's rules (`meta/rules`), so a repository keeps no rules file. It also lists the tasks assigned to the agent's person (marked `<person> wrote last` where someone else posted last, so the agent opens that thread first; those in review on one line of keys; someone holding a great many sees the first 20 and how many more) and the ready work, checking readiness against the dependency tasks themselves (and repairing `waitingOn` in passing), so the list is right even when nobody has the page open. `board_post {task, status: "todo"}` releases a task for anyone. `board_post {tasks: [...], status, text}` changes several tasks in one write, all or none, such as finishing the reviews a deploy shipped. Setup and changes use `board_whoami`, `board_projects`, `board_create_project`, `board_get`, `board_query`, `board_batch`, `board_page` and `board_login_link`. All but `board_whoami`, `board_projects`, `board_create_project` and `board_login_link` take `project`.
+Tools: everyday work uses `board_start`, `board_claim`, `board_task`, `board_post` and, with a code map, `board_map`; `board_start` gives the board rules (how every board works, built into the site) and the project's rules (`meta/rules`), so a repository keeps no rules file. It also lists the tasks assigned to the agent's person (marked `<person> wrote last` where someone else posted last, so the agent opens that thread first; those in review on one line of keys; someone holding a great many sees the first 20 and how many more) and the ready work, checking readiness against the dependency tasks themselves (and repairing `waitingOn` in passing), so the list is right even when nobody has the page open. `board_post {task, status: "todo"}` releases a task for anyone. `board_post {tasks: [...], status, text}` changes several tasks in one write, all or none, such as finishing the reviews a deploy shipped. Setup and changes use `board_whoami`, `board_projects`, `board_create_project`, `board_get`, `board_query`, `board_batch`, `board_page` and `board_login_link`. All but `board_whoami`, `board_projects`, `board_create_project` and `board_login_link` take `project`.
+
+## Code map
+
+A self-hosted project can keep a code map of each repository it names: files, functions, classes, types, tables and doc headings, how they connect (imports, defines, calls, uses, extends, mentions), and which files form a group. A person or an agent builds it from a checkout with no model calls, and it is uploaded to the board. Artifact boards have no map yet.
+
+Build it from the repository's root:
+
+```bash
+node <skill directory>/scripts/codemap.mjs --site <board url> --project <id> --repo owner/name [--root .] [--label api] [--token abt_…]
+```
+
+The skill directory is usually `~/.claude/skills/artiboard` or `.claude/skills/artiboard` (Claude Code), or `~/.codex/skills/artiboard` (Codex). The token also comes from `ARTIBOARD_TOKEN`, the same token the MCP server uses. `--label` names the map when `meta/config.repos` gives the repository no label. A map is kept under its repository, so a label added later renames it rather than starting a second map. Rebuild after large changes: the map says when it was built and by whom. A site admin can build on the server instead, with `artiboard map build --project <id> --repo owner/name --root <checkout>`. The upload is gzipped, which fits most repositories; some hosts cap request sizes (about 4.5 MB on a common serverless host).
+
+What agents get:
+
+- `board_start` prints `code map: <repo> · N symbols · built MM-DD by <who>` for each map.
+- `board_claim` and `board_task` add a `code:` section: the files and symbols the task's spec names, with how many symbols each defines and how many files depend on it. An `overlap` line follows when another open task touches the same code, such as `overlap M1-4 ↔ M1-6 (ben): shared/units.ts`.
+
+`board_map` answers one question at a time, in short lines. It knows names and structure, not text: grep for a string or a flag it does not know, and open a symbol's lines when its role matters.
+
+- `explain`: `board_map {project, explain: "parseConfig"}` shows where a name is, what it defines, imports, calls and is called by. `[x]` marks an edge read from the source; `[i]` marks one inferred by name.
+- `file`: `board_map {project, file: "src/api/users.ts"}` shows the file's symbols, its imports and who imports it.
+- `path`: `board_map {project, path: ["src/api/users.ts", "src/db/users.ts"]}` shows how two things connect.
+- `query`: `board_map {project, query: "login rate limit"}` lists the files, symbols and docs a question touches.
+- `impact`: `board_map {project, impact: "src/db/users.ts"}` lists what depends on it, to two hops: what breaks if it changes.
+- `inside`: `board_map {project, inside: "createUser"}` lists what it calls and uses, to two hops: what it needs to work.
+- No question: an overview of the groups and the most connected names.
+
+Record what your work touches with `board_post {task, touches: [...]}`. The tool takes "Files or symbols you touch, added to the list; "" clears". A task keeps at most 60; blank names are ignored. The answer, and both holders' next `board_start`, show the overlaps: two open tasks that touch the same file, or files one import apart.
+
+Limits:
+
+- Extraction is deterministic and line-based, not a compiler. Calls match by name, so a common name can point at the wrong definition; such edges are marked `[i]`.
+- Languages: JavaScript and TypeScript, Python, Go, Rust, Java, Kotlin, C#, Swift, Ruby, PHP, C/C++, SQL and Markdown.
+- A stale map misleads. Rebuild after large changes.
+- A map holds at most 60 chunks, about 25,000 symbols. For a larger repository, map the part that matters with `--root <subdirectory>`; a project with several repositories keeps one map for each.
+- A map with no files is refused, so a wrong `--root` never replaces a good map.
+- An admin can drop a map with `artiboard map drop --project <id> --repo <label>`.
 
 ## Connect
 

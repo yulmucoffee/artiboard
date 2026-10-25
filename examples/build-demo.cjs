@@ -26,6 +26,7 @@ const shim=`<script>
   function coll(p,o){o=o||{};return {
     orderBy:function(f,d){return coll(p,{order:f,dir:d,limit:o.limit})},
     limit:function(n){return coll(p,{order:o.order,dir:o.dir,limit:n})},
+    get:function(){return Promise.resolve(snap(p,o))},
     onSnapshot:function(cb){return sub(function(){cb(snap(p,o))})}}}
   function doc(p){return {
     get:function(){return Promise.resolve({exists:!!store[p],data:function(){return store[p]}})},

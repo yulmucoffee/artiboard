@@ -3,11 +3,26 @@
 // Settings come from the environment (see README "Self-host"); --env loads them from a file first.
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { mapRepo } from './codemap/build.js';
 import { BoardError, cleanRepos, now, reposOf, toBoardError } from './core.js';
 import { loadConfig, openStore } from './config.js';
+import { makeFlow } from './flow.js';
 import { addMember as joinSite, connectLines, entryFor, removeMember as leaveSite, setPerson as seat } from './members.js';
 import { defaultPage } from './page.js';
+
+const MAP_USAGE = `  map build      --project ID --repo owner/name [--root DIR] [--label L]
+           map a checkout (DIR, else this directory) and keep the map on the board
+  map overview   --project ID [--repo R]    a map's communities and most connected names
+  map query      --project ID TEXT          the files, symbols and docs some words find
+  map explain    --project ID NAME          a symbol or file and what it connects to
+  map file       --project ID PATH
+  map path       --project ID A B           how two names connect
+  map impact     --project ID X             what depends on X
+  map inside     --project ID X             what X calls and uses
+  map drop       --project ID --repo R      delete a repository's map
+           queries take --repo R when a project has several maps, and --limit N`;
 
 const USAGE = `usage: artiboard <command> [options]   (--env FILE loads settings first)
 
@@ -34,15 +49,18 @@ const USAGE = `usage: artiboard <command> [options]   (--env FILE loads settings
   page reset     --project ID                back to the bundled page
 
   import         --project ID --file FILE [--map old=new,...]
-           documents exported from a claude.ai artifact board ({"path": data} or {"docs": {...}})`;
+           documents exported from a claude.ai artifact board ({"path": data} or {"docs": {...}})
 
-const { positionals: [cmd, sub], values: o } = parseArgs({
+${MAP_USAGE}`;
+
+const { positionals: [cmd, sub, ...args], values: o } = parseArgs({
   allowPositionals: true,
   options: {
     env: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' },
     person: { type: 'string' }, name: { type: 'string' }, email: { type: 'string' }, access: { type: 'string' }, label: { type: 'string' },
     projects: { type: 'string' }, project: { type: 'string' }, id: { type: 'string' }, title: { type: 'string' }, lang: { type: 'string' },
     file: { type: 'string' }, out: { type: 'string' }, map: { type: 'string' }, repos: { type: 'string' }, help: { type: 'boolean', short: 'h' },
+    repo: { type: 'string' }, root: { type: 'string' }, limit: { type: 'string' },
   },
 });
 if (o.env) process.loadEnvFile(o.env);
@@ -75,6 +93,14 @@ function connectHelp(person, token) {
 }
 
 const pickProjects = async () => (o.projects ? o.projects.split(',').map((s) => s.trim()).filter(Boolean) : store.projectIds());
+
+// one question to a project's code map, printed as board_map answers it
+async function ask(question) {
+  need('project');
+  console.log(await makeFlow(store).map(o.project, { repo: o.repo, limit: o.limit ? Number(o.limit) : undefined, ...question }));
+}
+// the command line writes as the site (no member), naming who built a map after --person or the admin
+const site = () => ({ uid: null, person: o.person || 'admin' });
 
 async function addMember(access) {
   need('person');
@@ -204,10 +230,29 @@ const commands = {
     for (let i = 0; i < writes.length; i += 100) await store.apply(null, o.project, writes.slice(i, i + 100));
     console.log(`imported ${writes.length} documents into ${cfg.boardUrl}/p/${o.project}`);
   },
+
+  map: {
+    async build() {
+      need('project', 'repo');
+      const root = resolve(o.root || '.'), { index, chunks } = await mapRepo(root, { repo: o.repo });
+      // --label names the map where the board's repos give it no label
+      const r = await makeFlow(store).setMap(site(), o.project, { repo: o.repo, index: { ...index, ...(o.label && { label: o.label }) }, chunks, root });
+      const c = r.counts || {};
+      console.log(`${r.repoKey}: ${c.files ?? 0} files · ${c.symbols ?? 0} symbols · ${c.edges ?? 0} edges · ${r.chunks} chunk${r.chunks === 1 ? '' : 's'}`);
+    },
+    overview: () => ask({}),
+    query: () => ask({ query: args.join(' ') }),
+    explain: () => ask({ explain: args[0] }),
+    file: () => ask({ file: args[0] }),
+    path: () => ask({ path: args.slice(0, 2) }),
+    impact: () => ask({ impact: args[0] }),
+    inside: () => ask({ inside: args[0] }),
+    async drop() { need('project', 'repo'); console.log(await makeFlow(store).dropMap(site(), o.project, o.repo)); },
+  },
 };
 
 const run = typeof commands[cmd] === 'function' ? commands[cmd] : commands[cmd]?.[sub];
-if (!run) die(USAGE);
+if (!run) die(cmd === 'map' ? `usage: artiboard map <command> [options]\n\n${MAP_USAGE}` : USAGE);
 try {
   await run();
   if (cmd !== 'serve') { store.close(); }

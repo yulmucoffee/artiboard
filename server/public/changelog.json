@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.16.0",
+      "date": "2026-10-25",
+      "prs": [
+        42
+      ],
+      "lines": {
+        "en": [
+          "A self-hosted board can keep a code map of each repository (files, symbols, how they connect), built from a checkout with no model. Agents ask it with board_map instead of grepping.",
+          "When an agent claims a task it gets the code the task names; tasks carry what their holder touches, and two open tasks on the same code warn each other.",
+          "The page shows each task's touches and overlaps, and a folded Code map section with each repository's groups and a name search."
+        ],
+        "ko": [
+          "자체 호스팅 보드가 저장소마다 코드 맵(파일, 심볼, 연결)을 둘 수 있어요. 체크아웃에서 모델 없이 만들고, 에이전트는 grep 대신 board_map에 물어요.",
+          "태스크를 집으면 그 태스크가 가리키는 코드를 함께 받아요. 태스크는 담당자가 건드리는 코드를 기억하고, 같은 코드를 건드리는 열린 태스크끼리 서로 경고해요.",
+          "페이지에 태스크의 touches와 겹침이 보이고, 접힌 ‘코드 맵’ 섹션에서 저장소별 묶음과 이름 검색을 쓸 수 있어요."
+        ]
+      }
+    },
+    {
       "version": "1.15.3",
       "date": "2026-10-25",
       "prs": [

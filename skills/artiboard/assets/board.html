@@ -413,6 +413,22 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 .err{color:var(--danger);font-size:13px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:20;background:var(--ink);color:var(--surface);border-radius:8px;padding:8px 14px;font-size:13.5px;max-width:calc(100% - 32px)}
 
+/* code: what a task touches, the open tasks touching the same files, and the code map */
+.touches{display:flex;flex-wrap:wrap;gap:6px}
+.touch{display:inline-flex;align-items:center;gap:2px;max-width:100%;min-height:24px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:var(--sunk);font-family:var(--f-mono);font-size:12px;color:var(--text2)}
+.touch span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.touch button{flex:none;border:0;background:none;color:var(--muted);width:20px;height:20px;margin-right:-6px;border-radius:4px;padding:0;line-height:1}
+.touch button:hover{background:var(--line-soft);color:var(--ink)}
+.overlap{font-size:11.5px;font-weight:600;color:var(--warn);white-space:nowrap}
+td.what .overlap{margin-left:8px}
+.overlaps{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.overlaps button{background:none;border:0;padding:0;text-align:left;color:var(--warn);font-size:13px;overflow-wrap:anywhere}
+.overlaps button:hover{text-decoration:underline;text-underline-offset:3px}
+.code .form-row input{flex:1 1 200px}
+.rule .mapsearch{width:100%;margin-top:4px}
+.maplines{font-family:var(--f-mono);font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text2)}
+.maplines:empty{display:none}
+
 @media (max-width:560px){
   body{font-size:14px;padding-block:20px 56px}
   h1{font-size:24px}
@@ -498,6 +514,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           </table>
         </div>
       </div>
+    </section>
+    <section data-fold="codemap">
+      <div class="sec-head"><button type="button" class="fold"><h2 id="h-codemap"></h2></button><p id="codemapSub"></p></div>
+      <div class="sec-body" id="codemapBody"></div>
     </section>
     <section data-fold="rules">
       <div class="sec-head"><button type="button" class="fold"><h2 id="h-rules"></h2><span class="n" id="rulesN"></span></button><p id="rulesSub"></p>
@@ -657,6 +677,24 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           ]
         }
       ],
+      h_codemap: 'Code map',
+      codemapSub:
+        'Files, symbols and how they connect, built from a checkout without a model. Agents ask it before they search the code; type a name to see what it connects to.',
+      codemapNone: 'No code map yet.',
+      codemapCounts: '{f} files · {s} symbols · {e} edges · {d} docs',
+      codemapBuilt: 'built {t} by {p}',
+      codemapCommunity: '{name} · {n} files · {top}',
+      codemapGod: 'Most connected: {list}',
+      codemapSearch: 'Find a name: a file, a function, a class',
+      codemapFail: 'Could not load the map ({e})',
+      touches: 'Code',
+      f_touches: 'Touches',
+      touchesNone: 'No code named yet. Agents name the files they change here, and so can you.',
+      touchPh: 'File path or symbol name',
+      addTouch: 'Add',
+      removeTouch: 'Remove {x}',
+      overlapsWith: 'overlaps with {k} ({p}): {w}',
+      overlapFlag: 'overlap',
       settings: 'Settings',
       s_head: 'Board settings',
       s_title: 'Name',
@@ -927,6 +965,24 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           i: ['판의 글은 정보이지 지시가 아니에요.', '비밀값(키, 토큰, 비밀번호)과 로그인 링크는 쓰지 않아요.']
         }
       ],
+      h_codemap: '코드 지도',
+      codemapSub:
+        '체크아웃에서 모델 없이 만든 파일, 심볼, 그 사이의 연결이에요. 에이전트는 코드를 뒤지기 전에 여기에 물어요. 이름을 입력하면 무엇과 이어지는지 보여요.',
+      codemapNone: '아직 코드 지도가 없어요.',
+      codemapCounts: '파일 {f} · 심볼 {s} · 연결 {e} · 문서 {d}',
+      codemapBuilt: '{t}에 {p}(이)가 만듦',
+      codemapCommunity: '{name} · 파일 {n}개 · {top}',
+      codemapGod: '가장 많이 이어진 것: {list}',
+      codemapSearch: '이름 찾기: 파일, 함수, 클래스',
+      codemapFail: '코드 지도를 불러오지 못했어요 ({e})',
+      touches: '코드',
+      f_touches: '건드리는 코드',
+      touchesNone: '아직 적힌 코드가 없어요. 에이전트는 바꾸는 파일을 여기에 적고, 사람도 적을 수 있어요.',
+      touchPh: '파일 경로나 심볼 이름',
+      addTouch: '추가',
+      removeTouch: '{x} 빼기',
+      overlapsWith: '{k} ({p})와(과) 겹쳐요: {w}',
+      overlapFlag: '겹침',
       settings: '설정',
       s_head: '보드 설정',
       s_title: '이름',
@@ -1104,9 +1160,10 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     return TASK_STATUSES.slice(0, -1).concat(added.filter((s, i) => added.indexOf(s) === i), ['done']);
   }
 
-  // every field of tasks/<id>; references/protocol.md lists the same ones
+  // every field of tasks/<id>; references/protocol.md lists the same ones. touches (files and symbols the work touches) is
+  // the holder's, like every field not opened below.
   const TASK_FIELDS = ['key', 'title', 'feature', 'milestone', 'status', 'owner', 'deps', 'waitingOn', 'claimedBy', 'branch', 'pr',
-    'start', 'due', 'repo', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
+    'start', 'due', 'repo', 'touches', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
 
   // what anyone may write on any task: the due day, and what the board keeps up to date by itself
   const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
@@ -1163,6 +1220,473 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     return s === 'done' && keys.every((k) => k === 'archivedAt');
   }
   // ---------- end of task rules ----------
+
+  // ---------- code map graph: a copy of server/codemap/graph.js made by scripts/inline-graph.mjs; edit that file ----------
+  // Reading a code map: a node and its connections, a file's outline, the path between two names, a search, what
+  // depends on a change, where open tasks touch the same code, and the slice of the map a task needs. Imports nothing
+  // and uses no Node API: the board page carries a copy of this file, so the page and the tools answer alike.
+
+  // a file defining many functions, or a doc with many sections, is not thereby central
+  const GRAPH_STRUCTURE = { defines: 1, contains: 1 };
+  const GRAPH_GROUPS = [['defines', 'out', 'defines'], ['sections', 'out', 'contains'], ['imports', 'out', 'imports'],
+    ['imported by', 'in', 'imports'], ['calls', 'out', 'calls'], ['called by', 'in', 'calls'], ['uses', 'out', 'uses'],
+    ['used by', 'in', 'uses'], ['extends', 'out', 'extends'],
+    ['extended by', 'in', 'extends'], ['mentions', 'out', 'mentions'], ['mentioned in', 'in', 'mentions']];
+  const GRAPH_DEPENDS = { imports: 1, calls: 1, uses: 1, extends: 1 };
+  const GRAPH_CODE = { imports: 1, calls: 1, uses: 1, extends: 1, defines: 1 };
+  const GRAPH_SEEDS = 6;
+  // a word matching more nodes than this, and this many times the nodes the question's rarest word matches, is common;
+  // docs show this many lines
+  const GRAPH_COMMON_MIN = 5, GRAPH_COMMON_RATIO = 4, GRAPH_DOC_LINES = 4;
+  const GRAPH_CONTEXT_CHARS = 20000;
+  const GRAPH_STOP = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'from', 'into', 'when', 'what', 'where', 'which',
+    'how', 'why', 'are', 'was', 'were', 'has', 'have', 'had', 'not', 'but', 'all', 'any', 'can', 'does', 'did', 'its', 'our',
+    'out', 'use', 'using', 'used', 'should', 'would', 'could', 'will', 'then', 'than', 'them', 'they', 'there', 'their',
+    'about', 'after', 'before', 'over', 'under', 'also', 'each', 'every', 'only', 'just', 'more', 'most', 'some', 'such',
+    'very', 'been', 'being', 'both', 'same', 'other', 'make', 'need', 'needs', 'want', 'code', 'file', 'files', 'add', 'fix',
+    'new', 'way', 'work', 'works', 'like', 'see', 'get', 'got', 'who', 'you', 'your']);
+
+  const graphCmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const graphPush = (map, key, v) => { const list = map.get(key); if (list) list.push(v); else map.set(key, [v]); };
+  const graphKind = (n) => (n.k === 'sym' || n.k === 'sec' ? n.t || n.k : n.k);
+  const graphWhere = (n) => (n.l ? `${n.f}:${n.l}` : n.f);
+  // list lines stay one screen wide, so a long declaration is shortened there
+  const graphSig = (n, max = 80) => (n.s ? ` · ${n.s.length > max ? `${n.s.slice(0, max - 1)}…` : n.s}` : '');
+  const graphDeg = (g, id) => g.degree.get(id) || 0;
+  const graphByDegree = (g) => (a, b) => graphDeg(g, b) - graphDeg(g, a) || graphCmp(a, b);
+  const graphByLine = (g) => (a, b) => (g.nodes.get(a).l || 0) - (g.nodes.get(b).l || 0) || graphCmp(a, b);
+  // a function declared inside another ('makeFlow.post') is a function by its own name ('post'); a method is not
+  const graphShort = (n) => (n.k === 'sym' && n.t === 'fn' && n.n.includes('.') ? n.n.slice(n.n.lastIndexOf('.') + 1) : n.n);
+
+  // edges per node, both directions, leaving out a file's own definitions and a doc's own sections
+  function mapDegrees(edges) {
+    const deg = new Map();
+    for (const [from, to, type] of edges) {
+      if (GRAPH_STRUCTURE[type]) continue;
+      deg.set(from, (deg.get(from) || 0) + 1);
+      deg.set(to, (deg.get(to) || 0) + 1);
+    }
+    return deg;
+  }
+
+  // Up to limit items as lines, then how many were left out; with more, also the limit that shows them all (rounded
+  // up to ten), since an agent that is not told does not ask.
+  function graphList(lines, items, limit, line, more) {
+    for (const it of items.slice(0, limit)) lines.push(line(it));
+    if (items.length > limit) lines.push(`  … ${items.length - limit} more${more ? ` (limit ${Math.ceil(items.length / 10) * 10})` : ''}`);
+  }
+
+  function graphCommunity(g, n) {
+    const c = n && n.c != null && (g.index.communities || []).find((x) => x.c === n.c);
+    return c ? c.name : '';
+  }
+
+  // The nodes a name may mean, most exact first: an id, a name as written (a nested function's own name too), a name in
+  // any case, a method by its last part, the end of a file path. A tie between code and doc sections goes to the code.
+  function graphFind(g, q) {
+    const s = String(q == null ? '' : q).trim().replace(/^\.\//, '');
+    if (!s) return [];
+    if (g.nodes.has(s)) return [s];
+    const lower = s.toLowerCase(), named = g.names.get(lower) || [], lasts = g.lasts.get(lower) || [];
+    const tiers = [
+      named.filter((id) => g.nodes.get(id).n === s || graphShort(g.nodes.get(id)) === s),
+      named,
+      lasts.filter((id) => g.nodes.get(id).n.endsWith(`.${s}`)),
+      lasts,
+      s.includes('/') ? graphEnding(g, s) : [],
+    ];
+    for (const t of tiers) {
+      if (!t.length) continue;
+      const code = t.filter((id) => g.nodes.get(id).k !== 'sec');
+      return code.length ? code : t;
+    }
+    return [];
+  }
+
+  // File and doc ids whose path is p or ends in /p, looked up by p's last two parts (or its name): a path that is not in
+  // the map costs one lookup, not a pass over every node.
+  function graphEnding(g, p) {
+    const parts = p.split('/');
+    const pool = parts.length > 1 ? g.tails.get(parts.slice(-2).join('/')) : g.bases.get(p);
+    return (pool || []).filter((id) => id === p || id.endsWith(`/${p}`));
+  }
+
+  // one node for a name, or the answer that says why not
+  function graphOne(g, q) {
+    const ids = graphFind(g, q);
+    if (ids.length === 1) return { id: ids[0] };
+    if (!ids.length) return { lines: [`not in the map: ${q}`], missing: true };
+    const lines = [`${q} names ${ids.length}; say which:`];
+    graphList(lines, ids, 12, (id) => `  ${id} · ${graphKind(g.nodes.get(id))} · ${graphWhere(g.nodes.get(id))}`);
+    return { lines, ambiguous: ids };
+  }
+
+  function graphHead(g, n) {
+    const c = graphCommunity(g, n);
+    return `${n.n} · ${graphKind(n)} · ${graphWhere(n)}${c ? ` · community ${c}` : ''} · degree ${graphDeg(g, n.i)}`;
+  }
+
+  function graphExplain(g, name, { limit = 30 } = {}) {
+    const hit = graphOne(g, name);
+    if (!hit.id) return hit;
+    const n = g.nodes.get(hit.id), lines = [graphHead(g, n)];
+    // what it takes and what it is for, so the answer needs no trip to the file
+    if (n.s) lines.push(n.s);
+    if (n.d) lines.push(`// ${n.d}`);
+    for (const [label, dir, type] of GRAPH_GROUPS) {
+      const other = (e) => (dir === 'out' ? e.to : e.from);
+      const order = GRAPH_STRUCTURE[type] ? graphByLine(g) : graphByDegree(g);
+      const es = (g[dir].get(n.i) || []).filter((e) => e.type === type).sort((a, b) => order(other(a), other(b)));
+      if (!es.length) continue;
+      lines.push(`${label}:`);
+      graphList(lines, es, limit, (e) => `  ${other(e)} [${e.conf}]`, true);
+    }
+    return { lines, id: n.i };
+  }
+
+  // a file and its symbols are asked together, and an end reached twice is listed once, with its surest conf
+  function graphEnds(g, ids, dir, type) {
+    const ends = new Map(), own = new Set(ids);
+    for (const id of ids) {
+      for (const e of g[dir].get(id) || []) {
+        const end = dir === 'out' ? e.to : e.from;
+        if (e.type !== type || own.has(end)) continue;
+        if (!ends.has(end) || e.conf === 'x') ends.set(end, e.conf);
+      }
+    }
+    return [...ends].sort((a, b) => graphCmp(a[0], b[0]));
+  }
+
+  function graphFile(g, path, { limit = 30 } = {}) {
+    const files = [...new Set(graphFind(g, path).map((id) => g.nodes.get(id).f))].filter((f) => g.nodes.has(f));
+    if (files.length !== 1) return files.length ? graphOne(g, path) : { lines: [`not in the map: ${path}`], missing: true };
+    const f = g.nodes.get(files[0]), all = g.files.get(f.i) || [f.i];
+    const inner = all.filter((id) => id !== f.i).sort(graphByLine(g));
+    const importers = graphEnds(g, [f.i], 'in', 'imports'), c = graphCommunity(g, f);
+    const what = f.k === 'doc' ? 'sections' : 'symbols';
+    const lines = [`${f.i} · ${f.k}${c ? ` · community ${c}` : ''} · ${inner.length} ${what} · imported by ${importers.length}`];
+    if (inner.length) {
+      lines.push(`${what}:`);
+      graphList(lines, inner, limit, (id) => { const n = g.nodes.get(id); return `  ${n.n} ${graphKind(n)} ${n.l}${graphSig(n)}`; }, true);
+    }
+    const groups = [['imports', graphEnds(g, [f.i], 'out', 'imports')], ['imported by', importers],
+      ['mentions', graphEnds(g, all, 'out', 'mentions')], ['mentioned in', graphEnds(g, all, 'in', 'mentions')]];
+    for (const [label, ends] of groups) {
+      if (!ends.length) continue;
+      lines.push(`${label}:`);
+      graphList(lines, ends, limit, ([id, conf]) => `  ${id} [${conf}]`, true);
+    }
+    return { lines, id: f.i, symbols: inner };
+  }
+
+  // null when to is out of reach over these edges, so the caller can try again with more kinds of edge
+  function graphWalk(g, from, to, max, keep) {
+    const prev = new Map([[from, null]]);
+    let frontier = [from];
+    for (let d = 0; d < max && frontier.length && !prev.has(to); d++) {
+      const next = [];
+      for (const id of frontier) {
+        const steps = (g.out.get(id) || []).filter(keep).map((e) => [e.to, e])
+          .concat((g.in.get(id) || []).filter(keep).map((e) => [e.from, e])).sort((x, y) => graphCmp(x[0], y[0]));
+        for (const [n, e] of steps) if (!prev.has(n)) { prev.set(n, [id, e]); next.push(n); }
+      }
+      frontier = next;
+    }
+    return prev.has(to) ? prev : null;
+  }
+
+  // the shortest chain of edges between two names, whichever way each edge points; through code alone when there is
+  // one, since a doc that mentions both says little about how they connect
+  function graphPath(g, a, b, { max = 6 } = {}) {
+    const A = graphOne(g, a);
+    if (!A.id) return A;
+    const B = graphOne(g, b);
+    if (!B.id) return B;
+    const prev = graphWalk(g, A.id, B.id, max, (e) => GRAPH_CODE[e.type]) || graphWalk(g, A.id, B.id, max, () => true);
+    if (!prev) return { lines: [`no path from ${A.id} to ${B.id} within ${max} steps`], missing: true };
+    const steps = [];
+    for (let id = B.id; prev.get(id); id = prev.get(id)[0]) steps.unshift({ at: prev.get(id)[0], to: id, e: prev.get(id)[1] });
+    const line = steps.reduce((s, { at, to, e }) => `${s}${e.from === at ? ` --${e.type}--> ` : ` <--${e.type}-- `}${to}`, A.id);
+    const guessed = steps.filter((s) => s.e.conf === 'i').map((s) => `${s.e.from} → ${s.e.to}`);
+    return { lines: guessed.length ? [line, `matched by name: ${guessed.join(', ')}`] : [line], path: [A.id, ...steps.map((s) => s.to)] };
+  }
+
+  // what a word can match on a node: its names (×3), the parts of its path or name (×2), and its text (×1)
+  function graphTerms(g) {
+    if (g.terms) return g.terms;
+    g.terms = new Map();
+    for (const id of g.ids) {
+      const n = g.nodes.get(id), name = String(n.n || '');
+      let names, parts, hay;
+      if (n.k === 'file' || n.k === 'doc') {
+        names = [name.replace(/\.[^.]+$/, '').toLowerCase()];
+        parts = id.toLowerCase().split(/[/._-]+/);
+        hay = id.toLowerCase();
+      } else if (n.k === 'sym') {
+        const last = name.slice(name.lastIndexOf('.') + 1);
+        names = [name.toLowerCase(), last.toLowerCase()];
+        parts = last.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[\s_$]+/);
+        hay = name.toLowerCase();
+      } else {
+        names = [name.toLowerCase()];
+        parts = name.toLowerCase().split(/[^\p{L}\p{N}_]+/u);
+        hay = names[0];
+      }
+      g.terms.set(id, { names, parts, hay });
+    }
+    return g.terms;
+  }
+
+  // how well a word matches a node: one of its names 3, a part of its path or name 2, somewhere in its text 1
+  const graphMatch = (t, w) => (t.names.includes(w) ? 3 : t.parts.includes(w) ? 2 : t.hay.includes(w) ? 1 : 0);
+
+  function graphQuery(g, text, { limit = 20 } = {}) {
+    const words = [...new Set(String(text || '').toLowerCase().split(/[^\p{L}\p{N}_]+/u))].filter((w) => w.length >= 3 && !GRAPH_STOP.has(w));
+    const terms = graphTerms(g), hits = words.map(() => []);
+    for (const id of g.ids) words.forEach((w, k) => { const m = graphMatch(terms.get(id), w); if (m) hits[k].push([id, m]); });
+    // A word counts less the more nodes it matches. A common word ('read' is in every reader and every README) cannot
+    // carry a node alone when the question has a rarer word: such a node must match one of those.
+    const rarest = Math.min(...hits.map((list) => list.length || Infinity));
+    const common = hits.map((list) => list.length > GRAPH_COMMON_MIN && list.length >= GRAPH_COMMON_RATIO * rarest);
+    const rare = hits.some((list, k) => list.length && !common[k]);
+    const score = new Map(), carried = new Set();
+    hits.forEach((list, k) => {
+      for (const [id, m] of list) {
+        score.set(id, (score.get(id) || 0) + m / Math.log(2 + list.length));
+        if (!common[k]) carried.add(id);
+      }
+    });
+    for (const id of [...score.keys()]) {
+      if (rare && !carried.has(id)) score.delete(id);
+      else score.set(id, score.get(id) * Math.log(2 + graphDeg(g, id)));
+    }
+    if (!score.size) return { lines: [`nothing in the map matches: ${text}`], missing: true };
+    const byScore = (a, b) => score.get(b) - score.get(a) || graphCmp(a, b);
+    // the best matches bring their neighbors: a matching function brings its file, its callers and what it calls
+    for (const seed of [...score.keys()].sort(byScore).slice(0, GRAPH_SEEDS)) {
+      const near = score.get(seed) / 4;
+      for (const e of (g.out.get(seed) || []).concat(g.in.get(seed) || [])) {
+        const other = e.from === seed ? e.to : e.from;
+        if ((score.get(other) || 0) < near) score.set(other, near);
+      }
+    }
+    // code first and tests after the code they test; docs apart, a few
+    const isCode = (id) => g.nodes.get(id).k === 'file' || g.nodes.get(id).k === 'sym';
+    const isTest = (id) => { const f = g.nodes.get(g.nodes.get(id).f); return f && f.q === 't' ? 1 : 0; };
+    const code = [...score.keys()].filter(isCode).sort((a, b) => isTest(a) - isTest(b) || byScore(a, b)).slice(0, limit);
+    const kinds = { files: code.filter((id) => g.nodes.get(id).k === 'file'), symbols: code.filter((id) => g.nodes.get(id).k === 'sym'),
+      docs: [...score.keys()].filter((id) => !isCode(id)).sort(byScore).slice(0, GRAPH_DOC_LINES) };
+    const symbolCount = (id) => (g.files.get(id) || []).filter((s) => g.nodes.get(s).k === 'sym').length;
+    const show = {
+      files: (id) => { const c = graphCommunity(g, g.nodes.get(id)); return `  ${id} · ${symbolCount(id)} symbols${c ? ` · ${c}` : ''}`; },
+      symbols: (id) => { const n = g.nodes.get(id); return `  ${id} · ${graphKind(n)} · ${n.l}${graphSig(n)}`; },
+      docs: (id) => { const n = g.nodes.get(id); return n.k === 'doc' ? `  ${id} · doc` : `  ${id} · ${graphKind(n)} · ${n.l}`; },
+    };
+    const lines = [];
+    for (const k of ['files', 'symbols', 'docs']) {
+      if (!kinds[k].length) continue;
+      lines.push(`${k}:`);
+      for (const id of kinds[k]) lines.push(show[k](id));
+    }
+    return { lines, ...kinds };
+  }
+
+  // who depends on a node: importers, callers, users and subclasses; for a file, also those of its symbols, from elsewhere
+  function graphDependents(g, id) {
+    const n = g.nodes.get(id), found = [];
+    const targets = n.k === 'file' ? g.files.get(id) || [id] : [id];
+    for (const t of targets) for (const e of g.in.get(t) || []) if (GRAPH_DEPENDS[e.type]) found.push(e);
+    return n.k === 'file' ? found.filter((e) => g.nodes.get(e.from).f !== id) : found;
+  }
+
+  // Breadth first from a node through the edges step gives, to depth; each node once, at its first depth, with the
+  // edge that reached it (end says which end of an edge is the node reached). A file's own symbols start with it, so
+  // they are not listed. Prints like impact and inside do, depth by depth.
+  function graphReach(g, nameOrPath, { depth = 2, limit = 30 } = {}, step, end, head, none) {
+    const hit = graphOne(g, nameOrPath);
+    if (!hit.id) return hit;
+    const start = g.nodes.get(hit.id).k === 'file' ? g.files.get(hit.id) || [hit.id] : [hit.id];
+    const seen = new Set(start), levels = [];
+    let frontier = start;
+    for (let d = 1; d <= depth && frontier.length; d++) {
+      const level = [];
+      for (const id of frontier) for (const e of step(id)) if (!seen.has(end(e))) { seen.add(end(e)); level.push(e); }
+      level.sort((a, b) => graphCmp(end(a), end(b)));
+      if (level.length) levels.push(level);
+      frontier = level.map(end);
+    }
+    const total = levels.reduce((s, l) => s + l.length, 0);
+    if (!total) return { lines: [none(hit.id)], levels: [] };
+    const lines = [head(hit.id, total, depth)];
+    levels.forEach((level, d) => {
+      lines.push(`depth ${d + 1}:`);
+      graphList(lines, level, limit, (e) => `  ${end(e)} [${e.conf}] ${e.type}`, true);
+    });
+    return { lines, levels: levels.map((l) => l.map(end)) };
+  }
+
+  // what breaks if it changes: who imports, calls, uses or extends it, and theirs
+  function graphImpact(g, nameOrPath, opts = {}) {
+    return graphReach(g, nameOrPath, opts, (id) => graphDependents(g, id), (e) => e.from, (id, n, d) => `impact of ${id}: ${n} dependents within ${d} steps`, (id) => `nothing depends on ${id}`);
+  }
+
+  // what it is made of: what it calls, uses and extends, and theirs (a file: what its symbols do)
+  function graphInside(g, nameOrPath, opts = {}) {
+    const step = (id) => (g.out.get(id) || []).filter((e) => e.type === 'calls' || e.type === 'uses' || e.type === 'extends');
+    return graphReach(g, nameOrPath, opts, step, (e) => e.to, (id, n, d) => `inside ${id}: ${n} callees within ${d} steps`,
+      (id) => `${id} calls and uses nothing in the map`);
+  }
+
+  function graphOverview(g, { limit = 10 } = {}) {
+    const ix = g.index, c = ix.counts || {};
+    const built = [ix.builtAt ? `built ${String(ix.builtAt).slice(5, 10)}` : '', ix.by ? `by ${ix.by}` : ''].filter(Boolean).join(' ');
+    const lines = [[ix.repo || 'code map', `${c.files || 0} files`, `${c.symbols || 0} symbols`, `${c.edges || 0} edges`,
+      `${c.docs || 0} docs`, built].filter(Boolean).join(' · ')];
+    const langs = Object.entries(ix.langs || {}).sort((a, b) => b[1] - a[1] || graphCmp(a[0], b[0]));
+    if (langs.length) lines.push(`langs: ${langs.map(([l, n]) => `${l} ${n}`).join(' · ')}`);
+    const communities = ix.communities || [], god = ix.god || [];
+    if (communities.length) {
+      lines.push('communities:');
+      graphList(lines, communities, limit, (x) => `  ${x.name} · ${x.n} files · ${(x.top || []).slice(0, 3).join(', ')}`);
+    }
+    if (god.length) {
+      lines.push('most connected:');
+      graphList(lines, god, limit, (id) => {
+        const n = g.nodes.get(id);
+        return n ? `  ${id} · ${graphKind(n)} · degree ${graphDeg(g, id)}` : `  ${id}`;
+      });
+    }
+    return { lines, communities, god };
+  }
+
+  // A touch as overlaps compares it: a leading ./ dropped, a symbol (`src/a.js#run`) read as its file. A bare name
+  // ('run') stays itself and so matches only the same name.
+  const graphTouchKey = (t) => (typeof t === 'string' ? t.trim().replace(/^\.\//, '').replace(/#.*$/, '') : '');
+
+  // Open tasks that touch the same code, in one place for the server and the page.
+  //   tasks: [{ key, holder?, touches: string[] }], every open task the caller cares about; it keeps the pairs it wants.
+  //   Two tasks overlap when they share a touch (as graphTouchKey reads it), or, with a map, when a file one touches
+  //   imports a file the other touches. A person's own tasks never overlap each other.
+  //   Returns { lines, pairs: [{ a, b, shared } | { a, b, imports: [[from, to]] }] }, pairs in task order.
+  // Each task's touches are read once, and pairs come from a touch → tasks index, so many tasks stay cheap.
+  function graphOverlaps(g, tasks) {
+    const list = (Array.isArray(tasks) ? tasks : []).filter((t) => t && Array.isArray(t.touches) && t.touches.length);
+    const keys = list.map((t) => [...new Set(t.touches.map(graphTouchKey).filter(Boolean))]);
+    const tasksOf = new Map();
+    keys.forEach((ks, i) => ks.forEach((k) => graphPush(tasksOf, k, i)));
+    const apart = (i, j) => !!list[i].holder && list[i].holder === list[j].holder;
+    const found = new Map();
+    const meet = (i, j) => { if (i !== j && !apart(i, j)) found.set(Math.min(i, j) * list.length + Math.max(i, j), [Math.min(i, j), Math.max(i, j)]); };
+    for (const ts of tasksOf.values()) for (let x = 0; x < ts.length; x++) for (let y = x + 1; y < ts.length; y++) meet(ts[x], ts[y]);
+    const imports = new Set();
+    for (const [k, ts] of tasksOf) {
+      for (const e of g.out.get(k) || []) {
+        if (e.type !== 'imports' || !tasksOf.has(e.to)) continue;
+        imports.add(`${k}\n${e.to}`);
+        for (const i of ts) for (const j of tasksOf.get(e.to)) meet(i, j);
+      }
+    }
+    const who = (t) => (t.holder ? `${t.key} (${t.holder})` : `${t.key}`);
+    const lines = [], pairs = [];
+    for (const [i, j] of [...found.values()].sort((x, y) => x[0] - y[0] || x[1] - y[1])) {
+      const shared = keys[i].filter((k) => keys[j].includes(k)), hops = [];
+      if (!shared.length) {
+        for (const x of keys[i]) for (const y of keys[j]) {
+          if (imports.has(`${x}\n${y}`)) hops.push([x, y]);
+          else if (imports.has(`${y}\n${x}`)) hops.push([y, x]);
+        }
+      }
+      lines.push(`${who(list[i])} ↔ ${who(list[j])}: ${shared.length ? shared.join(', ') : hops.map(([x, y]) => `${x} → ${y}`).join(', ')}`);
+      pairs.push({ a: list[i].key, b: list[j].key, ...(shared.length ? { shared } : { imports: hops }) });
+    }
+    return { lines, pairs };
+  }
+
+  // The part of the map a task needs when it is claimed: its touches, the repo paths its text names, and the symbols
+  // it names in backticks or CamelCase, each as its file with what that file is. The text is read word by word and
+  // only its first 20,000 characters: a spec may be a quarter megabyte, and this runs inside every claim.
+  function graphContext(g, task, { limit = 8 } = {}) {
+    const t = task || {}, found = new Map();
+    const add = (file, name) => {
+      if (!g.nodes.has(file)) return;
+      if (!found.has(file)) found.set(file, new Set());
+      if (name) found.get(file).add(name);
+    };
+    for (const touch of Array.isArray(t.touches) ? t.touches : []) {
+      const ids = graphFind(g, touch);
+      if (ids.length === 1) { const n = g.nodes.get(ids[0]); add(n.f, n.k === 'sym' ? n.n : ''); }
+    }
+    const text = [t.title, t.spec, t.acceptance].filter((x) => typeof x === 'string').join('\n').slice(0, GRAPH_CONTEXT_CHARS);
+    const quoted = [], camel = [];
+    for (const word of text.split(/\s+/)) {
+      const bare = word.replace(/^[("'`[<]+/, '').replace(/[)"'`\]>.,;:!?]+$/, '').replace(/^\.\//, '');
+      if (!bare) continue;
+      if (bare.includes('/') || /\.[A-Za-z0-9]+$/.test(bare)) {
+        const n = g.nodes.get(bare);
+        const ends = n ? [] : bare.includes('/') ? graphEnding(g, bare) : [];
+        if (n && (n.k === 'file' || n.k === 'doc')) add(bare, '');
+        else if (ends.length === 1) add(ends[0], '');
+      }
+      if (word.startsWith('`')) quoted.push(word.replace(/^`+/, '').replace(/[`(].*$/, ''));
+      else if (/^[A-Za-z_$][\w$]*$/.test(bare) && /[a-z0-9][A-Z]/.test(bare)) camel.push(bare);
+    }
+    for (const name of new Set([...quoted, ...camel])) {
+      const ids = (g.names.get(name.toLowerCase()) || []).filter((id) => g.nodes.get(id).k === 'sym' && g.nodes.get(id).n === name);
+      // a name defined in many places says little about where the work is
+      if (ids.length && ids.length <= 3) for (const id of ids) add(g.nodes.get(id).f, name);
+    }
+    const lines = [];
+    for (const [file, syms] of [...found].slice(0, limit)) {
+      const n = g.nodes.get(file), c = graphCommunity(g, n);
+      const count = (g.files.get(file) || []).filter((id) => g.nodes.get(id).k === 'sym').length;
+      const importers = graphEnds(g, [file], 'in', 'imports').length;
+      lines.push([file, `${count} symbols`, `imported by ${importers}`, c, [...syms].join(', ')].filter(Boolean).join(' · '));
+    }
+    return { lines, files: [...found.keys()].slice(0, limit) };
+  }
+
+  function loadGraph(index, chunks) {
+    const g = { index: index || {}, nodes: new Map(), out: new Map(), in: new Map(), names: new Map(), lasts: new Map(),
+      files: new Map(), bases: new Map(), tails: new Map(), ids: [], degree: new Map(), terms: null };
+    const edges = [];
+    for (const ch of chunks || []) {
+      for (const n of (ch && ch.nodes) || []) if (n && typeof n.i === 'string') g.nodes.set(n.i, n);
+      for (const e of (ch && ch.edges) || []) if (Array.isArray(e)) edges.push(e);
+    }
+    const kept = edges.filter(([from, to]) => g.nodes.has(from) && g.nodes.has(to));
+    for (const [from, to, type, conf] of kept) {
+      const e = { from, to, type, conf };
+      graphPush(g.out, from, e);
+      graphPush(g.in, to, e);
+    }
+    g.degree = mapDegrees(kept);
+    g.ids = [...g.nodes.keys()].sort(graphCmp);
+    for (const id of g.ids) {
+      const n = g.nodes.get(id), name = String(n.n || '');
+      graphPush(g.names, name.toLowerCase(), id);
+      if (graphShort(n) !== name) graphPush(g.names, graphShort(n).toLowerCase(), id);
+      if (n.k === 'sym' && name.includes('.')) graphPush(g.lasts, name.slice(name.lastIndexOf('.') + 1).toLowerCase(), id);
+      if (n.f) graphPush(g.files, n.f, id);
+      if (n.k === 'file' || n.k === 'doc') {
+        const parts = id.split('/');
+        graphPush(g.bases, parts[parts.length - 1], id);
+        if (parts.length > 1) graphPush(g.tails, parts.slice(-2).join('/'), id);
+      }
+    }
+    return {
+      index: g.index,
+      explain: (name, opts) => graphExplain(g, name, opts || {}),
+      file: (path, opts) => graphFile(g, path, opts || {}),
+      path: (a, b, opts) => graphPath(g, a, b, opts || {}),
+      query: (text, opts) => graphQuery(g, text, opts || {}),
+      impact: (nameOrPath, opts) => graphImpact(g, nameOrPath, opts || {}),
+      inside: (nameOrPath, opts) => graphInside(g, nameOrPath, opts || {}),
+      overview: (opts) => graphOverview(g, opts || {}),
+      overlaps: (tasks) => graphOverlaps(g, tasks),
+      context: (task, opts) => graphContext(g, task, opts || {}),
+    };
+  }
+  // ---------- end of code map graph ----------
 
   var STATUS = TASK_STATUSES; // the board's own list once meta/config arrives (boardStatuses)
   var BAR_COLORS = {
@@ -1222,7 +1746,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   var fold = readJSON('ab-fold') || {},
     groupFold = readJSON('ab-groups') || {},
     showDone = read('ab-show-done') === '1';
-  var FOLD_DEFAULT = { rules: true, guide: true },
+  var FOLD_DEFAULT = { rules: true, guide: true, codemap: true },
     LANE_MAX = 5,
     NOW_MAX = 6;
 
@@ -1717,7 +2241,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     $('readAll').textContent = T('readAll');
     $('noticeRead').textContent = T('noticeRead');
     kbdText($('hint'), T('hint'));
-    ['now', 'activity', 'people', 'items', 'notices', 'notes', 'rules', 'guide', 'kanban', 'graph'].forEach(
+    ['now', 'activity', 'people', 'items', 'codemap', 'notices', 'notes', 'rules', 'guide', 'kanban', 'graph'].forEach(
       function (k) {
         $('h-' + k).textContent = T('h_' + k);
       }
@@ -1730,6 +2254,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     $('rulesSub').textContent = T('rulesSub');
     $('notesSub').textContent = T('notesSub');
     $('guideSub').textContent = T('guideSub');
+    $('codemapSub').textContent = T('codemapSub');
     $('kanbanSub').textContent = T('kanbanSub');
     $('graphSub').textContent = T('graphSub');
     $('setBtn').textContent = T('settings');
@@ -1924,7 +2449,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // A person's change from the page: the task, then one line in its thread saying what changed, as agents' changes do,
   // so the holder and their agents see who moved it. It reads the task first and writes with that version: the page's
   // copy may lag an agent's write, and status side effects and the holder rule must see the task as it is now. A task
-  // that moved again in between is read once more.
+  // that moved again in between is read once more. A patch that builds on what is there (adding to a list) is a
+  // function of the task as read, so it never drops what someone else added meanwhile.
   function change(t, patch, extra) {
     if (!writable() || !me) return Promise.resolve();
     function attempt(left) {
@@ -1933,7 +2459,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         .get()
         .then(function (s) {
           var cur = s.exists ? Object.assign({}, s.data(), { id: t.id }) : t;
-          return changeAt(cur, Object.assign({}, patch), extra, s.version).then(function (r) {
+          var next = typeof patch === 'function' ? patch(cur) : Object.assign({}, patch);
+          return changeAt(cur, next, extra, s.version).then(function (r) {
             return r === 'stale' && left ? attempt(left - 1) : r;
           });
         });
@@ -1964,6 +2491,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     was('branch', t.branch, patch.branch, String);
     was('pr', t.pr, patch.pr, String);
     was('repo', t.repo, patch.repo, String);
+    was('touches', touchesOf(t).join(', '), (patch.touches || []).join(', '), String);
     // a person may change a task someone else holds; the write says so and the thread names the holder
     var over = !mayChange(t, me, patch, false);
     if (over && !extra) extra = T('saidOver', { p: personName(holderOf(t)) });
@@ -2813,6 +3341,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
               el('td', { class: 'keycell' }, [el('span', { class: 'key', text: t.key }), newDot(isNew(t))]),
               el('td', { class: 'what' }, [
                 el('button', { type: 'button', text: t.title || T('untitled') }),
+                overlapFlag(t),
                 t.repo || t.branch
                   ? el('span', { class: 'sub' }, [repoTag(t), t.repo && t.branch ? ' ' : null, t.branch || null])
                   : null
@@ -3118,6 +3647,354 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     });
   }
 
+  // ---------- code: what tasks touch, where open tasks meet, the code map ----------
+  // A touch names a file ('shared/units.ts'), a symbol in one ('server/flow.js#start') or a symbol's name alone.
+  function touchesOf(t) {
+    return (Array.isArray(t.touches) ? t.touches : []).filter(function (touch) {
+      return typeof touch === 'string' && !!touch;
+    });
+  }
+  // Which open tasks touch the same code is the map module's decision, the one the tools print, so the page and the
+  // agents never disagree. It runs once per snapshot and again when a search loads a map's chunks, which adds files one
+  // import apart; a card, a row or the sheet only looks its task up. Open is held and not done.
+  var overlapsById = Object.create(null);
+  function findOverlaps() {
+    var open = tasks
+        .filter(function (t) {
+          return !!holderOf(t) && knownStatus(t) !== 'done' && touchesOf(t).length > 0;
+        })
+        .map(function (t) {
+          return { key: t.key, holder: holderOf(t), touches: touchesOf(t), id: t.id };
+        }),
+      openByKey = Object.create(null),
+      found = Object.create(null),
+      graphs = loadedGraphs();
+    open.forEach(function (o) {
+      openByKey[o.key] = o;
+    });
+    function note(t, other, what) {
+      var mine = (found[t.id] = found[t.id] || Object.create(null)),
+        overlap = (mine[other.id] = mine[other.id] || { task: taskById(other.id), what: [] });
+      what.forEach(function (w) {
+        if (overlap.what.indexOf(w) < 0) overlap.what.push(w);
+      });
+    }
+    (graphs.length ? graphs : [loadGraph({}, [])]).forEach(function (graph) {
+      graph.overlaps(open).pairs.forEach(function (pair) {
+        var a = openByKey[pair.a],
+          b = openByKey[pair.b],
+          what = Array.isArray(pair.shared)
+            ? pair.shared
+            : (pair.imports || []).map(function (hop) {
+                return hop.join(' → ');
+              });
+        if (!a || !b) return;
+        note(a, b, what);
+        note(b, a, what);
+      });
+    });
+    overlapsById = found;
+  }
+  function overlapsOf(t) {
+    var mine = overlapsById[t.id];
+    return mine
+      ? Object.keys(mine)
+          .map(function (id) {
+            return mine[id];
+          })
+          .sort(function (a, b) {
+            return byKey(a.task, b.task);
+          })
+      : [];
+  }
+  function overlapText(overlap) {
+    return T('overlapsWith', {
+      k: overlap.task.key,
+      p: personName(holderOf(overlap.task)),
+      w: overlap.what.join(', ')
+    });
+  }
+  function overlapFlag(t) {
+    var list = overlapsOf(t);
+    return list.length
+      ? el('span', { class: 'overlap', title: list.map(overlapText).join('\n'), text: T('overlapFlag') })
+      : null;
+  }
+  // The sheet's Code block: what the work touches (agents name files as they go, people add them here) and the open
+  // tasks touching the same code. It shows once a task names code or the project has a map to name it against.
+  function codeBlock(t, values) {
+    var mine = touchesOf(t),
+      editable = writable() && !!me;
+    if (!mine.length && !(maps && maps.length)) return null;
+    var overlaps = overlapsOf(t);
+    var input = el('input', {
+      type: 'text',
+      id: 'fTouch',
+      spellcheck: 'false',
+      placeholder: T('touchPh'),
+      'aria-label': T('touchPh')
+    });
+    input.value = values.fTouch || '';
+    // the box empties at once: the write redraws the sheet, which would bring the draft back
+    function add() {
+      var fresh = input.value.split(/[\s,]+/).filter(function (touch, i, all) {
+        return touch && all.indexOf(touch) === i && mine.indexOf(touch) < 0;
+      });
+      input.value = '';
+      if (fresh.length)
+        change(t, function (current) {
+          var had = touchesOf(current);
+          return {
+            touches: had.concat(
+              fresh.filter(function (touch) {
+                return had.indexOf(touch) < 0;
+              })
+            )
+          };
+        });
+    }
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        add();
+      }
+    });
+    function chip(touch) {
+      return el('span', { class: 'touch', title: touch }, [
+        el('span', { text: touch }),
+        editable
+          ? el('button', {
+              type: 'button',
+              'aria-label': T('removeTouch', { x: touch }),
+              title: T('removeTouch', { x: touch }),
+              text: '×',
+              onclick: function () {
+                change(t, function (current) {
+                  var left = touchesOf(current).filter(function (other) {
+                    return other !== touch;
+                  });
+                  return { touches: left.length ? left : null };
+                });
+              }
+            })
+          : null
+      ]);
+    }
+    return el('div', { class: 'block code' }, [
+      el('h3', { text: T('touches') }),
+      mine.length
+        ? el('div', { class: 'touches' }, mine.map(chip))
+        : el('p', { class: 'muted', style: 'font-size:13.5px', text: T('touchesNone') }),
+      overlaps.length
+        ? el(
+            'ul',
+            { class: 'overlaps' },
+            overlaps.map(function (overlap) {
+              return el('li', {}, [
+                el('button', {
+                  type: 'button',
+                  text: overlapText(overlap),
+                  onclick: function () {
+                    openSheet(overlap.task.id);
+                  }
+                })
+              ]);
+            })
+          )
+        : null,
+      editable
+        ? el('div', { class: 'form-row' }, [
+            input,
+            el('button', { type: 'button', class: 'btn small', text: T('addTouch'), onclick: add })
+          ])
+        : null
+    ]);
+  }
+
+  // The project's code maps, one index document per repository (map/<repoKey>), read once something needs them: the
+  // code map section opens, or a task's sheet does, whose Code block shows wherever a map exists. A map's chunks are
+  // read the first time someone searches it.
+  var maps = null,
+    mapsWatched = false,
+    mapCards = {},
+    GROUPS_SHOWN = 8;
+  function watchMaps() {
+    // the flag goes up first: a snapshot may arrive before onSnapshot returns
+    if (!db || mapsWatched) return;
+    mapsWatched = true;
+    db.collection('map').onSnapshot(
+      function (snapshot) {
+        maps = snapshot.docs
+          .map(function (doc) {
+            var index = doc.data();
+            return { key: doc.id, index: index && typeof index === 'object' ? index : {} };
+          })
+          .sort(function (a, b) {
+            return a.key < b.key ? -1 : 1;
+          });
+        if (view === 'doc') renderCodemap();
+        if (openId) renderSheet();
+      },
+      function () {
+        maps = [];
+        if (view === 'doc') renderCodemap();
+      }
+    );
+  }
+  function loadedGraphs() {
+    return Object.keys(mapCards)
+      .map(function (key) {
+        return mapCards[key].graph;
+      })
+      .filter(Boolean);
+  }
+  // an index is read as it comes: a field of the wrong kind shows as missing, so one bad document cannot stop the
+  // section for everyone who opens it
+  function mapText(v) {
+    return typeof v === 'string' ? v : '';
+  }
+  function mapCount(v) {
+    return typeof v === 'number' ? v : 0;
+  }
+  function mapList(v) {
+    return Array.isArray(v) ? v : [];
+  }
+  function renderCodemap() {
+    var body = $('codemapBody'),
+      typing = document.activeElement;
+    if (folded('codemap')) {
+      body.textContent = '';
+      return;
+    }
+    watchMaps();
+    // a search being typed keeps its box; its results redraw on their own
+    if (typing && typing.classList && typing.classList.contains('mapsearch') && body.contains(typing)) return;
+    body.textContent = '';
+    if (!maps) body.appendChild(el('p', { class: 'empty', text: failed || T('loading') }));
+    else if (!maps.length) body.appendChild(el('p', { class: 'empty', text: T('codemapNone') }));
+    else body.appendChild(el('div', { class: 'rules' }, maps.map(mapCard)));
+  }
+  // one repository's map: how big, when and by whom it was built, its groups of files, the most connected names,
+  // and a search that explains a name
+  function mapCard(map) {
+    var index = map.index,
+      counts = index.counts && typeof index.counts === 'object' ? index.counts : {},
+      groups = mapList(index.communities).filter(function (group) {
+        return group && typeof group === 'object';
+      }),
+      god = mapList(index.god).filter(mapText);
+    var card = (mapCards[map.key] = mapCards[map.key] || {
+      query: '',
+      graph: null,
+      builtAt: null,
+      loading: false,
+      error: '',
+      results: null,
+      allGroups: false
+    });
+    var input = el('input', {
+      type: 'text',
+      class: 'mapsearch',
+      spellcheck: 'false',
+      placeholder: T('codemapSearch'),
+      'aria-label': T('codemapSearch')
+    });
+    input.value = card.query;
+    input.addEventListener('input', function () {
+      card.query = input.value.trim();
+      searchMap(map, card);
+    });
+    card.results = el('div', { class: 'maplines' });
+    showMapLines(card);
+    var built = [
+      T('codemapCounts', {
+        f: mapCount(counts.files),
+        s: mapCount(counts.symbols),
+        e: mapCount(counts.edges),
+        d: mapCount(counts.docs)
+      }),
+      mapText(index.builtAt) ? T('codemapBuilt', { t: stamp(index.builtAt), p: personName(mapText(index.by)) }) : '',
+      mapText(index.commit).slice(0, 7)
+    ];
+    return el('div', { class: 'rule' }, [
+      el('h3', {}, [
+        mapText(index.label) ? el('span', { class: 'num', text: index.label }) : null,
+        mapText(index.repo) || map.key
+      ]),
+      el('p', { text: built.filter(Boolean).join(' · ') }),
+      groups.length
+        ? el(
+            'ul',
+            {},
+            (card.allGroups ? groups : groups.slice(0, GROUPS_SHOWN)).map(function (group) {
+              var top = mapList(group.top)
+                .filter(mapText)
+                .slice(0, 3)
+                .map(function (id) {
+                  return id.split('/').pop();
+                });
+              return el('li', {
+                text: T('codemapCommunity', { name: mapText(group.name), n: mapCount(group.n), top: top.join(', ') })
+              });
+            })
+          )
+        : null,
+      groups.length > GROUPS_SHOWN
+        ? moreBtn(card.allGroups, groups.length - GROUPS_SHOWN, function () {
+            card.allGroups = !card.allGroups;
+            renderCodemap();
+          })
+        : null,
+      god.length ? el('p', { text: T('codemapGod', { list: god.join(' · ') }) }) : null,
+      input,
+      card.results
+    ]);
+  }
+  // the first search of a map reads its chunks in one read; the graph stays while the map is the same build
+  function searchMap(map, card) {
+    var index = map.index;
+    if (card.query && !card.loading && (!card.graph || card.builtAt !== index.builtAt)) {
+      card.loading = true;
+      card.error = '';
+      db.collection('map/' + map.key + '/chunks')
+        .get()
+        .then(function (snapshot) {
+          var chunks = snapshot.docs
+            .filter(function (doc) {
+              return +doc.id < index.chunks;
+            })
+            .sort(function (a, b) {
+              return a.id - b.id;
+            })
+            .map(function (doc) {
+              return doc.data();
+            });
+          card.graph = loadGraph(index, chunks);
+          card.builtAt = index.builtAt;
+        })
+        .catch(function (e) {
+          card.error = T('codemapFail', { e: errText(e) });
+        })
+        .then(function () {
+          card.loading = false;
+          findOverlaps();
+          renderAll();
+          showMapLines(card);
+        });
+    }
+    showMapLines(card);
+  }
+  function showMapLines(card) {
+    var out = card.results;
+    out.textContent = '';
+    if (!card.query) return;
+    // asked as board_map asks it, so the page and the tools answer alike
+    var lines = card.error ? [card.error] : card.graph ? card.graph.explain(card.query, {}).lines : [T('loading')];
+    lines.forEach(function (line) {
+      out.appendChild(el('div', { text: line }));
+    });
+  }
+
   // ---------- kanban ----------
   // the owner as a round initial (alone on a card, with the name elsewhere); nobody's yet: nothing
   function avatar(t, solo) {
@@ -3185,7 +4062,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           el('span', { class: 'key', text: t.key }),
           meta ? el('span', { class: 'feat', text: meta }) : null,
           newDot(isNew(t)),
-          el('span', { class: 'right' }, [cardFlag(t), avatar(t, true)])
+          el('span', { class: 'right' }, [overlapFlag(t), cardFlag(t), avatar(t, true)])
         ]),
         el('div', { class: 'title', text: t.title || T('untitled') })
       ]
@@ -3797,6 +4674,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
       if (!folded('people')) renderLanes();
       if (!folded('items')) renderTable();
       else order = [];
+      renderCodemap();
       if (!folded('notices')) renderFeed();
       renderNotes();
       renderRules();
@@ -3940,6 +4818,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           },
           function () {}
         );
+        watchMaps();
       }
     }
     if (!openId) lastFocus = document.activeElement;
@@ -4146,7 +5025,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
   // what a re-render of the sheet keeps: drafts, the focused field and where the body was scrolled
   function sheetState(root) {
     var values = {};
-    ['msgText', 'msgType', 'fBranch', 'fPr', 'sumText'].forEach(function (id) {
+    ['msgText', 'msgType', 'fBranch', 'fPr', 'fTouch', 'sumText'].forEach(function (id) {
       var n = $(id);
       if (n) values[id] = n.value;
     });
@@ -4414,7 +5293,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
     var a = activeId && $(activeId);
     if (!a) return;
     a.focus();
-    if (a.setSelectionRange && (activeId === 'msgText' || activeId === 'fBranch' || activeId === 'fPr')) {
+    if (a.setSelectionRange && ['msgText', 'fBranch', 'fPr', 'fTouch'].indexOf(activeId) >= 0) {
       try {
         a.setSelectionRange(a.value.length, a.value.length);
       } catch (e) {}
@@ -4446,7 +5325,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           : null,
         spec
           ? el('div', { class: 'block' }, [el('h3', { text: T('spec') }), el('div', { class: 'pre', text: spec })])
-          : null
+          : null,
+        codeBlock(t, kept.values)
       ].concat(depBlocks(t), [
         el('div', { class: 'block' }, [el('h3', { text: T('thread', { n: msgs.length }) }), threadList()])
       ])
@@ -4576,6 +5456,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           return !!t.archivedAt;
         });
         indexTasks();
+        findOverlaps();
         loaded = true;
         if (first) {
           first = false;

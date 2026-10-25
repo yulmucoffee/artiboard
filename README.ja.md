@@ -101,6 +101,8 @@ artiboard はその状況をチームで共有するライブなボードひと�
 </tr>
 </table>
 
+**コードマップ。** セルフホストのボードは、リポジトリごとのファイル、関数、import の対応関係を地図として持てます。エージェントは grep の前に `board_map` に尋ね、同じコードに触れる未完了のタスクが二つあると、ボードが警告します。コマンド一つで作れます([セルフホスト](#セルフホスト))。claude.ai のアーティファクトのボードにはまだありません。
+
 ## クイックスタート
 
 ボードを置く場所は二通りです。どちらも同じページ、同じドキュメント、同じルールを使い、スキルはどちらもセットアップできます。
@@ -229,6 +231,12 @@ approval_mode = "approve"
 
 あとはエージェントに「このリポジトリにボードをセットアップして」と頼んでください。
 
+**コードマップ**(任意、セルフホスト専用)。リポジトリのチェックアウトからマップを作ってアップロードします。大きく変わったら作り直してください:
+
+```bash
+node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api
+```
+
 **カスタマイズ**は claude.ai とまったく同じです。タイトル、言語、あらゆる画面の文言は `meta/config` にあり、すぐに反映されます。誰がボードに入るかは管理者が決めます(`member join`、`member remove`)。ページ自体はプロジェクトごとにあります。管理者が `artiboard page set --project acme --file page.html` を実行して変え(ステータス、フィールド、ビュー)、`page reset` で同梱のページに戻せます。同梱のページはサイトと一緒に更新されます。ページのコードはすべてのメンバーのもとで動くので、サイトが `ARTIBOARD_AGENT_PAGE_EDITS=1` を設定しない限り、エージェントはページを読むだけです(`board_page` の `find`)。設定すれば、管理者のエージェントが小さく正確な編集でページを変えられます。
 
 | 設定 | 既定値 | 意味 |
@@ -251,6 +259,7 @@ artiboard member add|token|link|revoke|access|join|remove|list
 artiboard project add|repos|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
+artiboard map build|drop --project ID --repo R
 ```
 
 コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。管理者はサイト上でも同じことができます。プロジェクト一覧ページの **メンバー** パネルで追加・新しいトークン・サインインリンク・権限・失効・削除を行い、誰もが **プロフィール** で表示名と役割を自分で決め、それが参加しているすべてのボードに表示されます。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイト全体に適用されます。どのメンバーもすべてのプロジェクトを見られます。メンバーにパスワードはありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。`member revoke` はそのセッションも終わらせます。誰が誰か(`meta/config.people`、`people/`)を変えられるのは管理者だけで、メッセージとお知らせには常に書いた本人の名前が付きます。
@@ -265,7 +274,8 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_start {project または repo}` | ボードとプロジェクトのルール、カーソル以降の新しいお知らせ(カーソルも進める)、自分の進行中のタスク(最後に他の人が書いたものは印付き、レビュー中のものは一行に)、着手できるタスク、レビュー待ちの他人のタスク。`repo`(git remote)を渡すとプロジェクトを見つけ、そのリポジトリの仕事を出します |
 | `board_claim {id, text, override?}` | 着手できるタスクを取り、取ったことを投稿し、仕様、受け入れ条件、要約を返す。`override` は人が指示したときに他人のタスクを引き継ぎます |
 | `board_task {id}` | ステータス、詳細、要約より後のメッセージ |
-| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | スレッドのメッセージと自分のタスクの変更を一度に。締め切り(`due`)は誰でも動かせる。`done` で `doneAt` が記録され、後続のタスクが着手可能になる。`todo` でタスクを手放し、誰でも取れるようになる。`task` なしならお知らせ。`tasks` は複数のタスクに同じステータスとメッセージを一度に書き、全部か何もしないか(デプロイ後にレビュー待ちをまとめて完了するとき)。レビュー中のタスクはレビューした人も `done` か `doing` に変えられ、`override` は人が指示したときに他人のタスクを変更し、スレッドに元の担当を残します |
+| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | スレッドのメッセージと自分のタスクの変更を一度に。締め切り(`due`)は誰でも動かせる。`done` で `doneAt` が記録され、後続のタスクが着手可能になる。`todo` でタスクを手放し、誰でも取れるようになる。`task` なしならお知らせ。`tasks` は複数のタスクに同じステータスとメッセージを一度に書き、全部か何もしないか(デプロイ後にレビュー待ちをまとめて完了するとき)。レビュー中のタスクはレビューした人も `done` か `doing` に変えられ、`override` は人が指示したときに他人のタスクを変更し、スレッドに元の担当を残します。`touches` は自分が触れるファイルやシンボルを追加します(`""` で消去)。セルフホストのボードは、未完了のタスクが重なると警告します |
+| `board_map {explain, file, path, query, impact}` | セルフホストのボードのコードマップ。grep の前に尋ねます: 名前の説明、ファイルの表示、`path [a, b]`、語での検索、影響(X に依存するもの)。質問がなければ概要 |
 | `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き。タスクへの batch 書き込みも `board_post` と同じ担当者ルールに従う |
 | `board_page` | プロジェクトのページ: サイズ、`find`、`read`、管理者は `edits`、`html`、`reset` も |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | サイト。各プロジェクトの GitHub リポジトリも出ます |

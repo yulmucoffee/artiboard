@@ -6,7 +6,7 @@ argument-hint: "[setup|adapt|upgrade|move]"
 
 # artiboard
 
-This is artiboard 1.15.3. A self-hosted site names its own version on the first line of `board_start` and in `board_whoami`; when the site is newer, tell your person to update this skill before setting up or changing a board (`git -C "$HOME/.artiboard/src" pull --ff-only`, then copy `skills/artiboard` again, as in FOR_AGENTS.md).
+This is artiboard 1.16.0. A self-hosted site names its own version on the first line of `board_start` and in `board_whoami`; when the site is newer, tell your person to update this skill before setting up or changing a board (`git -C "$HOME/.artiboard/src" pull --ff-only`, then copy `skills/artiboard` again, as in FOR_AGENTS.md).
 
 One page is the board. Its code draws every view (document, kanban, dependency graph) straight from the board's database, so the board stays live without republishing and without spending model tokens.
 
@@ -133,6 +133,10 @@ The block costs every session a few dozen tokens. The rules file costs tokens on
 - `get meta/config` and confirm the people and language.
 - Tell the user, in one short list: the board URL; that it is private until they share it with each teammate from the artifact's Share menu with edit access; that teammates' agents get the rules when they pull the repository; how to ask for changes later.
 
+## Code map (self-hosted)
+
+When the project names repositories (`meta/config.repos`) on a self-hosted site, offer a code map after setup: **Build a code map now?** If yes, run it from each repository's root: `node <skill directory>/scripts/codemap.mjs --site <site> --project <id> --repo owner/name`. The token comes from `ARTIBOARD_TOKEN`. What agents get from the map, and its limits: `references/hosted.md` "Code map".
+
 ## Token rules
 
 These are why the board stays cheap as people, agents and months pile up. Keep them in every adaptation.
@@ -155,6 +159,7 @@ These are why the board stays cheap as people, agents and months pile up. Keep t
 - An older board whose `meta/protocol` mixes board rules with project agreements or status: move the project's own agreements to `meta/rules`, its status to `meta/notes`, drop the board rules (artiboard has them), show the user both texts, then delete `meta/protocol` in the same batch. Replace `docs/artiboard.md` with the verbatim `references/protocol.md`.
 - Page change or upgrade: read the live artifact first with the Artifact tool's `read` action, apply the change to that version, and republish to the same URL. Never republish just to change data. An upgrade also replaces the repository's `docs/artiboard.md` with the current `references/protocol.md` (replace `{{BOARD_URL}}` only), since the board rules change with the page.
 - Long-lived boards: one artifact database holds at most 25,000 documents, and every message, notice, task and detail is one document. The page's Archive only hides done tasks (`archivedAt`), and moving documents to an `archive` collection does not free any either. When past milestones pass a few hundred done tasks, or a write fails with `quota_exceeded`, fold each finished milestone into one `archive/<milestone>` document (key, title, owner, PR and summary per task, under 256 KiB), then delete those tasks, their details, their messages and old notices in batches. Deleting is permanent, so show the user the counts and get a yes first.
+- Code map (self-hosted): rebuild it after large changes with the same command, or drop it with `artiboard map drop --project <id> --repo <label>`. See `references/hosted.md` "Code map".
 
 ## Rules for you
 

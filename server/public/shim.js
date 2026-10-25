@@ -124,13 +124,16 @@
       limitedMany: function (reads) { return sb.rpc('ab_read_limited', { p_project: PROJECT, p_reads: reads }).then(rows); },
       changed: function (collections, since) { return base().in('collection', collections).gt('updated_at', since).then(rows); },
       batch: function (writes) { return sb.rpc('ab_batch', { p_project: PROJECT, p_writes: writes }).then(rows); },
-      subscribe: function (onRow, onLive) {
+      // shows(row): whether anything on the page shows that row
+      subscribe: function (onRow, onLive, shows) {
         function onChange(p) {
           if (p.eventType === 'DELETE') { var o = p.old || {}; if (o.project === PROJECT && o.collection) onRow({ collection: o.collection, doc_id: o.doc_id }, true); return; }
           var row = p.new && p.new.collection ? p.new : null;
           if (!row || row.project !== PROJECT) return;
-          // realtime may leave out a large value: read just that document
+          // realtime may leave out a large value: read just that document, if the page shows it (a rebuilt code map's
+          // chunks are large and read only when a search needs them)
           if (row.data === undefined || row.version === undefined) {
+            if (!shows(row)) return;
             base().eq('collection', row.collection).eq('doc_id', row.doc_id).maybeSingle().then(function (r) { if (r.data) onRow(r.data, false); });
             return;
           }
@@ -268,7 +271,7 @@
       live = on;
       statusCbs.forEach(function (cb) { cb(on); });
     }
-    tr.subscribe(applyRow, setLive);
+    tr.subscribe(applyRow, setLive, function (row) { return listeners.some(function (l) { return matches(l, row); }); });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) { hiddenAt = Date.now(); return; }
       if (hiddenAt && Date.now() - hiddenAt > 30 * 60000) { listeners.forEach(function (l) { l.ready = false; l.pending = []; }); load(listeners.slice()); }

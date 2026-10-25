@@ -3,9 +3,10 @@
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { BoardError, isToken, PERSON_ID, PROJECT_ID, toBoardError } from './core.js';
+import { makeFlow } from './flow.js';
 import { buildServer } from './mcp.js';
 import { addMember, connectLines, removeMember, setProfile, titleOf } from './members.js';
 import { defaultPage, pageHeaders, renderPage } from './page.js';
@@ -20,6 +21,9 @@ const SECURITY = {
 };
 const STATUS = { invalid_argument: 400, permission_denied: 403, not_yours: 403, not_found: 404, version_conflict: 409, already_exists: 409 };
 const MAX_BODY = 2 * 1048576;
+const MAP_CHUNKS = /^map\/[^/]+\/chunks$/;
+// a code map upload: up to 60 chunks of 200,000 bytes and the index
+const MAX_MAP_BODY = 16 * 1048576;
 
 function send(res, status, body, headers = {}) {
   res.statusCode = status;
@@ -41,20 +45,36 @@ function fail(res, e) {
 }
 
 // The request's JSON. The bytes are decoded once, whole: a character split across two chunks would otherwise be
-// stored as U+FFFD. A body that is not JSON is refused rather than read as nothing.
-async function body(req) {
+// stored as U+FFFD. A body that is not JSON is refused rather than read as nothing. A host may read the body before the
+// site does and hand it over parsed, as text or as bytes. Gzipped bytes are inflated, at most to max: a map upload
+// sends them as they are (octet-stream, so no host tries to parse them first), and other clients may say gzip.
+async function body(req, max = MAX_BODY) {
   const parse = (raw) => {
     try { return raw ? JSON.parse(raw) : undefined; } catch { throw new BoardError('invalid_argument', 'the request body is not JSON'); }
   };
-  if (req.body !== undefined) return typeof req.body === 'string' ? parse(req.body) : req.body;
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of req) {
-    size += chunk.length;
-    if (size > MAX_BODY) throw new BoardError('invalid_argument', 'request too large');
-    chunks.push(chunk);
+  let given;
+  // a host's own parse of a body that is not JSON throws here
+  try { given = req.body; } catch { throw new BoardError('invalid_argument', 'the request body is not JSON'); }
+  let raw;
+  if (given !== undefined) {
+    if (typeof given !== 'string' && !Buffer.isBuffer(given)) return given;
+    raw = Buffer.from(given);
+    if (raw.length > max) throw new BoardError('invalid_argument', 'request too large');
+  } else {
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.length;
+      if (size > max) throw new BoardError('invalid_argument', 'request too large');
+      chunks.push(chunk);
+    }
+    raw = Buffer.concat(chunks);
   }
-  return parse(Buffer.concat(chunks).toString('utf8'));
+  // JSON never starts with these two bytes; gzip always does
+  if ((raw[0] === 0x1f && raw[1] === 0x8b) || /\bgzip\b/.test(req.headers['content-encoding'] || '')) {
+    try { raw = gunzipSync(raw, { maxOutputLength: max }); } catch { throw new BoardError('invalid_argument', 'request too large or not gzip'); }
+  }
+  return parse(raw.toString('utf8'));
 }
 
 const bearer = (req) => /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '')?.[1] || null;
@@ -67,6 +87,7 @@ function sameOrigin(req) {
 }
 
 export function makeApp({ store, cfg }) {
+  const { setMap } = makeFlow(store);
   const streams = new Map();
   const secure = cfg.boardUrl.startsWith('https:');
   const sessionCookie = (sid, maxAge) => `ab_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
@@ -124,7 +145,8 @@ export function makeApp({ store, cfg }) {
       req.on('close', () => { const n = streams.get(member.uid) - 1; if (n > 0) streams.set(member.uid, n); else streams.delete(member.uid); });
       res.writeHead(200, { ...SECURITY, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
       res.write(': live\n\n');
-      const off = store.subscribe(project, (row) => res.write(`data: ${JSON.stringify(row)}\n\n`));
+      // a rebuilt code map's chunks are large and pages read them when a search needs them: they are not pushed
+      const off = store.subscribe(project, (row) => { if (!MAP_CHUNKS.test(row.collection)) res.write(`data: ${JSON.stringify(row)}\n\n`); });
       const ping = setInterval(() => res.write(': ping\n\n'), 25000);
       req.on('close', () => { off(); clearInterval(ping); });
       return;
@@ -194,8 +216,10 @@ export function makeApp({ store, cfg }) {
       const api = route ? [null, route] : /^\/api\/(.+)$/.exec(p);
       if (!api) return await serveStatic(res, p);
       let name = api[1];
-      // Vercel runs one function per route, so /api/members/<person>/<action> arrives rewritten as a query
+      // Vercel runs one function per route, so /api/members/<person>/<action> and /api/p/<project>/map arrive rewritten
+      // as a query
       if (name === 'members' && url.searchParams.get('person')) name = `members/${url.searchParams.get('person')}/${url.searchParams.get('action') || ''}`;
+      if (name === 'map') name = `p/${url.searchParams.get('project')}/map`;
       if (req.method !== 'GET' && !sameOrigin(req)) return send(res, 403, { error: 'cross_origin' });
 
       if (name === 'config') {
@@ -227,6 +251,12 @@ export function makeApp({ store, cfg }) {
           return send(res, 200, await store.createProject(member.uid, { id: b.id, title: b.title, lang: b.lang || cfg.lang }));
         }
         return send(res, 200, await store.overview());
+      }
+      // a code map from the build script, written as the member who sent it, so the store's rules apply (a viewer cannot)
+      const up = /^p\/([a-z0-9][a-z0-9-]{0,39})\/map$/.exec(name);
+      if (up) {
+        if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, { Allow: 'POST' });
+        return send(res, 200, await setMap(member, up[1], (await body(req, MAX_MAP_BODY)) || {}));
       }
       const m = /^p\/([a-z0-9][a-z0-9-]{0,39})\/(read|batch|events)$/.exec(name);
       if (m && store.readRows) return await docs(req, res, member, m[1], m[2]);

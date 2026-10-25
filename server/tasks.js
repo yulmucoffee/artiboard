@@ -12,9 +12,10 @@ export function boardStatuses(config) {
   return TASK_STATUSES.slice(0, -1).concat(added.filter((s, i) => added.indexOf(s) === i), ['done']);
 }
 
-// every field of tasks/<id>; references/protocol.md lists the same ones
+// every field of tasks/<id>; references/protocol.md lists the same ones. touches (files and symbols the work touches) is
+// the holder's, like every field not opened below.
 export const TASK_FIELDS = ['key', 'title', 'feature', 'milestone', 'status', 'owner', 'deps', 'waitingOn', 'claimedBy', 'branch', 'pr',
-  'start', 'due', 'repo', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
+  'start', 'due', 'repo', 'touches', 'doneAt', 'archivedAt', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];
 
 // what anyone may write on any task: the due day, and what the board keeps up to date by itself
 const OPEN_FIELDS = ['due', 'waitingOn', 'updatedAt', 'lastMessageAt', 'lastMessageBy'];

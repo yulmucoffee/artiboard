@@ -101,6 +101,8 @@ artiboard 把这些状态集中到团队共享的一块实时看板上，并给 
 </tr>
 </table>
 
+**代码地图。** 自托管看板可以为每个仓库保存文件、函数和 import 的地图。Agent 在 grep 之前先问 `board_map`，两个未完成的任务碰到同一段代码时，看板会发出警告。一条命令即可生成（[自托管](#自托管)）。claude.ai artifact 看板暂时还没有这项功能。
+
 ## 快速开始
 
 看板可以放在两个地方之一。两者使用同一个页面、同样的文档和同样的规则，skill 两种都能搭建。
@@ -229,6 +231,12 @@ approval_mode = "approve"
 
 然后让 agent "为这个仓库设置看板"。
 
+**代码地图**（可选，仅自托管）。在仓库的检出目录中生成并上传地图，代码有大改动后请重新生成：
+
+```bash
+node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api
+```
+
 **自定义**方式与 claude.ai 上完全相同。标题、语言和任意界面文案都在 `meta/config` 里，修改即时生效；谁在看板上由管理员决定（`member join`、`member remove`）。页面本身按项目区分：由管理员运行 `artiboard page set --project acme --file page.html` 修改（状态、字段、视图），`page reset` 会恢复为内置页面，内置页面随站点一起更新。页面代码会为每个成员运行，所以除非站点设置了 `ARTIBOARD_AGENT_PAGE_EDITS=1`，agent 只读取页面（`board_page` 的 `find`）；设置后，管理员的 agent 可以通过小而精确的编辑修改页面。
 
 | 设置 | 默认值 | 含义 |
@@ -251,6 +259,7 @@ artiboard member add|token|link|revoke|access|join|remove|list
 artiboard project add|repos|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
+artiboard map build|drop --project ID --repo R
 ```
 
 不带命令运行 `node server/cli.js` 可查看全部选项。管理员在站点上也能做同样的事：项目列表页的 **成员** 面板可以添加成员、签发新令牌、生成登录链接、改访问级别、吊销和移除；每个人都在 **个人资料** 里自己设置显示名和角色，它会出现在自己所在的每个看板上。访问级别有 `admin`、`member`（可写）和 `viewer`（只读），并在整个站点范围内生效：每个成员都能看到所有项目。成员从不需要密码：令牌让 agent 登录，页面则用令牌或一次性链接换取浏览器会话。`member revoke` 也会结束这些会话。只有管理员能改变谁是谁（`meta/config.people`、`people/`），消息和公告始终带着写入者本人的名字。
@@ -265,7 +274,8 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_start {project 或 repo}` | 看板规则和项目规则、游标之后的新公告（并移动游标）、你未完成的任务（别人最后发言的会标出，评审中的合成一行）、可领取的任务、等待评审的他人任务。传入 `repo`（git remote）时会找到项目并列出该仓库的工作 |
 | `board_claim {id, text, override?}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准和摘要。`override` 在你的使用者要求时接手别人的任务 |
 | `board_task {id}` | 状态、详情，以及摘要之后的消息 |
-| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | 一条讨论串消息，加上对你任务的修改；任何人都可以调整任务的 `due`。`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞；`todo` 会释放任务，任何人都可以再领取。不带 `task` 时：发布公告。`tasks` 在一次写入里给多个任务同一状态和消息，要么全部成功要么都不写（部署后一次完成评审中的任务）。评审中的任务对评审人开放（`done` 或退回 `doing`）；`override` 在你的使用者要求时修改别人的任务，讨论串会记下原负责人 |
+| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | 一条讨论串消息，加上对你任务的修改；任何人都可以调整任务的 `due`。`done` 会记录 `doneAt`，并解除依赖它的任务的阻塞；`todo` 会释放任务，任何人都可以再领取。不带 `task` 时：发布公告。`tasks` 在一次写入里给多个任务同一状态和消息，要么全部成功要么都不写（部署后一次完成评审中的任务）。评审中的任务对评审人开放（`done` 或退回 `doing`）；`override` 在你的使用者要求时修改别人的任务，讨论串会记下原负责人。`touches` 添加你所触及的文件或符号（`""` 清空）；自托管看板在未完成的任务重叠时会发出警告 |
+| `board_map {explain, file, path, query, impact}` | 自托管看板的代码地图。在 grep 之前先问：解释一个名称、查看文件、`path [a, b]`、查询关键词、影响范围（依赖 X 的内容）。不带问题时：概览 |
 | `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同。对任务的 batch 写入同样遵守 `board_post` 的负责人规则 |
 | `board_page` | 项目的页面：大小、`find`、`read`，管理员还有 `edits`、`html`、`reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 站点；每个项目都列出其 GitHub 仓库 |

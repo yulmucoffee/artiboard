@@ -101,6 +101,8 @@ Views are drawn by code, never by a model. Agents read only the slice they need 
 </tr>
 </table>
 
+**Code map.** A self-hosted board can keep a map of each repository's files, functions and imports. Agents ask `board_map` before they grep, and the board warns when two open tasks touch the same code. Build it with one command ([Self-host](#self-host)). Artifact boards do not have one yet.
+
 ## Quick start
 
 A board lives in one of two places. Both use the same page, the same documents and the same rules, and the skill sets up either.
@@ -229,6 +231,12 @@ approval_mode = "approve"
 
 Then ask the agent to "set up the board for this repo".
 
+**Code map** (optional, self-hosted). From the repository's checkout, build and upload its map. Rebuild it after big changes:
+
+```bash
+node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api
+```
+
 **Customize** exactly as on claude.ai. Title, language and any UI string live in `meta/config` and change live; who is on a board is the admins' (`member join`, `member remove`). The page itself is per project: an admin runs `artiboard page set --project acme --file page.html` (statuses, fields, views), and `page reset` goes back to the bundled page, which updates with the site. Page code runs for every member, so agents only read pages (`board_page` with `find`) unless the site sets `ARTIBOARD_AGENT_PAGE_EDITS=1`; then an admin's agent can change a page with small exact edits.
 
 | Setting | Default | Meaning |
@@ -251,6 +259,7 @@ artiboard member add|token|link|revoke|access|join|remove|list
 artiboard project add|repos|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
+artiboard map build|drop --project ID --repo R
 ```
 
 Run `node server/cli.js` with no command for every option. Admins do the same from the site: the projects page has a **Members** panel (add, new token, sign-in link, access, revoke, remove), and everyone sets their own display name and role in **Profile**, which shows on every board they sit on. Access levels are `admin`, `member` (writes) and `viewer` (reads), and they hold across the site: every member sees every project. Members never get a password: a token signs in an agent, and the page trades a token or a one-time link for a browser session. `member revoke` ends those sessions too. Only admins change who is who (`meta/config.people`, `people/`), and messages and notices always carry their writer's own name.
@@ -265,7 +274,8 @@ Run `node server/cli.js` with no command for every option. Admins do the same fr
 | `board_start {project or repo}` | The board rules and the project's rules, new notices since your cursor (and moves it), your open tasks (marked where someone else wrote last; those in review on one line), ready tasks, others' tasks waiting for review. With `repo` (a git remote) it finds the project and lists that repository's work |
 | `board_claim {id, text, override?}` | Claims a ready task, posts the claim, returns spec, acceptance, summary. `override` takes over someone else's task when your person says so |
 | `board_task {id}` | Status, details, and the messages after the summary |
-| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | A thread message plus changes to your task; anyone may move a task's `due`. `done` stamps `doneAt` and unblocks dependents; `todo` releases the task for anyone. Without `task`: a notice. `tasks` gives several tasks one status and message in one write, all or none (a deploy finishing its reviews). A task in review is open to its reviewer (`done`, or back to `doing`); `override` changes someone else's task when your person says so, and the thread names the holder |
+| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | A thread message plus changes to your task; anyone may move a task's `due`. `done` stamps `doneAt` and unblocks dependents; `todo` releases the task for anyone. Without `task`: a notice. `tasks` gives several tasks one status and message in one write, all or none (a deploy finishing its reviews). A task in review is open to its reviewer (`done`, or back to `doing`); `override` changes someone else's task when your person says so, and the thread names the holder. `touches` adds the files or symbols you touch (`""` clears); a self-hosted board warns when open tasks overlap |
+| `board_map {explain, file, path, query, impact}` | The code map of a self-hosted board. Ask it before grepping: explain a name, file a path, path [a, b], query words, impact (what depends on X). No question: overview |
 | `board_get`, `board_query`, `board_batch` | Documents, as `ArtifactData` reads and writes them. Batch writes to tasks follow the same holder rule as `board_post` |
 | `board_page` | The project's page: size, `find`, `read`, and for admins `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | The site; each project lists its GitHub repositories |

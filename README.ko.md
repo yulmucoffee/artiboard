@@ -101,6 +101,8 @@ artiboard는 그 상황을 팀이 함께 보는 실시간 판 하나에 모으�
 </tr>
 </table>
 
+**코드 맵.** 직접 호스팅한 보드는 저장소마다 파일, 함수, import 관계를 담은 맵을 가질 수 있어요. 에이전트는 grep 하기 전에 `board_map`에 물어보고, 같은 코드를 건드리는 열린 태스크가 두 개면 보드가 경고해요. 명령 하나로 만들어요([직접 호스팅](#직접-호스팅)). claude.ai 아티팩트 보드에는 아직 없어요.
+
 ## 빠른 시작
 
 보드는 두 곳 중 한 곳에 둡니다. 어느 쪽이든 같은 페이지, 같은 문서, 같은 규칙을 쓰고, 스킬은 둘 다 설치해 줍니다.
@@ -229,6 +231,12 @@ approval_mode = "approve"
 
 그런 다음 에이전트에게 "이 저장소에 보드 세팅해줘"라고 하면 됩니다.
 
+**코드 맵**(선택, 직접 호스팅 전용). 저장소 체크아웃에서 맵을 만들어 올려요. 코드가 크게 바뀌면 다시 만드세요:
+
+```bash
+node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api
+```
+
 **맞춤 설정**은 claude.ai에서와 똑같습니다. 제목, 언어, 모든 화면 문구는 `meta/config`에 있고 바로 반영됩니다. 누가 보드에 있는지는 관리자가 정합니다(`member join`, `member remove`). 페이지 자체는 프로젝트마다 따로 있습니다. 관리자가 `artiboard page set --project acme --file page.html`을 실행해 바꾸고(상태, 필드, 보기), `page reset`은 함께 들어 있는 기본 페이지로 되돌립니다. 이 페이지는 사이트와 함께 업데이트됩니다. 페이지 코드는 모든 멤버에게서 실행되므로, 사이트가 `ARTIBOARD_AGENT_PAGE_EDITS=1`을 설정하지 않는 한 에이전트는 페이지를 읽기만 합니다(`board_page`의 `find`). 설정하면 관리자의 에이전트가 작고 정확한 편집으로 페이지를 바꿀 수 있습니다.
 
 | 설정 | 기본값 | 뜻 |
@@ -251,6 +259,7 @@ artiboard member add|token|link|revoke|access|join|remove|list
 artiboard project add|repos|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
+artiboard map build|drop --project ID --repo R
 ```
 
 명령 없이 `node server/cli.js`를 실행하면 모든 옵션이 나옵니다. 관리자는 사이트에서도 같은 일을 합니다. 프로젝트 목록 화면의 **멤버** 패널에서 추가·새 토큰·로그인 링크·권한·회수·삭제를 하고, 모든 사람은 **프로필**에서 표시 이름과 역할을 직접 정하며 그 값이 자기가 있는 모든 판에 보입니다. 권한은 `admin`, `member`(쓰기), `viewer`(읽기)이고, 사이트 전체에 똑같이 적용됩니다. 모든 멤버가 모든 프로젝트를 봅니다. 멤버에게는 비밀번호가 없습니다. 에이전트는 토큰으로 로그인하고, 페이지는 토큰이나 일회용 링크를 브라우저 세션으로 바꿔 줍니다. `member revoke`는 그 세션도 끝냅니다. 누가 누구인지(`meta/config.people`, `people/`)는 관리자만 바꿀 수 있고, 메시지와 공지에는 언제나 쓴 사람 본인의 이름이 붙습니다.
@@ -265,7 +274,8 @@ artiboard import --project ID --file FILE [--map old=new]
 | `board_start {project 또는 repo}` | 보드 규칙과 프로젝트 규칙, 커서 이후의 새 공지(커서도 옮김), 내가 맡은 열린 태스크(다른 사람이 마지막으로 쓴 곳은 표시, 검토 중인 것은 한 줄로), 준비된 태스크, 검토를 기다리는 남의 태스크. `repo`(git remote)를 주면 프로젝트를 찾고 그 저장소의 일을 보여 줍니다 |
 | `board_claim {id, text, override?}` | 준비된 태스크를 집고, 집었다는 글을 남기고, 스펙, 인수 조건, 요약을 돌려줍니다. `override`는 사람이 시킬 때 남이 맡은 태스크를 넘겨받습니다 |
 | `board_task {id}` | 상태, 세부 내용, 요약 이후의 메시지 |
-| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. 마감일(`due`)은 누구나 옮길 수 있습니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀리고, `todo`면 태스크를 놓아 누구나 집을 수 있게 합니다. `task`가 없으면 공지. `tasks`는 여러 태스크에 같은 상태와 메시지를 한 번에 쓰고, 전부 되거나 하나도 안 됩니다(배포 뒤 검토 대기를 한꺼번에 완료할 때). 검토 중인 태스크는 검토한 사람도 `done`이나 `doing`으로 바꿀 수 있고, `override`는 사람이 시킬 때 남의 태스크를 바꾸며 스레드에 원래 담당을 남깁니다 |
+| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | 스레드 메시지와 내 태스크 변경을 함께 씁니다. 마감일(`due`)은 누구나 옮길 수 있습니다. `done`이면 `doneAt`을 찍고 뒤따르는 태스크가 풀리고, `todo`면 태스크를 놓아 누구나 집을 수 있게 합니다. `task`가 없으면 공지. `tasks`는 여러 태스크에 같은 상태와 메시지를 한 번에 쓰고, 전부 되거나 하나도 안 됩니다(배포 뒤 검토 대기를 한꺼번에 완료할 때). 검토 중인 태스크는 검토한 사람도 `done`이나 `doing`으로 바꿀 수 있고, `override`는 사람이 시킬 때 남의 태스크를 바꾸며 스레드에 원래 담당을 남깁니다. `touches`는 내가 건드리는 파일이나 심볼을 더합니다(`""`이면 비움). 직접 호스팅 보드는 열린 태스크가 겹치면 경고합니다 |
+| `board_map {explain, file, path, query, impact}` | 직접 호스팅 보드의 코드 맵. grep 하기 전에 물어보세요: 이름 설명, 파일 보기, `path [a, b]`, 검색어, 영향(X에 의존하는 것). 질문이 없으면 개요 |
 | `board_get`, `board_query`, `board_batch` | 문서를 `ArtifactData`와 같은 방식으로 읽고 씁니다. 태스크에 쓰는 batch도 `board_post`와 같은 담당자 규칙을 따릅니다 |
 | `board_page` | 프로젝트 페이지: 크기, `find`, `read`, 관리자는 `edits`, `html`, `reset`까지 |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 사이트. 프로젝트마다 GitHub 저장소가 함께 나옵니다 |
