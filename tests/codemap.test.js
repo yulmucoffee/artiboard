@@ -868,6 +868,36 @@ test('impact: dependents by depth; a file\'s own symbols are not its dependents'
     'depth 1:', '  src/legacy/orphan.js#Ledger.record [x] uses'], 'a function passed as a value is depended on');
 });
 
+test('inside: what a symbol or file calls, uses and extends, by depth; the opposite of impact', () => {
+  // main calls fetchCart, new Cart, applyDiscount, and by name cart.add( and format.formatLine(; one more step reaches
+  // what those call or extend (fetchCart's callees are already listed)
+  const lines = [
+    'inside src/index.js#main: 9 callees within 2 steps',
+    'depth 1:',
+    '  src/api/client.js#fetchCart [x] calls',
+    '  src/cart.ts#Cart [x] calls',
+    '  src/cart.ts#Cart.add [i] calls',
+    '  src/cart.ts#applyDiscount [x] calls',
+    '  src/util/format.js#formatLine [i] calls',
+    'depth 2:',
+    '  src/cart.ts#Cart.total [i] calls',
+    '  src/store.ts#Store [x] extends',
+    '  src/store.ts#Store.save [i] calls',
+    '  src/util/format.js#formatPrice [x] calls',
+  ];
+  assert.deepEqual(G.inside('main').lines, lines);
+  assert.deepEqual(G.inside('main', { depth: 3 }).lines.slice(12),
+    ['depth 3:', '  src/store.ts#Store.touch [x] calls', '  src/util/parse.js#parseAmount [x] calls']);
+  assert.deepEqual(G.inside('main', { limit: 2 }).lines, [...lines.slice(0, 4), '  … 3 more (limit 10)', 'depth 2:', ...lines.slice(8, 10),
+    '  … 2 more (limit 10)']);
+  assert.deepEqual(G.inside('src/util/parse.js').lines, ['inside src/util/parse.js: 1 callees within 2 steps', 'depth 1:',
+    '  src/util/format.js#formatPrice [x] calls'], 'a file starts from its symbols; its import of format.js is not a call');
+  assert.deepEqual(G.inside('src/legacy/orphan.js#Ledger.record').lines.slice(1), ['depth 1:', '  src/legacy/orphan.js#formatPrice [x] uses']);
+  assert.deepEqual(G.inside('src/cart.ts#Price').lines, ['src/cart.ts#Price calls and uses nothing in the map']);
+  assert.deepEqual(G.inside('formatPrice').ambiguous, ['src/legacy/orphan.js#formatPrice', 'src/util/format.js#formatPrice']);
+  assert.equal(G.inside('nope').missing, true);
+});
+
 test('overview: counts, languages, communities and the most connected nodes', () => {
   const lines = G.overview().lines;
   assert.deepEqual(lines.slice(0, 6), [

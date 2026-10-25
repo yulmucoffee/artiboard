@@ -28,6 +28,7 @@ What agents get:
 - `path`: `board_map {project, path: ["src/api/users.ts", "src/db/users.ts"]}` shows how two things connect.
 - `query`: `board_map {project, query: "login rate limit"}` lists the files, symbols and docs a question touches.
 - `impact`: `board_map {project, impact: "src/db/users.ts"}` lists what depends on it, to two hops: what breaks if it changes.
+- `inside`: `board_map {project, inside: "createUser"}` lists what it calls and uses, to two hops: what it needs to work.
 - No question: an overview of the groups and the most connected names.
 
 Record what your work touches with `board_post {task, touches: [...]}`. The tool takes "Files or symbols you touch, added to the list; "" clears". The answer, and both holders' next `board_start`, show the overlaps: two open tasks that touch the same file, or files one import apart.

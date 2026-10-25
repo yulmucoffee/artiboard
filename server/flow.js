@@ -542,9 +542,9 @@ export function makeFlow(store) {
 
   // board_map: one question to one repository's map, answered in lines; no question, the map's overview. repo picks
   // the map by label or owner/name when the project has several.
-  async function map(project, { repo, explain, file, path: pair, query: words, impact, limit } = {}) {
-    const asked = Object.entries({ explain, file, path: pair, query: words, impact }).filter(([, v]) => v !== undefined);
-    if (asked.length > 1) throw new BoardError('invalid_argument', 'ask one of explain, file, path, query and impact at a time');
+  async function map(project, { repo, explain, file, path: pair, query: words, impact, inside, limit } = {}) {
+    const asked = Object.entries({ explain, file, path: pair, query: words, impact, inside }).filter(([, v]) => v !== undefined);
+    if (asked.length > 1) throw new BoardError('invalid_argument', 'ask one of explain, file, path, query, impact and inside at a time');
     const all = await mapsOf(project), maps = mapsNamed(all, repo);
     if (!all.length) return `no code map on ${project}; one is built from a checkout with the artiboard skill's scripts/codemap.mjs`;
     if (!maps.length) throw new BoardError('not_found', `no code map for ${repo}; maps: ${all.map(mapName).join(', ')}`);

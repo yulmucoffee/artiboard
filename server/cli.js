@@ -47,6 +47,7 @@ const USAGE = `usage: artiboard <command> [options]   (--env FILE loads settings
   map file       --project ID PATH
   map path       --project ID A B           how two names connect
   map impact     --project ID X             what depends on X
+  map inside     --project ID X             what X calls and uses
   map drop       --project ID --repo R      delete a repository's map
            queries take --repo R when a project has several maps, and --limit N`;
 
@@ -243,6 +244,7 @@ const commands = {
     file: () => ask({ file: args[0] }),
     path: () => ask({ path: args.slice(0, 2) }),
     impact: () => ask({ impact: args[0] }),
+    inside: () => ask({ inside: args[0] }),
     async drop() { need('project', 'repo'); console.log(await makeFlow(store).dropMap(site(), o.project, o.repo)); },
   },
 };

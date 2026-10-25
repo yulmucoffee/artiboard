@@ -917,6 +917,14 @@ for (const backend of backends) {
       assert.match(impact, /api\/report\.js/, 'two imports away');
     });
 
+    test('board_map inside lists what a symbol calls and uses, two steps down', async () => {
+      const inside = (await call(board, 'board_map', { project: M, inside: 'monthlyReport' })).value;
+      assert.match(inside, /^inside api\/report\.js#monthlyReport: \d+ \w+ within 2 steps$/m);
+      const [one = '', two = ''] = inside.split(/^depth 2:$/m);
+      assert.match(one, /^depth 1:\n(?:  .*\n)*  api\/orders\.js#orderTotal \[[xi]\] calls$/m, 'what it calls');
+      assert.match(two, /^  shared\/units\.js#toCents \[[xi]\] calls$/m, 'and what that calls');
+    });
+
     test('a claim on a board with a map brings the code its task names, and overlaps reach across an import', async () => {
       const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
       const task = (n, spec) => [{ op: 'set', path: `tasks/${n}`, data: { key: n, title: `code ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at } },
@@ -962,7 +970,7 @@ for (const backend of backends) {
       }
     });
 
-    test('artiboard map query answers from the map built at the command line', async (t) => {
+    test('artiboard map query, path and inside answer from the map built at the command line', async (t) => {
       if (store.kind !== 'sqlite') return t.skip('the command line runs on the SQLite file this test opens');
       const env = { ...process.env, ARTIBOARD_BACKEND: 'sqlite', ARTIBOARD_DB: join(dir, 'board.db'), BOARD_URL: BASE };
       const cli = async (...args) => (await runCli(process.execPath, [fileURLToPath(new URL('../server/cli.js', import.meta.url)), ...args], { env })).stdout.trim();
@@ -970,6 +978,9 @@ for (const backend of backends) {
       assert.match(q, /shared\/units\.js/);
       assert.equal(q, (await call(board, 'board_map', { project: M, query: 'cents' })).value);
       assert.match(await cli('map', 'path', '--project', M, 'api/report.js', 'shared/units.js'), /api\/orders\.js/);
+      const inside = await cli('map', 'inside', '--project', M, 'monthlyReport');
+      assert.match(inside, /api\/orders\.js#orderTotal/);
+      assert.equal(inside, (await call(board, 'board_map', { project: M, inside: 'monthlyReport' })).value);
     });
 
     test('refuses requests without a valid token', async () => {

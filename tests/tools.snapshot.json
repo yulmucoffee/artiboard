@@ -190,7 +190,7 @@
  },
  {
   "name": "board_map",
-  "description": "The project's code map: files, symbols and how they connect. Ask it before grepping (it knows names, not text): explain a name, file a path, path [a, b], query words, impact (what depends on X). No question: overview.",
+  "description": "The project's code map: files, symbols, links. Ask before grepping (it knows names, not text): explain X, file a path, path [a, b], query words, impact X (what uses it), inside X (what it uses). None: overview.",
   "inputSchema": {
    "type": "object",
    "properties": {
@@ -199,7 +199,7 @@
      "description": "Project id"
     },
     "repo": {
-     "description": "Label or owner/name, when there are several maps",
+     "description": "Label or owner/name, if several maps",
      "type": "string"
     },
     "explain": {
@@ -218,6 +218,9 @@
      "type": "string"
     },
     "impact": {
+     "type": "string"
+    },
+    "inside": {
      "type": "string"
     },
     "limit": {

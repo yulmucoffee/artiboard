@@ -3969,29 +3969,42 @@ function graphDependents(g, id) {
   return n.k === 'file' ? found.filter((e) => g.nodes.get(e.from).f !== id) : found;
 }
 
-function graphImpact(g, nameOrPath, { depth = 2, limit = 30 } = {}) {
+// Breadth first from a node through the edges step gives, to depth; each node once, at its first depth, with the
+// edge that reached it (end says which end of an edge is the node reached). A file's own symbols start with it, so
+// they are not listed. Prints like impact and inside do, depth by depth.
+function graphReach(g, nameOrPath, { depth = 2, limit = 30 } = {}, step, end, head, none) {
   const hit = graphOne(g, nameOrPath);
   if (!hit.id) return hit;
-  // a file's own symbols do not depend on it
-  const seen = new Set(g.nodes.get(hit.id).k === 'file' ? g.files.get(hit.id) : [hit.id]), levels = [];
-  let frontier = [hit.id];
+  const start = g.nodes.get(hit.id).k === 'file' ? g.files.get(hit.id) || [hit.id] : [hit.id];
+  const seen = new Set(start), levels = [];
+  let frontier = start;
   for (let d = 1; d <= depth && frontier.length; d++) {
     const level = [];
-    for (const id of frontier) {
-      for (const e of graphDependents(g, id)) if (!seen.has(e.from)) { seen.add(e.from); level.push(e); }
-    }
-    level.sort((a, b) => graphCmp(a.from, b.from));
+    for (const id of frontier) for (const e of step(id)) if (!seen.has(end(e))) { seen.add(end(e)); level.push(e); }
+    level.sort((a, b) => graphCmp(end(a), end(b)));
     if (level.length) levels.push(level);
-    frontier = level.map((e) => e.from);
+    frontier = level.map(end);
   }
   const total = levels.reduce((s, l) => s + l.length, 0);
-  if (!total) return { lines: [`nothing depends on ${hit.id}`], levels: [] };
-  const lines = [`impact of ${hit.id}: ${total} dependents within ${depth} steps`];
+  if (!total) return { lines: [none(hit.id)], levels: [] };
+  const lines = [head(hit.id, total, depth)];
   levels.forEach((level, d) => {
     lines.push(`depth ${d + 1}:`);
-    graphList(lines, level, limit, (e) => `  ${e.from} [${e.conf}] ${e.type}`, true);
+    graphList(lines, level, limit, (e) => `  ${end(e)} [${e.conf}] ${e.type}`, true);
   });
-  return { lines, levels: levels.map((l) => l.map((e) => e.from)) };
+  return { lines, levels: levels.map((l) => l.map(end)) };
+}
+
+// what breaks if it changes: who imports, calls, uses or extends it, and theirs
+function graphImpact(g, nameOrPath, opts = {}) {
+  return graphReach(g, nameOrPath, opts, (id) => graphDependents(g, id), (e) => e.from, (id, n, d) => `impact of ${id}: ${n} dependents within ${d} steps`, (id) => `nothing depends on ${id}`);
+}
+
+// what it is made of: what it calls, uses and extends, and theirs (a file: what its symbols do)
+function graphInside(g, nameOrPath, opts = {}) {
+  const step = (id) => (g.out.get(id) || []).filter((e) => e.type === 'calls' || e.type === 'uses' || e.type === 'extends');
+  return graphReach(g, nameOrPath, opts, step, (e) => e.to, (id, n, d) => `inside ${id}: ${n} callees within ${d} steps`,
+    (id) => `${id} calls and uses nothing in the map`);
 }
 
 function graphOverview(g, { limit = 10 } = {}) {
@@ -4126,6 +4139,7 @@ function loadGraph(index, chunks) {
     path: (a, b, opts) => graphPath(g, a, b, opts || {}),
     query: (text, opts) => graphQuery(g, text, opts || {}),
     impact: (nameOrPath, opts) => graphImpact(g, nameOrPath, opts || {}),
+    inside: (nameOrPath, opts) => graphInside(g, nameOrPath, opts || {}),
     overview: (opts) => graphOverview(g, opts || {}),
     overlaps: (tasks) => graphOverlaps(g, tasks),
     context: (task, opts) => graphContext(g, task, opts || {}),
