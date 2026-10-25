@@ -99,4 +99,6 @@ record Discount(String code, double rate) {
     double applyTo(double amount) {
         return amount * (1 - rate);
     }
+    public int getX() { return x; }
+    void n() {}
 }

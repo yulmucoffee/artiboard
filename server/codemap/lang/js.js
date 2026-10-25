@@ -132,14 +132,14 @@ function jsTokens(code, strings) {
 const jsAt = (toks, j) => toks[j] || JS_NONE;
 const jsIs = (tok, v) => tok.t === 'p' && tok.v === v;
 
-// the index of the closer that matches the opener at j, or the last token when it is never closed
+// an opener never closed runs to the last token, so broken input still reads to its end
 function jsMatch(toks, j) {
   const d = toks[j].d, close = JS_CLOSERS[toks[j].v];
   for (let k = j + 1; k < toks.length; k++) if (toks[k].d === d && jsIs(toks[k], close)) return k;
   return toks.length - 1;
 }
 
-// past a TypeScript type argument list `<...>` starting at j
+// a TypeScript type argument list holds commas and braces that are not the code's (`Map<A, B>`, `<T extends {}>`)
 function jsSkipAngles(toks, j) {
   let n = 0;
   for (let k = j; k < toks.length; k++) {
@@ -176,7 +176,7 @@ function jsWrappers(toks) {
   return out;
 }
 
-// whether the token at i begins a statement at its depth
+// a line break ends a statement unless the line runs on, as JavaScript reads code without semicolons
 function jsStarts(toks, i) {
   if (i === 0) return true;
   const prev = toks[i - 1], cur = toks[i];
@@ -188,7 +188,7 @@ function jsStarts(toks, i) {
   return true;
 }
 
-// what the initializer at j makes of a name: a function, a class, or neither
+// `const f = () => {}` is a function: its calls are its own, and a query lists it as one
 function jsInitKind(toks, j, ts) {
   let t = jsAt(toks, j);
   if (t.v === 'async' && t.t === 'id') t = jsAt(toks, ++j);
@@ -203,7 +203,7 @@ function jsInitKind(toks, j, ts) {
   return null;
 }
 
-// a dotted name starting at j (a.b.C): its last part and the index after it
+// `new a.b.C` and `extends ns.Base` name C and Base: the last part is what some file defines
 function jsDotted(toks, j) {
   let last = null;
   while (toks[j] && toks[j].t === 'id') {
@@ -243,7 +243,7 @@ function jsAdd(x, tok, kind, exported, end, name = tok.v) {
   x.out.symbols.push(sym);
 }
 
-// a statement at the top level, tokens [s, stop)
+// only top-level declarations (and the factory's nested functions) are symbols: locals come and go too often to map
 function jsDeclaration(x, s, stop) {
   const { toks } = x, at = (j) => (j < stop ? jsAt(toks, j) : JS_NONE), end = toks[stop - 1].line;
   let k = s, exported = false, isDefault = false;
@@ -399,7 +399,7 @@ function jsClass(x, k, stop, exported) {
   if (j < stop) jsMembers(x, name.v, j, jsMatch(toks, j), exported);
 }
 
-// methods of the class whose body is the braces [open, close]: `name(`, `name<T>(`, and `name = () =>` fields
+// a class's methods, `name = () =>` fields among them: they are methods in all but syntax
 function jsMembers(x, cls, open, close, exported) {
   const { toks } = x, bd = toks[open].d + 1, found = [];
   for (let j = open + 1; j < close; j++) {
@@ -512,8 +512,7 @@ function jsJsxHere(prev) {
   return prev.t === 'id' && JS_OPEN_WORDS.has(prev.v);
 }
 
-// names called, constructed, decorated or used as JSX components, outside type declarations
-// the opener (an index) each token sits directly inside, or -1
+// an argument and a pattern look alike token by token; what holds a name tells them apart
 function jsEnclosing(toks) {
   const encl = new Array(toks.length), stack = [];
   toks.forEach((t, j) => {
@@ -553,7 +552,8 @@ function jsLiteral(x, encl, open) {
 // assigned, or returned. A key, a member name, a binding in a pattern or a parameter list is not a use.
 function jsUseAt(x, encl, j) {
   const { toks } = x, prev = jsAt(toks, j - 1), next = jsAt(toks, j + 1);
-  if (jsIs(next, '.') || jsIs(next, '?.') || jsIs(next, '=')) return false;
+  // `name =>` declares a parameter where an argument would sit
+  if (jsIs(next, '.') || jsIs(next, '?.') || jsIs(next, '=') || jsIs(next, '=>')) return false;
   if (prev.t === 'id') return prev.v === 'return';
   if (jsIs(prev, '=')) return true;
   const open = encl[j], o = open >= 0 ? toks[open].v : '';
@@ -563,9 +563,73 @@ function jsUseAt(x, encl, j) {
   return false;
 }
 
+// The names a parameter list binds: plain and rest parameters, and what a pattern binds (`{ a: b }` binds b, `[c]`
+// binds c); not a default's value, an object pattern's key, or a TypeScript type. Best effort, over its tokens.
+function jsParams(toks, open, close) {
+  const names = new Set(), base = toks[open].d + 1;
+  let skip = -1;
+  for (let k = open + 1; k < close; k++) {
+    const t = toks[k];
+    if (skip >= 0 && (t.d < skip || t.d === skip && jsIs(t, ','))) skip = -1;
+    if (skip >= 0) continue;
+    if (jsIs(t, '=')) { skip = t.d; continue; }
+    if (t.t !== 'id' || JS_RESERVED.has(t.v) || t.v === 'this') continue;
+    if (jsIs(toks[k - 1], ':') && t.d === base) { skip = base; continue; }
+    if (jsIs(jsAt(toks, k + 1), ':') && t.d > base) continue;
+    names.add(t.v);
+  }
+  return names;
+}
+
+// an arrow function's body from k: a block, or an expression up to a `,` or `;` at its depth, the end of what holds
+// it, or the next statement
+function jsArrowBody(toks, k, d) {
+  if (jsIs(jsAt(toks, k), '{')) return [k, jsMatch(toks, k)];
+  let end = k;
+  while (end < toks.length && toks[end].d >= d && !(toks[end].d === d && (jsIs(toks[end], ',') || jsIs(toks[end], ';')
+    || end > k && jsStarts(toks, end)))) end++;
+  return end > k ? [k, end - 1] : null;
+}
+
+// Each function's parameters and the tokens of its body: inside, a name a parameter binds is that parameter, not a
+// file-level name (`function send(res, body) { … body … }` uses its own body).
+function jsScopes(x) {
+  const { toks, defs } = x, scopes = [];
+  const control = new Set(['if', 'for', 'while', 'switch', 'with']);
+  for (let j = 0; j < toks.length; j++) {
+    const t = toks[j];
+    if (t.t === 'id' && jsIs(jsAt(toks, j + 1), '=>') && !jsIs(jsAt(toks, j - 1), '.')) {
+      const body = jsArrowBody(toks, j + 2, t.d);
+      if (body) scopes.push({ from: body[0], to: body[1], names: new Set([t.v]) });
+      continue;
+    }
+    if (!jsIs(t, '(')) continue;
+    const close = jsMatch(toks, j), after = jsAt(toks, close + 1), p = jsAt(toks, j - 1);
+    let body = null;
+    if (jsIs(after, '=>')) body = jsArrowBody(toks, close + 2, t.d);
+    else if (p.v === 'function' || jsAt(toks, j - 2).v === 'function' || defs.has(j - 1)
+      || jsIs(after, '{') && p.t === 'id' && !control.has(p.v)) {
+      // a TypeScript return type may sit between the parameters and the body
+      let open = close + 1;
+      while (open < toks.length && toks[open].d >= t.d && !(toks[open].d === t.d && (jsIs(toks[open], '{') || jsIs(toks[open], ';')))) open++;
+      if (jsIs(jsAt(toks, open), '{') && toks[open].d === t.d) body = [open, jsMatch(toks, open)];
+    }
+    if (body) scopes.push({ from: body[0], to: body[1], names: jsParams(toks, j, close) });
+  }
+  return scopes.sort((a, b) => a.from - b.from);
+}
+
+// names called, constructed, decorated, used as JSX components or used as values, outside type declarations
 function jsRefs(x, jsx) {
   const { toks, out, defs, types, aliases } = x;
-  const refs = [], encl = jsEnclosing(toks);
+  const refs = [], encl = jsEnclosing(toks), scopes = jsScopes(x), active = [];
+  let entered = 0;
+  // whether a parameter of a function around token j binds name (asked with j rising)
+  const shadowed = (j, name) => {
+    while (entered < scopes.length && scopes[entered].from <= j) active.push(scopes[entered++]);
+    for (let a = active.length - 1; a >= 0; a--) if (active[a].to < j) active.splice(a, 1);
+    return active.some((s) => s.names.has(name));
+  };
   // the names a use may mean: this file's own top-level names, its functions' nested functions, and what it imports
   const bound = new Set(x.locals);
   for (const s of out.symbols) {
@@ -579,14 +643,14 @@ function jsRefs(x, jsx) {
     const t = toks[j], prev = jsAt(toks, j - 1), next = jsAt(toks, j + 1);
     if (jsx && jsIs(t, '<') && next.t === 'id' && /^[A-Z]/.test(next.v) && jsJsxHere(prev)) {
       const after = jsAt(toks, j + 2);
-      if (!jsIs(after, '.') && !jsIs(after, ',') && after.v !== 'extends') refs.push({ name: next.v, line: next.line });
+      if (!jsIs(after, '.') && !jsIs(after, ',') && after.v !== 'extends' && !shadowed(j, next.v)) refs.push({ name: next.v, line: next.line });
       continue;
     }
     if (t.t !== 'id') continue;
     if (jsIs(prev, '@')) { refs.push({ name: jsDotted(toks, j).last.v, line: t.line }); j = jsDotted(toks, j).next - 1; continue; }
     if (prev.v === 'new' && prev.t === 'id') {
       const { last, next: after } = jsDotted(toks, j);
-      refs.push({ name: last.v, line: last.line });
+      if (last !== t || !shadowed(j, t.v)) refs.push({ name: last.v, line: last.line });
       j = after - 1;
       continue;
     }
@@ -594,10 +658,10 @@ function jsRefs(x, jsx) {
     const member = jsIs(prev, '.') || jsIs(prev, '?.');
     const call = jsIs(next, '(') || jsIs(next, '`') || jsIs(next, '?.') && jsIs(jsAt(toks, j + 2), '(');
     if (!call) {
-      if (!member && bound.has(t.v) && jsUseAt(x, encl, j)) refs.push({ name: t.v, line: t.line, use: true });
+      if (!member && bound.has(t.v) && jsUseAt(x, encl, j) && !shadowed(j, t.v)) refs.push({ name: t.v, line: t.line, use: true });
       continue;
     }
-    if (!member && (JS_RESERVED.has(t.v) || prev.v === 'function' || jsIs(prev, '*') && jsAt(toks, j - 2).v === 'function')) continue;
+    if (!member && (JS_RESERVED.has(t.v) || prev.v === 'function' || jsIs(prev, '*') && jsAt(toks, j - 2).v === 'function' || shadowed(j, t.v))) continue;
     const recv = member ? jsAt(toks, j - 2) : JS_NONE;
     if (member && recv.t === 'id' && JS_GLOBALS.has(recv.v) && !jsIs(jsAt(toks, j - 3), '.') && !x.modules.has(recv.v)) continue;
     // `name(args) {` in an object literal defines a method; it calls nothing
@@ -614,7 +678,7 @@ function jsRefs(x, jsx) {
   out.refs.push(...refs);
 }
 
-// p without '.' or '..' parts, or null when it climbs out of the repository
+// an import that climbs out of the repository names no repo file
 function jsNormalize(p) {
   const out = [];
   for (const part of p.split('/')) {

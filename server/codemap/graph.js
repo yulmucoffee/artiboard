@@ -14,6 +14,7 @@ const GRAPH_SEEDS = 6;
 // a word matching more nodes than this, and this many times the nodes the question's rarest word matches, is common;
 // docs show this many lines
 const GRAPH_COMMON_MIN = 5, GRAPH_COMMON_RATIO = 4, GRAPH_DOC_LINES = 4;
+const GRAPH_CONTEXT_CHARS = 20000;
 const GRAPH_STOP = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'from', 'into', 'when', 'what', 'where', 'which',
   'how', 'why', 'are', 'was', 'were', 'has', 'have', 'had', 'not', 'but', 'all', 'any', 'can', 'does', 'did', 'its', 'our',
   'out', 'use', 'using', 'used', 'should', 'would', 'could', 'will', 'then', 'than', 'them', 'they', 'there', 'their',
@@ -25,7 +26,7 @@ const graphCmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const graphPush = (map, key, v) => { const list = map.get(key); if (list) list.push(v); else map.set(key, [v]); };
 const graphKind = (n) => (n.k === 'sym' || n.k === 'sec' ? n.t || n.k : n.k);
 const graphWhere = (n) => (n.l ? `${n.f}:${n.l}` : n.f);
-// a symbol's declaration after its line, shortened for list lines
+// list lines stay one screen wide, so a long declaration is shortened there
 const graphSig = (n, max = 80) => (n.s ? ` · ${n.s.length > max ? `${n.s.slice(0, max - 1)}…` : n.s}` : '');
 const graphDeg = (g, id) => g.degree.get(id) || 0;
 const graphByDegree = (g) => (a, b) => graphDeg(g, b) - graphDeg(g, a) || graphCmp(a, b);
@@ -68,7 +69,7 @@ function graphFind(g, q) {
     named,
     lasts.filter((id) => g.nodes.get(id).n.endsWith(`.${s}`)),
     lasts,
-    s.includes('/') ? g.ids.filter((id) => { const k = g.nodes.get(id).k; return (k === 'file' || k === 'doc') && id.endsWith(`/${s}`); }) : [],
+    s.includes('/') ? graphEnding(g, s) : [],
   ];
   for (const t of tiers) {
     if (!t.length) continue;
@@ -76,6 +77,14 @@ function graphFind(g, q) {
     return code.length ? code : t;
   }
   return [];
+}
+
+// File and doc ids whose path is p or ends in /p, looked up by p's last two parts (or its name): a path that is not in
+// the map costs one lookup, not a pass over every node.
+function graphEnding(g, p) {
+  const parts = p.split('/');
+  const pool = parts.length > 1 ? g.tails.get(parts.slice(-2).join('/')) : g.bases.get(p);
+  return (pool || []).filter((id) => id === p || id.endsWith(`/${p}`));
 }
 
 // one node for a name, or the answer that says why not
@@ -111,7 +120,7 @@ function graphExplain(g, name, { limit = 30 } = {}) {
   return { lines, id: n.i };
 }
 
-// the other ends of edges of one type into or out of any of ids, each once with its surest conf, sorted by id
+// a file and its symbols are asked together, and an end reached twice is listed once, with its surest conf
 function graphEnds(g, ids, dir, type) {
   const ends = new Map(), own = new Set(ids);
   for (const id of ids) {
@@ -146,7 +155,7 @@ function graphFile(g, path, { limit = 30 } = {}) {
   return { lines, id: f.i, symbols: inner };
 }
 
-// breadth first over the edges keep accepts, either way along each; how each reached node was reached, or null
+// null when to is out of reach over these edges, so the caller can try again with more kinds of edge
 function graphWalk(g, from, to, max, keep) {
   const prev = new Map([[from, null]]);
   let frontier = [from];
@@ -326,49 +335,52 @@ function graphOverview(g, { limit = 10 } = {}) {
   return { lines, communities, god };
 }
 
-// the files a task's touches name: a path, a symbol's file, or the one node a bare name means
-function graphTouchFiles(g, touches) {
-  const files = new Set();
-  for (const t of touches) {
-    const ids = graphFind(g, t);
-    if (ids.length === 1) files.add(g.nodes.get(ids[0]).f);
-  }
-  return [...files].filter((f) => g.nodes.has(f));
-}
+// A touch as overlaps compares it: a leading ./ dropped, a symbol (`src/a.js#run`) read as its file. A bare name
+// ('run') stays itself and so matches only the same name.
+const graphTouchKey = (t) => (typeof t === 'string' ? t.trim().replace(/^\.\//, '').replace(/#.*$/, '') : '');
 
-const graphImports = (g, a, b) => (g.out.get(a) || []).some((e) => e.type === 'imports' && e.to === b);
-
-// Open tasks that touch the same code: the same touch written on both; else, with a map, the same file under
-// different names, or a file of one importing a file of the other.
+// Open tasks that touch the same code, in one place for the server and the page.
+//   tasks: [{ key, holder?, touches: string[] }], every open task the caller cares about; it keeps the pairs it wants.
+//   Two tasks overlap when they share a touch (as graphTouchKey reads it), or, with a map, when a file one touches
+//   imports a file the other touches. A person's own tasks never overlap each other.
+//   Returns { lines, pairs: [{ a, b, shared } | { a, b, imports: [[from, to]] }] }, pairs in task order.
+// Each task's touches are read once, and pairs come from a touch → tasks index, so many tasks stay cheap.
 function graphOverlaps(g, tasks) {
   const list = (Array.isArray(tasks) ? tasks : []).filter((t) => t && Array.isArray(t.touches) && t.touches.length);
+  const keys = list.map((t) => [...new Set(t.touches.map(graphTouchKey).filter(Boolean))]);
+  const tasksOf = new Map();
+  keys.forEach((ks, i) => ks.forEach((k) => graphPush(tasksOf, k, i)));
+  const apart = (i, j) => !!list[i].holder && list[i].holder === list[j].holder;
+  const found = new Map();
+  const meet = (i, j) => { if (i !== j && !apart(i, j)) found.set(Math.min(i, j) * list.length + Math.max(i, j), [Math.min(i, j), Math.max(i, j)]); };
+  for (const ts of tasksOf.values()) for (let x = 0; x < ts.length; x++) for (let y = x + 1; y < ts.length; y++) meet(ts[x], ts[y]);
+  const imports = new Set();
+  for (const [k, ts] of tasksOf) {
+    for (const e of g.out.get(k) || []) {
+      if (e.type !== 'imports' || !tasksOf.has(e.to)) continue;
+      imports.add(`${k}\n${e.to}`);
+      for (const i of ts) for (const j of tasksOf.get(e.to)) meet(i, j);
+    }
+  }
   const who = (t) => (t.holder ? `${t.key} (${t.holder})` : `${t.key}`);
   const lines = [], pairs = [];
-  for (let i = 0; i < list.length; i++) {
-    for (let j = i + 1; j < list.length; j++) {
-      const a = list[i], b = list[j];
-      const shared = [...new Set(a.touches.filter((x) => b.touches.includes(x)))];
-      let what = shared, hops = [];
-      if (!shared.length) {
-        const fa = graphTouchFiles(g, a.touches), fb = graphTouchFiles(g, b.touches);
-        what = fa.filter((f) => fb.includes(f));
-        if (!what.length) {
-          for (const x of fa) for (const y of fb) {
-            if (graphImports(g, x, y)) hops.push([x, y]);
-            else if (graphImports(g, y, x)) hops.push([y, x]);
-          }
-        }
+  for (const [i, j] of [...found.values()].sort((x, y) => x[0] - y[0] || x[1] - y[1])) {
+    const shared = keys[i].filter((k) => keys[j].includes(k)), hops = [];
+    if (!shared.length) {
+      for (const x of keys[i]) for (const y of keys[j]) {
+        if (imports.has(`${x}\n${y}`)) hops.push([x, y]);
+        else if (imports.has(`${y}\n${x}`)) hops.push([y, x]);
       }
-      if (!what.length && !hops.length) continue;
-      lines.push(`${who(a)} ↔ ${who(b)}: ${what.length ? what.join(', ') : hops.map(([x, y]) => `${x} → ${y}`).join(', ')}`);
-      pairs.push({ a: a.key, b: b.key, ...(what.length ? { shared: what } : { imports: hops }) });
     }
+    lines.push(`${who(list[i])} ↔ ${who(list[j])}: ${shared.length ? shared.join(', ') : hops.map(([x, y]) => `${x} → ${y}`).join(', ')}`);
+    pairs.push({ a: list[i].key, b: list[j].key, ...(shared.length ? { shared } : { imports: hops }) });
   }
   return { lines, pairs };
 }
 
 // The part of the map a task needs when it is claimed: its touches, the repo paths its text names, and the symbols
-// it names in backticks or CamelCase, each as its file with what that file is.
+// it names in backticks or CamelCase, each as its file with what that file is. The text is read word by word and
+// only its first 20,000 characters: a spec may be a quarter megabyte, and this runs inside every claim.
 function graphContext(g, task, { limit = 8 } = {}) {
   const t = task || {}, found = new Map();
   const add = (file, name) => {
@@ -380,18 +392,21 @@ function graphContext(g, task, { limit = 8 } = {}) {
     const ids = graphFind(g, touch);
     if (ids.length === 1) { const n = g.nodes.get(ids[0]); add(n.f, n.k === 'sym' ? n.n : ''); }
   }
-  const text = [t.title, t.spec, t.acceptance].filter((s) => typeof s === 'string').join('\n');
-  for (const m of text.matchAll(/[\w@~.-]+(?:\/[\w@~.-]+)+|[\w@~-][\w@~.-]*\.[A-Za-z0-9]+/g)) {
-    const p = m[0].replace(/^\.\//, '').replace(/[.,;:]+$/, '');
-    const n = g.nodes.get(p);
-    if (n && (n.k === 'file' || n.k === 'doc')) { add(p, ''); continue; }
-    const ends = p.includes('/') ? g.ids.filter((id) => { const k = g.nodes.get(id).k; return (k === 'file' || k === 'doc') && id.endsWith(`/${p}`); }) : [];
-    if (ends.length === 1) add(ends[0], '');
+  const text = [t.title, t.spec, t.acceptance].filter((x) => typeof x === 'string').join('\n').slice(0, GRAPH_CONTEXT_CHARS);
+  const quoted = [], camel = [];
+  for (const word of text.split(/\s+/)) {
+    const bare = word.replace(/^[("'`[<]+/, '').replace(/[)"'`\]>.,;:!?]+$/, '').replace(/^\.\//, '');
+    if (!bare) continue;
+    if (bare.includes('/') || /\.[A-Za-z0-9]+$/.test(bare)) {
+      const n = g.nodes.get(bare);
+      const ends = n ? [] : bare.includes('/') ? graphEnding(g, bare) : [];
+      if (n && (n.k === 'file' || n.k === 'doc')) add(bare, '');
+      else if (ends.length === 1) add(ends[0], '');
+    }
+    if (word.startsWith('`')) quoted.push(word.replace(/^`+/, '').replace(/[`(].*$/, ''));
+    else if (/^[A-Za-z_$][\w$]*$/.test(bare) && /[a-z0-9][A-Z]/.test(bare)) camel.push(bare);
   }
-  const names = new Set();
-  for (const m of text.matchAll(/`([^`\n]+)`/g)) names.add(m[1].trim().replace(/\(.*\)$/, ''));
-  for (const m of text.matchAll(/\b[A-Za-z_$][\w$]*[a-z0-9][A-Z][\w$]*/g)) names.add(m[0]);
-  for (const name of names) {
+  for (const name of new Set([...quoted, ...camel])) {
     const ids = (g.names.get(name.toLowerCase()) || []).filter((id) => g.nodes.get(id).k === 'sym' && g.nodes.get(id).n === name);
     // a name defined in many places says little about where the work is
     if (ids.length && ids.length <= 3) for (const id of ids) add(g.nodes.get(id).f, name);
@@ -408,7 +423,7 @@ function graphContext(g, task, { limit = 8 } = {}) {
 
 export function loadGraph(index, chunks) {
   const g = { index: index || {}, nodes: new Map(), out: new Map(), in: new Map(), names: new Map(), lasts: new Map(),
-    files: new Map(), ids: [], degree: new Map(), terms: null };
+    files: new Map(), bases: new Map(), tails: new Map(), ids: [], degree: new Map(), terms: null };
   const edges = [];
   for (const ch of chunks || []) {
     for (const n of (ch && ch.nodes) || []) if (n && typeof n.i === 'string') g.nodes.set(n.i, n);
@@ -428,6 +443,11 @@ export function loadGraph(index, chunks) {
     if (graphShort(n) !== name) graphPush(g.names, graphShort(n).toLowerCase(), id);
     if (n.k === 'sym' && name.includes('.')) graphPush(g.lasts, name.slice(name.lastIndexOf('.') + 1).toLowerCase(), id);
     if (n.f) graphPush(g.files, n.f, id);
+    if (n.k === 'file' || n.k === 'doc') {
+      const parts = id.split('/');
+      graphPush(g.bases, parts[parts.length - 1], id);
+      if (parts.length > 1) graphPush(g.tails, parts.slice(-2).join('/'), id);
+    }
   }
   return {
     index: g.index,

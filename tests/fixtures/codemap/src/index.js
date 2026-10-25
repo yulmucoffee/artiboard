@@ -4,9 +4,9 @@ import { Cart, applyDiscount } from './cart';
 import { fetchCart } from './api';
 import * as format from './util/format.js';
 import Badge from './components/Badge.jsx';
-import express from 'express';
+import webframe from 'webframe';
 
-const app = express();
+const app = webframe();
 
 export async function main(id) {
   const cart = id ? await fetchCart(id) : new Cart();

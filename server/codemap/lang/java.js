@@ -171,7 +171,10 @@ export const javaLang = {
         if (method) {
           // Blank modifiers, return type and name: a 'void' before '(' would otherwise read as a call.
           refText = javaBlankSpan(code, method[1].length, method[0].length);
-          const declared = /[{;,(]\s*$/.test(code) && !javaCallSkip.has(method[3]) && !javaCallSkip.has(method[4]);
+          // a header that ends the line, or a whole method on one line (`int getX() { return x; }`, `void n() {}`)
+          const oneLine = /^\s*\([^{;]*\{.*\}\s*$/.test(code.slice(method[0].length))
+            && code.split('{').length === code.split('}').length;
+          const declared = (/[{;,(]\s*$/.test(code) || oneLine) && !javaCallSkip.has(method[3]) && !javaCallSkip.has(method[4]);
           if (declared && !top.skip) {
             symbols.push({ name: `${top.full}.${method[4]}`, kind: 'method', line, exported: /\bpublic\b/.test(method[2]) });
           }

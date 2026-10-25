@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { runInNewContext } from 'node:vm';
 import { gzipSync } from 'node:zlib';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -41,7 +42,7 @@ for (const backend of backends) {
     const P = `smoke-${R}`;
     const C = `scratch-${R}`;
     // a project with a code map of SHOP, which the code map tests share
-    const M = `map-${R}`, SHOP_REPO = `acme-${R}/shop`;
+    const M = `map-${R}`, SHOP_REPO = `acme-${R}/shop`, SHOP_KEY = `acme-${R}--shop`;
     const K = (n) => `S${R}-${n}`;
     let dir, store, http, BASE, cfg, tokens = {}, people = {}, board;
 
@@ -635,8 +636,7 @@ for (const backend of backends) {
       assert.match(s, new RegExp(`^repos: ${api} \\(api\\) · ${web}$`, 'm'));
       assert.match(s, /^board rules \(every board\):$/m);
       const rules = /^board rules \(every board\):\n(?:- .*\n)+/m.exec(s)[0];
-      // 1800 until the code map bullet added 166 chars: agents ask the map before grepping and post what they touch
-      assert.ok(rules.length < 2000, `every session that does board work reads the board rules once, so they stay short (${rules.length} chars)`);
+      assert.ok(rules.length < 1800, `every session that does board work reads the board rules once, so they stay short (${rules.length} chars)`);
       assert.match(s, new RegExp(`^project rules \\(rev 2 · ${people.admin.person} \\d\\d-\\d\\d\\):\n1\\. Roles\n- the api is ours$`, 'm'));
       assert.match(s, new RegExp(`^${K('r1')} \\[?.*repo:api.* repo 1$`, 'm'));
       assert.match(s, new RegExp(`^${K('r3')} repo 3$`, 'm'), 'tasks that name no repo are anyone\'s');
@@ -824,6 +824,14 @@ for (const backend of backends) {
         assert.equal(await said('T-1'), 'touches none');
         assert.doesNotMatch(await start(other), /^overlap/m, 'and the overlap is gone');
         assert.equal(await post(other, { task: 'T-2', touches: [] }), 'ok T-2', '[] clears too');
+        await post(board, { task: 'T-1', touches: ['a.js'] });
+        assert.equal(await post(board, { task: 'T-1', text: 'blank names are no names', touches: ['  ', ' '] }), 'ok T-1');
+        assert.deepEqual(await touches('T-1'), ['a.js'], 'and clear nothing');
+        const files = (from) => Array.from({ length: 30 }, (_, i) => `f${from + i}.js`);
+        assert.equal(await post(board, { task: 'T-1', touches: files(0) }), 'ok T-1');
+        assert.equal(await post(board, { task: 'T-1', touches: files(30).slice(0, 29) }), 'ok T-1', '60 in all');
+        assert.match(await post(board, { task: 'T-1', touches: ['one-more.js'] }), /^invalid_argument: T-1 would touch 61 files and symbols; a task keeps at most 60/);
+        assert.equal((await touches('T-1')).length, 60);
         assert.match(await post(board, { tasks: ['T-1', 'T-2'], touches: ['x.js'] }), /^invalid_argument: /, 'several tasks at once take status and text only');
         assert.match(await post(board, { touches: ['x.js'] }), /^invalid_argument: /, 'a notice touches nothing');
       } finally {
@@ -838,8 +846,9 @@ for (const backend of backends) {
       const up = (token, body, path = `/api/p/${M}/map`) => api(path, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body });
       const r = await up(tokens.member, { repo: SHOP_REPO, index, chunks });
       assert.equal(r.status, 200);
-      assert.deepEqual(await r.json(), { repoKey: 'shop', counts: index.counts, chunks: chunks.length }, 'the map is kept under the repo\'s label');
-      const stored = (await call(board, 'board_get', { project: M, path: 'map/shop' })).value.data;
+      assert.deepEqual(await r.json(), { repoKey: SHOP_KEY, counts: index.counts, chunks: chunks.length }, 'the map is kept under its repository, whatever its label');
+      const stored = (await call(board, 'board_get', { project: M, path: `map/${SHOP_KEY}` })).value.data;
+      assert.equal(stored.label, 'shop', 'the board\'s label is the map\'s name');
       assert.equal(stored.by, people.member.person, 'the uploader is who built it');
       assert.equal(stored.repo, SHOP_REPO);
       assert.equal(stored.chunks, chunks.length);
@@ -855,29 +864,92 @@ for (const backend of backends) {
       await refused({ repo: 'not a repo', index, chunks }, 'a repo is owner/name');
       await refused({ repo: SHOP_REPO, index, chunks: Array.from({ length: 61 }, () => ({ nodes: [], edges: [] })) }, 'at most 60 chunks');
       await refused({ repo: SHOP_REPO, index }, 'chunks are a list');
+      const says = async (body, message, why) => {
+        const res = await up(tokens.member, body);
+        assert.equal(res.status, 400, why);
+        assert.match((await res.json()).message, message, why);
+      };
+      const node = { i: 'a.js#f', k: 'sym', n: 'f', f: 'a.js', l: 1, t: 'fn' };
+      const one = (c) => [{ nodes: [node], edges: [], ...c }];
+      await says({ repo: SHOP_REPO, index: { ...index, communities: [null] }, chunks }, /^index\.communities\[0\] /, 'a community is an object');
+      await says({ repo: SHOP_REPO, index: { ...index, god: [7] }, chunks }, /^index\.god\[0\] /, 'god nodes are ids');
+      await says({ repo: SHOP_REPO, index: { ...index, counts: { ...index.counts, symbols: 'many' } }, chunks }, /^index\.counts\.symbols /, 'counts are integers');
+      await says({ repo: SHOP_REPO, index: { ...index, langs: { js: -1 } }, chunks }, /^index\.langs\.js /, 'and so are langs');
+      await says({ repo: SHOP_REPO, index: { ...index, label: 'a/b' }, chunks }, /^index\.label /, 'a label names no path');
+      await says({ repo: SHOP_REPO, index, chunks: one({ nodes: [{ ...node, n: 5 }] }) }, /^chunks\[0\]\.nodes\[0\]\.n /, 'a node\'s name is a string');
+      await says({ repo: SHOP_REPO, index, chunks: one({ nodes: [{ ...node, k: 'thing' }] }) }, /^chunks\[0\]\.nodes\[0\]\.k /, 'of a known kind');
+      await says({ repo: SHOP_REPO, index, chunks: one({ nodes: [{ ...node, s: 'x'.repeat(161) }] }) }, /^chunks\[0\]\.nodes\[0\]\.s /, 'with a short signature');
+      await says({ repo: SHOP_REPO, index, chunks: one({ edges: [['a.js', 'a.js#f', 'eats', 'x']] }) }, /^chunks\[0\]\.edges\[0\] /, 'an edge has a known type');
+      await says({ repo: SHOP_REPO, index, chunks: one({ edges: [['a.js', 'a.js#f', 'calls', 'y']] }) }, /^chunks\[0\]\.edges\[0\] /, 'and says x or i');
+      await says({ repo: SHOP_REPO, index: { ...index, counts: { ...index.counts, files: 0 } }, chunks, root: '/src/shop/web' },
+        /no files: is \/src\/shop\/web the repository's root\?/, 'an empty map never replaces a good one');
 
       const small = { nodes: [], edges: [] };
       assert.equal((await up(tokens.member, { repo: SHOP_REPO, index, chunks: [small, small, small] })).status, 200);
       assert.equal((await up(tokens.member, { repo: SHOP_REPO, index, chunks: [small] })).status, 200);
-      assert.equal(await store.get(M, 'map/shop/chunks/1'), null, 'a rebuild with fewer chunks leaves none of the old ones behind');
-      assert.equal((await store.get(M, 'map/shop')).data.chunks, 1);
+      assert.equal(await store.get(M, `map/${SHOP_KEY}/chunks/1`), null, 'a rebuild with fewer chunks leaves none of the old ones behind');
+      assert.equal((await store.get(M, `map/${SHOP_KEY}`)).data.chunks, 1);
       assert.equal((await up(tokens.member, { repo: SHOP_REPO, index, chunks }, `/api/map?project=${M}`)).status, 200, 'the form Vercel rewrites the route to');
-      assert.equal((await store.get(M, 'map/shop')).data.chunks, chunks.length);
-      // the skill's uploader gzips the body: a map's JSON is large and hosts cap a request well under it
-      const zipped = await fetch(`${BASE}/api/p/${M}/map`, { method: 'POST', body: gzipSync(JSON.stringify({ repo: SHOP_REPO, index, chunks: [small] })),
-        headers: { Authorization: `Bearer ${tokens.member}`, 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' } });
-      assert.equal(zipped.status, 200, 'a gzipped upload');
-      assert.equal((await store.get(M, 'map/shop')).data.chunks, 1);
-      const bomb = await fetch(`${BASE}/api/p/${M}/map`, { method: 'POST', body: gzipSync(Buffer.alloc(17 * 1048576, 0x20)),
-        headers: { Authorization: `Bearer ${tokens.member}`, 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' } });
-      assert.equal(bomb.status, 400, 'what inflates past the limit is refused too');
+      assert.equal((await store.get(M, `map/${SHOP_KEY}`)).data.chunks, chunks.length);
+      // the skill's uploader gzips the body: a map's JSON is large and hosts cap a request well under it. It sends the
+      // bytes as they are, so a host that parses JSON bodies first leaves them alone; other clients may say gzip
+      const zipped = (body, headers) => fetch(`${BASE}/api/p/${M}/map`, { method: 'POST', body: gzipSync(JSON.stringify(body)), headers: { Authorization: `Bearer ${tokens.member}`, ...headers } });
+      assert.equal((await zipped({ repo: SHOP_REPO, index, chunks: [small] }, { 'Content-Type': 'application/octet-stream' })).status, 200, 'gzipped bytes');
+      assert.equal((await store.get(M, `map/${SHOP_KEY}`)).data.chunks, 1);
+      assert.equal((await zipped({ repo: SHOP_REPO, index, chunks: [small, small] }, { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' })).status, 200, 'or said to be gzip');
+      assert.equal((await store.get(M, `map/${SHOP_KEY}`)).data.chunks, 2);
+      const bomb = await zipped({ repo: SHOP_REPO, index, chunks: [{ nodes: [], edges: [], pad: 'x'.repeat(17 * 1048576) }] }, { 'Content-Type': 'application/octet-stream' });
+      assert.equal(bomb.status, 400);
+      assert.equal((await bomb.json()).message, 'request too large or not gzip', 'what inflates past the limit is refused before it is read');
       assert.equal((await up(tokens.member, { repo: SHOP_REPO, index, chunks })).status, 200);
+    });
+
+    test('a host that reads the body before the site does hands it over as bytes, text or JSON, and a map still arrives', async () => {
+      // what a serverless platform does: the handler gets req.body, already read, and no stream
+      const handle = makeApp({ store, cfg }), { index, chunks } = buildGraph(SHOP, { repo: SHOP_REPO, by: 'x' });
+      const send = (body) => new Promise((resolve) => {
+        const req = { method: 'POST', url: `/api/map?project=${M}`, body, headers: { host: 'example.com', authorization: `Bearer ${tokens.member}`, 'content-type': 'application/octet-stream' } };
+        const res = { req, statusCode: 0, headersSent: false, setHeader() {}, end: (out) => resolve({ status: res.statusCode, body: JSON.parse(String(out)) }) };
+        handle(req, res, 'map');
+      });
+      const json = JSON.stringify({ repo: SHOP_REPO, index, chunks });
+      for (const [body, what] of [[gzipSync(json), 'gzipped bytes'], [Buffer.from(json), 'bytes'], [json, 'text'], [JSON.parse(json), 'JSON']]) {
+        const r = await send(body);
+        assert.deepEqual([r.status, r.body.repoKey], [200, SHOP_KEY], `${what}: ${JSON.stringify(r.body)}`);
+      }
+    });
+
+    test('a map is kept under its repository: a new label renames it, and a rebuild replaces it', async () => {
+      const cfgDoc = await store.get(M, 'meta/config');
+      const label = (l) => store.apply(null, M, [{ op: 'update', path: 'meta/config', data: { repos: [{ repo: SHOP_REPO, label: l }] } }]);
+      await label('store');
+      try {
+        const start = async () => (await call(board, 'board_start', { project: M, ready: 0, rules: false, peek: true })).value;
+        assert.match(await start(), /^code map: store · /m, 'the board\'s label names the map at once');
+        assert.equal((await call(board, 'board_map', { project: M, repo: 'store' })).value, (await call(board, 'board_map', { project: M })).value, 'and finds it');
+        const r = await api(`/api/p/${M}/map`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.member}` }, body: { repo: SHOP_REPO, ...buildGraph(SHOP, { repo: SHOP_REPO, by: 'x' }) } });
+        assert.equal((await r.json()).repoKey, SHOP_KEY);
+        assert.deepEqual((await store.query(M, 'map')).map((m) => [m.id, m.data.label]), [[SHOP_KEY, 'store']], 'a rebuild replaces the map, under the new label');
+        assert.equal((await start()).match(/^code map:/gm).length, 1);
+      } finally {
+        await label('shop');
+      }
+      assert.equal(cfgDoc.data.repos[0].label, 'shop');
+      for (const repos of [[{ repo: 'acme/x', label: 'a/b' }], ['acme/x a#b']]) {
+        const made = await call(board, 'board_create_project', { id: `${M}-l`, title: 'Labels', repos });
+        assert.equal(made.value.code, 'invalid_argument', `a label is a name, not a path: ${JSON.stringify(repos)}`);
+      }
     });
 
     test('the start names each code map; a project without one prints nothing extra, and board_map says so in one line', async () => {
       const s = (await call(board, 'board_start', { project: M, ready: 0, rules: false, peek: true })).value;
       assert.match(s, new RegExp(`^repos: ${SHOP_REPO} \\(shop\\)\\ncode map: shop · \\d+ symbols · built \\d\\d-\\d\\d by ${people.member.person}$`, 'm'));
-      assert.doesNotMatch((await call(board, 'board_start', { project: P, ready: 50, peek: true })).value, /^code map/m);
+      const plain = (await call(board, 'board_start', { project: P, ready: 50, peek: true })).value;
+      assert.doesNotMatch(plain, /^code map/m);
+      assert.doesNotMatch(plain, /board_map/, 'nor a rule about a map it does not have');
+      const mapped = (await call(board, 'board_start', { project: M, ready: 0, peek: true })).value;
+      assert.match(mapped, /^board rules \(every board\):\n(?:- .*\n)*- With a code map: .*board_map.*\n/m, 'a board with a map adds its rule to the board rules');
+      assert.equal(mapped.match(/With a code map/g).length, 1);
       const none = (await call(board, 'board_map', { project: P })).value;
       assert.match(none, new RegExp(`^no code map on ${P}; `));
       assert.ok(!none.includes('\n'), none);
@@ -965,6 +1037,16 @@ for (const backend of backends) {
         assert.equal(await store.get(id, `map/acme-${R}--shop`), null);
         assert.deepEqual(await store.query(id, `map/acme-${R}--shop/chunks`), [], 'with its chunks');
         assert.match(await cli('map', 'overview', '--project', id), /^no code map on /);
+        const empty = join(dir, 'empty');
+        mkdirSync(empty, { recursive: true });
+        const wrong = await cli('map', 'build', '--project', id, '--repo', SHOP_REPO, '--root', empty).catch((e) => e);
+        assert.equal(wrong.code, 1, 'a wrong --root fails');
+        assert.match(wrong.stderr, new RegExp(`no files: is ${empty.replace(/[/.]/g, '\\$&')} the repository's root\\?`));
+        assert.equal(await store.get(id, `map/acme-${R}--shop`), null, 'and writes nothing');
+        const help = await cli('map').catch((e) => e);
+        assert.match(help.stderr, /^usage: artiboard map /);
+        assert.match(help.stderr, /^ {2}map inside /m, 'artiboard map lists the map commands');
+        assert.doesNotMatch(help.stderr, /member add/, 'and only those');
       } finally {
         await store.dropProject(id);
       }
@@ -1054,6 +1136,23 @@ for (const backend of backends) {
         const code = /#ab-code=(.+)$/.exec(url)[1];
         assert.equal((await api('/api/login', { method: 'POST', body: { code } })).status, 200);
         assert.equal((await api('/api/login', { method: 'POST', body: { code } })).status, 401, 'a link works once');
+      });
+
+      test('live updates carry a rebuilt map\'s index, not its chunks: pages read those when a search needs them', async () => {
+        const cookie = (await api('/api/login', { method: 'POST', body: { token: tokens.member } })).headers.get('set-cookie').split(';')[0];
+        const events = await fetch(`${BASE}/api/p/${M}/events`, { headers: { Cookie: cookie } });
+        const reader = events.body.getReader();
+        let text = '';
+        const index = `"collection":"map","doc_id":"${SHOP_KEY}"`;
+        const heard = (async () => {
+          for (let r = await reader.read(); !r.done; r = await reader.read()) if ((text += new TextDecoder().decode(r.value)).includes(index)) return;
+        })();
+        const r = await api(`/api/p/${M}/map`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.member}` }, body: { repo: SHOP_REPO, ...buildGraph(SHOP, { repo: SHOP_REPO, by: 'x' }) } });
+        assert.equal(r.status, 200);
+        await Promise.race([heard, new Promise((resolve) => setTimeout(resolve, 3000))]);
+        await reader.cancel();
+        assert.ok(text.includes(index), 'the index was sent');
+        assert.doesNotMatch(text, /"collection":"map\/[^"]*\/chunks"/, 'the chunks, written first, were not sent');
       });
 
       test('revoking a token signs the member out; page writes and logout are guarded', async () => {
@@ -1155,3 +1254,35 @@ for (const backend of backends) {
     }
   });
 }
+
+// The page on a Supabase site: realtime may push a large row without its value, and the page reads such a row only when
+// something on the page shows that collection, so a rebuilt map's chunks are not fetched by every open tab.
+test('a page reads a row pushed without its value only when it shows that collection', async () => {
+  const reads = [], handlers = [];
+  const query = (filters) => ({
+    select: () => query(filters), or: () => query(filters), order: () => query(filters), limit: () => query(filters), in: () => query(filters), gt: () => query(filters),
+    eq: (k, v) => query({ ...filters, [k]: v }),
+    maybeSingle: () => { reads.push(filters.collection); return Promise.resolve({ data: null }); },
+    then: (ok, ko) => Promise.resolve({ data: [], error: null }).then(ok, ko),
+  });
+  const channel = { on: (_, __, fn) => { handlers.push(fn); return channel; }, subscribe: (cb) => { cb('SUBSCRIBED'); return channel; } };
+  const sb = {
+    auth: { getSession: async () => ({ data: { session: { access_token: 't' } } }), signOut: async () => {} },
+    rpc: async () => ({ data: { user_id: 'u', person: 'ana', role: 'member' } }),
+    from: () => query({}),
+    channel: () => channel,
+  };
+  const window = { supabase: { createClient: () => sb }, addEventListener() {} };
+  runInNewContext(readFileSync(new URL('../server/public/shim.js', import.meta.url), 'utf8'), {
+    window, setTimeout, clearTimeout, setInterval: () => 0,
+    document: { addEventListener() {}, getElementById: () => null, hidden: false },
+    location: { pathname: '/p/demo', hash: '', search: '' }, history: { replaceState() {} },
+    fetch: async () => ({ json: async () => ({ backend: 'supabase', supabaseUrl: 'https://db.example', supabaseKey: 'k', lang: 'en' }) }),
+  });
+  const db = await window.claude.use('db');
+  db.collection('tasks').onSnapshot(() => {});
+  await new Promise((r) => setTimeout(r, 20));
+  for (const collection of ['map/acme--shop/chunks', 'tasks']) handlers[1]({ eventType: 'UPDATE', new: { project: 'demo', collection, doc_id: '0' } });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(reads, ['tasks'], 'only the row a listener shows is read');
+});

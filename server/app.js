@@ -21,6 +21,7 @@ const SECURITY = {
 };
 const STATUS = { invalid_argument: 400, permission_denied: 403, not_yours: 403, not_found: 404, version_conflict: 409, already_exists: 409 };
 const MAX_BODY = 2 * 1048576;
+const MAP_CHUNKS = /^map\/[^/]+\/chunks$/;
 // a code map upload: up to 60 chunks of 200,000 bytes and the index
 const MAX_MAP_BODY = 16 * 1048576;
 
@@ -44,22 +45,33 @@ function fail(res, e) {
 }
 
 // The request's JSON. The bytes are decoded once, whole: a character split across two chunks would otherwise be
-// stored as U+FFFD. A body that is not JSON is refused rather than read as nothing.
+// stored as U+FFFD. A body that is not JSON is refused rather than read as nothing. A host may read the body before the
+// site does and hand it over parsed, as text or as bytes. Gzipped bytes are inflated, at most to max: a map upload
+// sends them as they are (octet-stream, so no host tries to parse them first), and other clients may say gzip.
 async function body(req, max = MAX_BODY) {
   const parse = (raw) => {
     try { return raw ? JSON.parse(raw) : undefined; } catch { throw new BoardError('invalid_argument', 'the request body is not JSON'); }
   };
-  if (req.body !== undefined) return typeof req.body === 'string' ? parse(req.body) : req.body;
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of req) {
-    size += chunk.length;
-    if (size > max) throw new BoardError('invalid_argument', 'request too large');
-    chunks.push(chunk);
+  let given;
+  // a host's own parse of a body that is not JSON throws here
+  try { given = req.body; } catch { throw new BoardError('invalid_argument', 'the request body is not JSON'); }
+  let raw;
+  if (given !== undefined) {
+    if (typeof given !== 'string' && !Buffer.isBuffer(given)) return given;
+    raw = Buffer.from(given);
+    if (raw.length > max) throw new BoardError('invalid_argument', 'request too large');
+  } else {
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.length;
+      if (size > max) throw new BoardError('invalid_argument', 'request too large');
+      chunks.push(chunk);
+    }
+    raw = Buffer.concat(chunks);
   }
-  let raw = Buffer.concat(chunks);
-  // a code map compresses about eightfold, and hosts cap a request body well under a big map's JSON
-  if (/\bgzip\b/.test(req.headers['content-encoding'] || '')) {
+  // JSON never starts with these two bytes; gzip always does
+  if ((raw[0] === 0x1f && raw[1] === 0x8b) || /\bgzip\b/.test(req.headers['content-encoding'] || '')) {
     try { raw = gunzipSync(raw, { maxOutputLength: max }); } catch { throw new BoardError('invalid_argument', 'request too large or not gzip'); }
   }
   return parse(raw.toString('utf8'));
@@ -133,7 +145,8 @@ export function makeApp({ store, cfg }) {
       req.on('close', () => { const n = streams.get(member.uid) - 1; if (n > 0) streams.set(member.uid, n); else streams.delete(member.uid); });
       res.writeHead(200, { ...SECURITY, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
       res.write(': live\n\n');
-      const off = store.subscribe(project, (row) => res.write(`data: ${JSON.stringify(row)}\n\n`));
+      // a rebuilt code map's chunks are large and pages read them when a search needs them: they are not pushed
+      const off = store.subscribe(project, (row) => { if (!MAP_CHUNKS.test(row.collection)) res.write(`data: ${JSON.stringify(row)}\n\n`); });
       const ping = setInterval(() => res.write(': ping\n\n'), 25000);
       req.on('close', () => { off(); clearInterval(ping); });
       return;

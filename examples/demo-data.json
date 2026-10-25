@@ -140,7 +140,11 @@
    "start": "@d-2",
    "due": "@d+2",
    "repo": "api",
-   "lastMessageBy": "ben"
+   "lastMessageBy": "ben",
+   "touches": [
+    "shared/units.ts",
+    "shared/units.test.ts"
+   ]
   },
   "tasks/V1-6": {
    "key": "V1-6",
@@ -148,7 +152,7 @@
    "feature": "Shopping list",
    "milestone": "v1.0",
    "status": "todo",
-   "owner": null,
+   "owner": "ana",
    "deps": [
     "V1-4",
     "V1-5"
@@ -159,7 +163,11 @@
    "updatedAt": "@-2900",
    "start": "@d+2",
    "due": "@d+6",
-   "repo": "app"
+   "repo": "app",
+   "touches": [
+    "app/shopping/list.ts",
+    "shared/units.ts"
+   ]
   },
   "tasks/V1-7": {
    "key": "V1-7",
@@ -506,6 +514,329 @@
    "rev": 3,
    "by": "ben",
    "updatedAt": "@-600"
+  },
+  "map/app": {
+   "repo": "pocket-pantry/app",
+   "label": "app",
+   "commit": "4f2a9c1d8e7b6a5f3c2d1e0f9a8b7c6d5e4f3a2b",
+   "builtAt": "@-1500",
+   "by": "ben",
+   "root": "",
+   "counts": {
+    "files": 7,
+    "symbols": 8,
+    "edges": 18,
+    "docs": 0
+   },
+   "chunks": 1,
+   "communities": [
+    {
+     "c": 0,
+     "name": "app/recipes",
+     "n": 3,
+     "top": [
+      "app/recipes/RecipeDetail.tsx#RecipeDetail",
+      "app/recipes/RecipeDetail.tsx",
+      "app/recipes/RecipeList.tsx",
+      "app/recipes/ingredients.ts"
+     ]
+    },
+    {
+     "c": 1,
+     "name": "app/shopping",
+     "n": 2,
+     "top": [
+      "app/shopping/list.ts",
+      "app/shopping/ShoppingList.tsx"
+     ]
+    },
+    {
+     "c": 2,
+     "name": "shared",
+     "n": 2,
+     "top": [
+      "shared/units.ts",
+      "shared/units.ts#parseQuantity",
+      "shared/units.ts#formatQuantity"
+     ]
+    }
+   ],
+   "god": [
+    "shared/units.ts",
+    "shared/units.ts#parseQuantity",
+    "app/recipes/RecipeDetail.tsx#RecipeDetail",
+    "app/recipes/RecipeDetail.tsx"
+   ],
+   "langs": {
+    "js": 7
+   },
+   "version": 1
+  },
+  "map/app/chunks/0": {
+   "nodes": [
+    {
+     "i": "app/recipes/RecipeDetail.tsx",
+     "k": "file",
+     "n": "RecipeDetail.tsx",
+     "f": "app/recipes/RecipeDetail.tsx",
+     "l": 0,
+     "c": 0
+    },
+    {
+     "i": "app/recipes/RecipeDetail.tsx#RecipeDetail",
+     "k": "sym",
+     "n": "RecipeDetail",
+     "f": "app/recipes/RecipeDetail.tsx",
+     "l": 14,
+     "t": "fn",
+     "c": 0,
+     "e": 1,
+     "s": "export function RecipeDetail({ recipe, servings }: Props)",
+     "d": "Ingredients scaled to the chosen servings, then the steps. Nutrition is per serving."
+    },
+    {
+     "i": "app/recipes/RecipeList.tsx",
+     "k": "file",
+     "n": "RecipeList.tsx",
+     "f": "app/recipes/RecipeList.tsx",
+     "l": 0,
+     "c": 0
+    },
+    {
+     "i": "app/recipes/RecipeList.tsx#RecipeList",
+     "k": "sym",
+     "n": "RecipeList",
+     "f": "app/recipes/RecipeList.tsx",
+     "l": 9,
+     "t": "fn",
+     "c": 0,
+     "e": 1,
+     "s": "export function RecipeList({ householdId }: Props)",
+     "d": "Every recipe in the household, newest first; a tap opens its detail."
+    },
+    {
+     "i": "app/recipes/ingredients.ts",
+     "k": "file",
+     "n": "ingredients.ts",
+     "f": "app/recipes/ingredients.ts",
+     "l": 0,
+     "c": 0
+    },
+    {
+     "i": "app/recipes/ingredients.ts#readIngredients",
+     "k": "sym",
+     "n": "readIngredients",
+     "f": "app/recipes/ingredients.ts",
+     "l": 6,
+     "t": "fn",
+     "c": 0,
+     "e": 1,
+     "s": "export function readIngredients(lines: string[]): Ingredient[]",
+     "d": "Splits each imported line into a quantity and a name; a line without a quantity keeps its text."
+    },
+    {
+     "i": "app/shopping/ShoppingList.tsx",
+     "k": "file",
+     "n": "ShoppingList.tsx",
+     "f": "app/shopping/ShoppingList.tsx",
+     "l": 0,
+     "c": 1
+    },
+    {
+     "i": "app/shopping/ShoppingList.tsx#ShoppingList",
+     "k": "sym",
+     "n": "ShoppingList",
+     "f": "app/shopping/ShoppingList.tsx",
+     "l": 8,
+     "t": "fn",
+     "c": 1,
+     "e": 1,
+     "s": "export function ShoppingList({ items }: Props)",
+     "d": "Empty until recipes are picked; then one row per item to check off."
+    },
+    {
+     "i": "app/shopping/list.ts",
+     "k": "file",
+     "n": "list.ts",
+     "f": "app/shopping/list.ts",
+     "l": 0,
+     "c": 1
+    },
+    {
+     "i": "app/shopping/list.ts#ShoppingItem",
+     "k": "sym",
+     "n": "ShoppingItem",
+     "f": "app/shopping/list.ts",
+     "l": 4,
+     "t": "type",
+     "c": 1,
+     "e": 1,
+     "s": "export type ShoppingItem = { name: string; quantity: Quantity | null; done: boolean }"
+    },
+    {
+     "i": "shared/units.test.ts",
+     "k": "file",
+     "n": "units.test.ts",
+     "f": "shared/units.test.ts",
+     "l": 0,
+     "c": 2,
+     "q": "t"
+    },
+    {
+     "i": "shared/units.ts",
+     "k": "file",
+     "n": "units.ts",
+     "f": "shared/units.ts",
+     "l": 0,
+     "c": 2
+    },
+    {
+     "i": "shared/units.ts#Quantity",
+     "k": "sym",
+     "n": "Quantity",
+     "f": "shared/units.ts",
+     "l": 3,
+     "t": "type",
+     "c": 2,
+     "e": 1,
+     "s": "export type Quantity = { amount: number; unit: Unit | null }",
+     "d": "An amount and its unit; the unit is null for counts such as 2 eggs."
+    },
+    {
+     "i": "shared/units.ts#formatQuantity",
+     "k": "sym",
+     "n": "formatQuantity",
+     "f": "shared/units.ts",
+     "l": 41,
+     "t": "fn",
+     "c": 2,
+     "e": 1,
+     "s": "export function formatQuantity(quantity: Quantity, servings = 1): string",
+     "d": "Scales by servings and writes the amount the way a cook reads it: 1½ cups, not 1.5 cup."
+    },
+    {
+     "i": "shared/units.ts#parseQuantity",
+     "k": "sym",
+     "n": "parseQuantity",
+     "f": "shared/units.ts",
+     "l": 12,
+     "t": "fn",
+     "c": 2,
+     "e": 1,
+     "s": "export function parseQuantity(text: string): Quantity | null",
+     "d": "Reads 1½ cups, 200 g or a pinch into an amount and a unit; null when the text has no quantity."
+    }
+   ],
+   "edges": [
+    [
+     "app/recipes/RecipeDetail.tsx",
+     "app/recipes/RecipeDetail.tsx#RecipeDetail",
+     "defines",
+     "x"
+    ],
+    [
+     "app/recipes/RecipeDetail.tsx",
+     "shared/units.ts",
+     "imports",
+     "x"
+    ],
+    [
+     "app/recipes/RecipeDetail.tsx#RecipeDetail",
+     "shared/units.ts#formatQuantity",
+     "calls",
+     "x"
+    ],
+    [
+     "app/recipes/RecipeList.tsx",
+     "app/recipes/RecipeDetail.tsx",
+     "imports",
+     "x"
+    ],
+    [
+     "app/recipes/RecipeList.tsx",
+     "app/recipes/RecipeList.tsx#RecipeList",
+     "defines",
+     "x"
+    ],
+    [
+     "app/recipes/RecipeList.tsx#RecipeList",
+     "app/recipes/RecipeDetail.tsx#RecipeDetail",
+     "uses",
+     "x"
+    ],
+    [
+     "app/recipes/ingredients.ts",
+     "app/recipes/ingredients.ts#readIngredients",
+     "defines",
+     "x"
+    ],
+    [
+     "app/recipes/ingredients.ts",
+     "shared/units.ts",
+     "imports",
+     "x"
+    ],
+    [
+     "app/recipes/ingredients.ts#readIngredients",
+     "shared/units.ts#parseQuantity",
+     "uses",
+     "x"
+    ],
+    [
+     "app/shopping/ShoppingList.tsx",
+     "app/shopping/ShoppingList.tsx#ShoppingList",
+     "defines",
+     "x"
+    ],
+    [
+     "app/shopping/ShoppingList.tsx",
+     "app/shopping/list.ts",
+     "imports",
+     "x"
+    ],
+    [
+     "app/shopping/list.ts",
+     "app/shopping/list.ts#ShoppingItem",
+     "defines",
+     "x"
+    ],
+    [
+     "app/shopping/list.ts",
+     "shared/units.ts",
+     "imports",
+     "x"
+    ],
+    [
+     "shared/units.test.ts",
+     "shared/units.ts",
+     "imports",
+     "x"
+    ],
+    [
+     "shared/units.test.ts",
+     "shared/units.ts#parseQuantity",
+     "calls",
+     "x"
+    ],
+    [
+     "shared/units.ts",
+     "shared/units.ts#Quantity",
+     "defines",
+     "x"
+    ],
+    [
+     "shared/units.ts",
+     "shared/units.ts#formatQuantity",
+     "defines",
+     "x"
+    ],
+    [
+     "shared/units.ts",
+     "shared/units.ts#parseQuantity",
+     "defines",
+     "x"
+    ]
+   ]
   }
  },
  "events": [
@@ -641,6 +972,13 @@
   "PR open: parser with 40 test cases, including fractions and ranges.": "PR 열었어요: 분수와 범위를 포함한 테스트 40개가 있는 파서예요.",
   "Parser done, PR open on feat/ingredient-parser.\nAPI: parseQuantity(text) in shared/units.ts.\nLeft: review; V1-6 can use it right after merge.": "파서 완료, feat/ingredient-parser에 PR 열림.\nAPI: shared/units.ts의 parseQuantity(text).\n남은 일: 검토. 병합 직후 V1-6에서 쓸 수 있어요.",
   "Claimed. Invite links reuse the household API from V1-2.": "집었어요. 초대 링크는 V1-2의 가구 API를 그대로 써요.",
-  "Three of us, each with a Claude agent. Specs live in docs/ of each repository; the board points at them.\n1. Who owns what\n- Ana: the app (pocket-pantry/app). Ben: the API (pocket-pantry/api). Cy: design, in the app repo under design/.\n- Touching the other repo: ask its owner in the task thread first.\n2. Branches and merges\n- One branch per task, named after its key (v1-6-shopping-list). A person merges; agents open PRs only.\n- API contract changes (api/openapi.yaml) need a notice the day they merge.\n3. Announce\n- Contract changes, new environment variables, anything that breaks a local setup.": "세 사람이 각자 Claude 에이전트와 함께 일해요. 스펙은 각 저장소의 docs/에 있고, 판은 위치만 가리켜요.\n1. 누가 무엇을\n- Ana: 앱(pocket-pantry/app). Ben: API(pocket-pantry/api). Cy: 디자인, 앱 저장소의 design/.\n- 다른 저장소를 건드릴 때는 먼저 태스크 스레드에서 담당에게 물어요.\n2. 브랜치와 병합\n- 태스크마다 브랜치 하나, 이름은 번호로(v1-6-shopping-list). 병합은 사람이, 에이전트는 PR만 열어요.\n- API 계약(api/openapi.yaml)이 바뀌면 병합하는 날 공지해요.\n3. 공지할 것\n- 계약 변경, 새 환경 변수, 로컬 환경을 깨는 모든 것."
+  "Three of us, each with a Claude agent. Specs live in docs/ of each repository; the board points at them.\n1. Who owns what\n- Ana: the app (pocket-pantry/app). Ben: the API (pocket-pantry/api). Cy: design, in the app repo under design/.\n- Touching the other repo: ask its owner in the task thread first.\n2. Branches and merges\n- One branch per task, named after its key (v1-6-shopping-list). A person merges; agents open PRs only.\n- API contract changes (api/openapi.yaml) need a notice the day they merge.\n3. Announce\n- Contract changes, new environment variables, anything that breaks a local setup.": "세 사람이 각자 Claude 에이전트와 함께 일해요. 스펙은 각 저장소의 docs/에 있고, 판은 위치만 가리켜요.\n1. 누가 무엇을\n- Ana: 앱(pocket-pantry/app). Ben: API(pocket-pantry/api). Cy: 디자인, 앱 저장소의 design/.\n- 다른 저장소를 건드릴 때는 먼저 태스크 스레드에서 담당에게 물어요.\n2. 브랜치와 병합\n- 태스크마다 브랜치 하나, 이름은 번호로(v1-6-shopping-list). 병합은 사람이, 에이전트는 PR만 열어요.\n- API 계약(api/openapi.yaml)이 바뀌면 병합하는 날 공지해요.\n3. 공지할 것\n- 계약 변경, 새 환경 변수, 로컬 환경을 깨는 모든 것.",
+  "Ingredients scaled to the chosen servings, then the steps. Nutrition is per serving.": "고른 인분에 맞춘 재료, 그다음 조리 단계예요. 영양 정보는 1인분 기준이에요.",
+  "Every recipe in the household, newest first; a tap opens its detail.": "가구의 모든 레시피를 최신순으로 보여 줘요. 누르면 상세가 열려요.",
+  "Splits each imported line into a quantity and a name; a line without a quantity keeps its text.": "가져온 줄마다 수량과 이름으로 나눠요. 수량이 없는 줄은 글자 그대로 둬요.",
+  "Empty until recipes are picked; then one row per item to check off.": "레시피를 고르기 전에는 비어 있고, 고르면 체크할 항목이 한 줄씩 나와요.",
+  "An amount and its unit; the unit is null for counts such as 2 eggs.": "양과 단위예요. 달걀 2개처럼 개수일 때는 단위가 null이에요.",
+  "Scales by servings and writes the amount the way a cook reads it: 1½ cups, not 1.5 cup.": "인분에 맞춰 늘리고, 요리하는 사람이 읽는 대로 써요: 1.5컵이 아니라 1½컵.",
+  "Reads 1½ cups, 200 g or a pinch into an amount and a unit; null when the text has no quantity.": "1½컵, 200 g, 한 꼬집을 양과 단위로 읽어요. 수량이 없으면 null이에요."
  }
 }

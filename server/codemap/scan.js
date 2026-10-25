@@ -1,7 +1,7 @@
 // The code map's only contact with the file system: which files a checkout has, their text, and its commit.
 // Git's own listing is used when there is one, so .gitignore decides what is left out.
 import { execFile } from 'node:child_process';
-import { open, readFile, readdir, stat } from 'node:fs/promises';
+import { lstat, open, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -12,8 +12,10 @@ const SCAN_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 
 const SCAN_LOCKS = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'Cargo.lock', 'poetry.lock', 'go.sum']);
 const SCAN_MAX_BYTES = 1024 * 1024;
 const SCAN_SNIFF_BYTES = 8192;
-// generated code says so near its top; its names belong to the files it was made from
-const SCAN_GENERATED = /\bgenerated\b|\bdo not edit\b/i;
+// Generated code says so in a comment near its top, and its names belong to the files it was made from. Only a comment
+// line counts, and only these phrases: hand-written code says "generated" too (`from './generated/db'`).
+const SCAN_COMMENT = /^\s*(\/\/|#|\/\*|\*|--|<!--|")/;
+const SCAN_GENERATED = /generated (by|from|file|code)|auto-generated|do not edit/i;
 
 async function scanGit(root, args) {
   const { stdout } = await scanExec('git', args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
@@ -24,7 +26,7 @@ async function scanWalk(root, dir, out) {
   const entries = await readdir(join(root, dir), { withFileTypes: true }).catch(() => []);
   for (const e of entries) {
     const path = dir ? `${dir}/${e.name}` : e.name;
-    // links are not followed: a link to a parent folder would never end
+    // a link is neither a file nor a folder here: it may point out of the checkout, or at a parent folder
     if (e.isDirectory() && !SCAN_SKIP_DIRS.has(e.name)) await scanWalk(root, path, out);
     else if (e.isFile()) out.push(path);
   }
@@ -36,18 +38,19 @@ const scanNamed = (path) => {
   return !parts.slice(0, -1).some((p) => SCAN_SKIP_DIRS.has(p)) && !SCAN_LOCKS.has(base) && !/\.min\.js$/i.test(base);
 };
 
-// A regular file of at most 1 MiB, with no NUL byte near its start (binary files carry no names worth mapping) and
-// no "generated" or "do not edit" in its first five lines.
+// A regular file, not a link (git lists links too, and one may point out of the checkout), of at most 1 MiB, with no
+// NUL byte near its start (binary files carry no names worth mapping), that no comment in its first five lines calls
+// generated.
 async function scanWanted(root, path) {
   try {
-    const st = await stat(join(root, path));
+    const st = await lstat(join(root, path));
     if (!st.isFile() || st.size > SCAN_MAX_BYTES) return false;
     const fh = await open(join(root, path), 'r');
     try {
       const buf = Buffer.alloc(Math.min(SCAN_SNIFF_BYTES, st.size));
       const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
       const head = buf.subarray(0, bytesRead);
-      return head.indexOf(0) < 0 && !SCAN_GENERATED.test(head.toString('utf8').split('\n', 5).join('\n'));
+      return head.indexOf(0) < 0 && !head.toString('utf8').split('\n', 5).some((l) => SCAN_COMMENT.test(l) && SCAN_GENERATED.test(l));
     } finally { await fh.close(); }
   } catch { return false; }
 }
@@ -62,7 +65,7 @@ async function scanEach(items, fn, width = 64) {
   return out;
 }
 
-// repo-relative paths with '/' separators, sorted
+// '/' separators and a sorted order whatever the system, so one checkout always gives the same map
 export async function listFiles(root) {
   let paths;
   try {
@@ -83,7 +86,7 @@ export async function readFiles(root, paths) {
   return out;
 }
 
-// the checked-out commit, or undefined outside a git work tree
+// outside a git work tree there is no commit, and the index says none
 export async function headCommit(root) {
   try { return (await scanGit(root, ['rev-parse', 'HEAD'])).trim() || undefined; } catch { return undefined; }
 }

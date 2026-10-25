@@ -10,7 +10,7 @@ const MD_NAME = /^[A-Za-z_$][\w$]*(?:[.#][A-Za-z_$][\w$]*)*$/;
 const MD_CODE = /[a-z0-9][A-Z]|^[A-Z]|[_.#$]/;
 const MD_URL = /\b[a-z][a-z0-9+.-]*:\/\/\S+|\bwww\.\S+/gi;
 
-// heading text without its markup: `code`, *emphasis*, [link](target) and closing #s
+// a section reads as its words, and its id stays the same when only the markup around them changes
 function mdHeading(s) {
   return s.replace(/\s+#+\s*$/, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_]/g, '').trim();
 }

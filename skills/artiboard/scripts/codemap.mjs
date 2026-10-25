@@ -4,7 +4,7 @@
 import { execFile } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
-import { open, readFile, readdir, stat } from 'node:fs/promises';
+import { lstat, open, readFile, readdir } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
 // ---- server/codemap/lang/c.js ----
@@ -1097,7 +1097,10 @@ const javaLang = {
         if (method) {
           // Blank modifiers, return type and name: a 'void' before '(' would otherwise read as a call.
           refText = javaBlankSpan(code, method[1].length, method[0].length);
-          const declared = /[{;,(]\s*$/.test(code) && !javaCallSkip.has(method[3]) && !javaCallSkip.has(method[4]);
+          // a header that ends the line, or a whole method on one line (`int getX() { return x; }`, `void n() {}`)
+          const oneLine = /^\s*\([^{;]*\{.*\}\s*$/.test(code.slice(method[0].length))
+            && code.split('{').length === code.split('}').length;
+          const declared = (/[{;,(]\s*$/.test(code) || oneLine) && !javaCallSkip.has(method[3]) && !javaCallSkip.has(method[4]);
           if (declared && !top.skip) {
             symbols.push({ name: `${top.full}.${method[4]}`, kind: 'method', line, exported: /\bpublic\b/.test(method[2]) });
           }
@@ -1276,14 +1279,14 @@ function jsTokens(code, strings) {
 const jsAt = (toks, j) => toks[j] || JS_NONE;
 const jsIs = (tok, v) => tok.t === 'p' && tok.v === v;
 
-// the index of the closer that matches the opener at j, or the last token when it is never closed
+// an opener never closed runs to the last token, so broken input still reads to its end
 function jsMatch(toks, j) {
   const d = toks[j].d, close = JS_CLOSERS[toks[j].v];
   for (let k = j + 1; k < toks.length; k++) if (toks[k].d === d && jsIs(toks[k], close)) return k;
   return toks.length - 1;
 }
 
-// past a TypeScript type argument list `<...>` starting at j
+// a TypeScript type argument list holds commas and braces that are not the code's (`Map<A, B>`, `<T extends {}>`)
 function jsSkipAngles(toks, j) {
   let n = 0;
   for (let k = j; k < toks.length; k++) {
@@ -1320,7 +1323,7 @@ function jsWrappers(toks) {
   return out;
 }
 
-// whether the token at i begins a statement at its depth
+// a line break ends a statement unless the line runs on, as JavaScript reads code without semicolons
 function jsStarts(toks, i) {
   if (i === 0) return true;
   const prev = toks[i - 1], cur = toks[i];
@@ -1332,7 +1335,7 @@ function jsStarts(toks, i) {
   return true;
 }
 
-// what the initializer at j makes of a name: a function, a class, or neither
+// `const f = () => {}` is a function: its calls are its own, and a query lists it as one
 function jsInitKind(toks, j, ts) {
   let t = jsAt(toks, j);
   if (t.v === 'async' && t.t === 'id') t = jsAt(toks, ++j);
@@ -1347,7 +1350,7 @@ function jsInitKind(toks, j, ts) {
   return null;
 }
 
-// a dotted name starting at j (a.b.C): its last part and the index after it
+// `new a.b.C` and `extends ns.Base` name C and Base: the last part is what some file defines
 function jsDotted(toks, j) {
   let last = null;
   while (toks[j] && toks[j].t === 'id') {
@@ -1387,7 +1390,7 @@ function jsAdd(x, tok, kind, exported, end, name = tok.v) {
   x.out.symbols.push(sym);
 }
 
-// a statement at the top level, tokens [s, stop)
+// only top-level declarations (and the factory's nested functions) are symbols: locals come and go too often to map
 function jsDeclaration(x, s, stop) {
   const { toks } = x, at = (j) => (j < stop ? jsAt(toks, j) : JS_NONE), end = toks[stop - 1].line;
   let k = s, exported = false, isDefault = false;
@@ -1543,7 +1546,7 @@ function jsClass(x, k, stop, exported) {
   if (j < stop) jsMembers(x, name.v, j, jsMatch(toks, j), exported);
 }
 
-// methods of the class whose body is the braces [open, close]: `name(`, `name<T>(`, and `name = () =>` fields
+// a class's methods, `name = () =>` fields among them: they are methods in all but syntax
 function jsMembers(x, cls, open, close, exported) {
   const { toks } = x, bd = toks[open].d + 1, found = [];
   for (let j = open + 1; j < close; j++) {
@@ -1656,8 +1659,7 @@ function jsJsxHere(prev) {
   return prev.t === 'id' && JS_OPEN_WORDS.has(prev.v);
 }
 
-// names called, constructed, decorated or used as JSX components, outside type declarations
-// the opener (an index) each token sits directly inside, or -1
+// an argument and a pattern look alike token by token; what holds a name tells them apart
 function jsEnclosing(toks) {
   const encl = new Array(toks.length), stack = [];
   toks.forEach((t, j) => {
@@ -1697,7 +1699,8 @@ function jsLiteral(x, encl, open) {
 // assigned, or returned. A key, a member name, a binding in a pattern or a parameter list is not a use.
 function jsUseAt(x, encl, j) {
   const { toks } = x, prev = jsAt(toks, j - 1), next = jsAt(toks, j + 1);
-  if (jsIs(next, '.') || jsIs(next, '?.') || jsIs(next, '=')) return false;
+  // `name =>` declares a parameter where an argument would sit
+  if (jsIs(next, '.') || jsIs(next, '?.') || jsIs(next, '=') || jsIs(next, '=>')) return false;
   if (prev.t === 'id') return prev.v === 'return';
   if (jsIs(prev, '=')) return true;
   const open = encl[j], o = open >= 0 ? toks[open].v : '';
@@ -1707,9 +1710,73 @@ function jsUseAt(x, encl, j) {
   return false;
 }
 
+// The names a parameter list binds: plain and rest parameters, and what a pattern binds (`{ a: b }` binds b, `[c]`
+// binds c); not a default's value, an object pattern's key, or a TypeScript type. Best effort, over its tokens.
+function jsParams(toks, open, close) {
+  const names = new Set(), base = toks[open].d + 1;
+  let skip = -1;
+  for (let k = open + 1; k < close; k++) {
+    const t = toks[k];
+    if (skip >= 0 && (t.d < skip || t.d === skip && jsIs(t, ','))) skip = -1;
+    if (skip >= 0) continue;
+    if (jsIs(t, '=')) { skip = t.d; continue; }
+    if (t.t !== 'id' || JS_RESERVED.has(t.v) || t.v === 'this') continue;
+    if (jsIs(toks[k - 1], ':') && t.d === base) { skip = base; continue; }
+    if (jsIs(jsAt(toks, k + 1), ':') && t.d > base) continue;
+    names.add(t.v);
+  }
+  return names;
+}
+
+// an arrow function's body from k: a block, or an expression up to a `,` or `;` at its depth, the end of what holds
+// it, or the next statement
+function jsArrowBody(toks, k, d) {
+  if (jsIs(jsAt(toks, k), '{')) return [k, jsMatch(toks, k)];
+  let end = k;
+  while (end < toks.length && toks[end].d >= d && !(toks[end].d === d && (jsIs(toks[end], ',') || jsIs(toks[end], ';')
+    || end > k && jsStarts(toks, end)))) end++;
+  return end > k ? [k, end - 1] : null;
+}
+
+// Each function's parameters and the tokens of its body: inside, a name a parameter binds is that parameter, not a
+// file-level name (`function send(res, body) { … body … }` uses its own body).
+function jsScopes(x) {
+  const { toks, defs } = x, scopes = [];
+  const control = new Set(['if', 'for', 'while', 'switch', 'with']);
+  for (let j = 0; j < toks.length; j++) {
+    const t = toks[j];
+    if (t.t === 'id' && jsIs(jsAt(toks, j + 1), '=>') && !jsIs(jsAt(toks, j - 1), '.')) {
+      const body = jsArrowBody(toks, j + 2, t.d);
+      if (body) scopes.push({ from: body[0], to: body[1], names: new Set([t.v]) });
+      continue;
+    }
+    if (!jsIs(t, '(')) continue;
+    const close = jsMatch(toks, j), after = jsAt(toks, close + 1), p = jsAt(toks, j - 1);
+    let body = null;
+    if (jsIs(after, '=>')) body = jsArrowBody(toks, close + 2, t.d);
+    else if (p.v === 'function' || jsAt(toks, j - 2).v === 'function' || defs.has(j - 1)
+      || jsIs(after, '{') && p.t === 'id' && !control.has(p.v)) {
+      // a TypeScript return type may sit between the parameters and the body
+      let open = close + 1;
+      while (open < toks.length && toks[open].d >= t.d && !(toks[open].d === t.d && (jsIs(toks[open], '{') || jsIs(toks[open], ';')))) open++;
+      if (jsIs(jsAt(toks, open), '{') && toks[open].d === t.d) body = [open, jsMatch(toks, open)];
+    }
+    if (body) scopes.push({ from: body[0], to: body[1], names: jsParams(toks, j, close) });
+  }
+  return scopes.sort((a, b) => a.from - b.from);
+}
+
+// names called, constructed, decorated, used as JSX components or used as values, outside type declarations
 function jsRefs(x, jsx) {
   const { toks, out, defs, types, aliases } = x;
-  const refs = [], encl = jsEnclosing(toks);
+  const refs = [], encl = jsEnclosing(toks), scopes = jsScopes(x), active = [];
+  let entered = 0;
+  // whether a parameter of a function around token j binds name (asked with j rising)
+  const shadowed = (j, name) => {
+    while (entered < scopes.length && scopes[entered].from <= j) active.push(scopes[entered++]);
+    for (let a = active.length - 1; a >= 0; a--) if (active[a].to < j) active.splice(a, 1);
+    return active.some((s) => s.names.has(name));
+  };
   // the names a use may mean: this file's own top-level names, its functions' nested functions, and what it imports
   const bound = new Set(x.locals);
   for (const s of out.symbols) {
@@ -1723,14 +1790,14 @@ function jsRefs(x, jsx) {
     const t = toks[j], prev = jsAt(toks, j - 1), next = jsAt(toks, j + 1);
     if (jsx && jsIs(t, '<') && next.t === 'id' && /^[A-Z]/.test(next.v) && jsJsxHere(prev)) {
       const after = jsAt(toks, j + 2);
-      if (!jsIs(after, '.') && !jsIs(after, ',') && after.v !== 'extends') refs.push({ name: next.v, line: next.line });
+      if (!jsIs(after, '.') && !jsIs(after, ',') && after.v !== 'extends' && !shadowed(j, next.v)) refs.push({ name: next.v, line: next.line });
       continue;
     }
     if (t.t !== 'id') continue;
     if (jsIs(prev, '@')) { refs.push({ name: jsDotted(toks, j).last.v, line: t.line }); j = jsDotted(toks, j).next - 1; continue; }
     if (prev.v === 'new' && prev.t === 'id') {
       const { last, next: after } = jsDotted(toks, j);
-      refs.push({ name: last.v, line: last.line });
+      if (last !== t || !shadowed(j, t.v)) refs.push({ name: last.v, line: last.line });
       j = after - 1;
       continue;
     }
@@ -1738,10 +1805,10 @@ function jsRefs(x, jsx) {
     const member = jsIs(prev, '.') || jsIs(prev, '?.');
     const call = jsIs(next, '(') || jsIs(next, '`') || jsIs(next, '?.') && jsIs(jsAt(toks, j + 2), '(');
     if (!call) {
-      if (!member && bound.has(t.v) && jsUseAt(x, encl, j)) refs.push({ name: t.v, line: t.line, use: true });
+      if (!member && bound.has(t.v) && jsUseAt(x, encl, j) && !shadowed(j, t.v)) refs.push({ name: t.v, line: t.line, use: true });
       continue;
     }
-    if (!member && (JS_RESERVED.has(t.v) || prev.v === 'function' || jsIs(prev, '*') && jsAt(toks, j - 2).v === 'function')) continue;
+    if (!member && (JS_RESERVED.has(t.v) || prev.v === 'function' || jsIs(prev, '*') && jsAt(toks, j - 2).v === 'function' || shadowed(j, t.v))) continue;
     const recv = member ? jsAt(toks, j - 2) : JS_NONE;
     if (member && recv.t === 'id' && JS_GLOBALS.has(recv.v) && !jsIs(jsAt(toks, j - 3), '.') && !x.modules.has(recv.v)) continue;
     // `name(args) {` in an object literal defines a method; it calls nothing
@@ -1758,7 +1825,7 @@ function jsRefs(x, jsx) {
   out.refs.push(...refs);
 }
 
-// p without '.' or '..' parts, or null when it climbs out of the repository
+// an import that climbs out of the repository names no repo file
 function jsNormalize(p) {
   const out = [];
   for (const part of p.split('/')) {
@@ -2068,7 +2135,7 @@ const MD_NAME = /^[A-Za-z_$][\w$]*(?:[.#][A-Za-z_$][\w$]*)*$/;
 const MD_CODE = /[a-z0-9][A-Z]|^[A-Z]|[_.#$]/;
 const MD_URL = /\b[a-z][a-z0-9+.-]*:\/\/\S+|\bwww\.\S+/gi;
 
-// heading text without its markup: `code`, *emphasis*, [link](target) and closing #s
+// a section reads as its words, and its id stays the same when only the markup around them changes
 function mdHeading(s) {
   return s.replace(/\s+#+\s*$/, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_]/g, '').trim();
 }
@@ -3717,6 +3784,7 @@ const GRAPH_SEEDS = 6;
 // a word matching more nodes than this, and this many times the nodes the question's rarest word matches, is common;
 // docs show this many lines
 const GRAPH_COMMON_MIN = 5, GRAPH_COMMON_RATIO = 4, GRAPH_DOC_LINES = 4;
+const GRAPH_CONTEXT_CHARS = 20000;
 const GRAPH_STOP = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'from', 'into', 'when', 'what', 'where', 'which',
   'how', 'why', 'are', 'was', 'were', 'has', 'have', 'had', 'not', 'but', 'all', 'any', 'can', 'does', 'did', 'its', 'our',
   'out', 'use', 'using', 'used', 'should', 'would', 'could', 'will', 'then', 'than', 'them', 'they', 'there', 'their',
@@ -3728,7 +3796,7 @@ const graphCmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const graphPush = (map, key, v) => { const list = map.get(key); if (list) list.push(v); else map.set(key, [v]); };
 const graphKind = (n) => (n.k === 'sym' || n.k === 'sec' ? n.t || n.k : n.k);
 const graphWhere = (n) => (n.l ? `${n.f}:${n.l}` : n.f);
-// a symbol's declaration after its line, shortened for list lines
+// list lines stay one screen wide, so a long declaration is shortened there
 const graphSig = (n, max = 80) => (n.s ? ` · ${n.s.length > max ? `${n.s.slice(0, max - 1)}…` : n.s}` : '');
 const graphDeg = (g, id) => g.degree.get(id) || 0;
 const graphByDegree = (g) => (a, b) => graphDeg(g, b) - graphDeg(g, a) || graphCmp(a, b);
@@ -3771,7 +3839,7 @@ function graphFind(g, q) {
     named,
     lasts.filter((id) => g.nodes.get(id).n.endsWith(`.${s}`)),
     lasts,
-    s.includes('/') ? g.ids.filter((id) => { const k = g.nodes.get(id).k; return (k === 'file' || k === 'doc') && id.endsWith(`/${s}`); }) : [],
+    s.includes('/') ? graphEnding(g, s) : [],
   ];
   for (const t of tiers) {
     if (!t.length) continue;
@@ -3779,6 +3847,14 @@ function graphFind(g, q) {
     return code.length ? code : t;
   }
   return [];
+}
+
+// File and doc ids whose path is p or ends in /p, looked up by p's last two parts (or its name): a path that is not in
+// the map costs one lookup, not a pass over every node.
+function graphEnding(g, p) {
+  const parts = p.split('/');
+  const pool = parts.length > 1 ? g.tails.get(parts.slice(-2).join('/')) : g.bases.get(p);
+  return (pool || []).filter((id) => id === p || id.endsWith(`/${p}`));
 }
 
 // one node for a name, or the answer that says why not
@@ -3814,7 +3890,7 @@ function graphExplain(g, name, { limit = 30 } = {}) {
   return { lines, id: n.i };
 }
 
-// the other ends of edges of one type into or out of any of ids, each once with its surest conf, sorted by id
+// a file and its symbols are asked together, and an end reached twice is listed once, with its surest conf
 function graphEnds(g, ids, dir, type) {
   const ends = new Map(), own = new Set(ids);
   for (const id of ids) {
@@ -3849,7 +3925,7 @@ function graphFile(g, path, { limit = 30 } = {}) {
   return { lines, id: f.i, symbols: inner };
 }
 
-// breadth first over the edges keep accepts, either way along each; how each reached node was reached, or null
+// null when to is out of reach over these edges, so the caller can try again with more kinds of edge
 function graphWalk(g, from, to, max, keep) {
   const prev = new Map([[from, null]]);
   let frontier = [from];
@@ -4029,49 +4105,52 @@ function graphOverview(g, { limit = 10 } = {}) {
   return { lines, communities, god };
 }
 
-// the files a task's touches name: a path, a symbol's file, or the one node a bare name means
-function graphTouchFiles(g, touches) {
-  const files = new Set();
-  for (const t of touches) {
-    const ids = graphFind(g, t);
-    if (ids.length === 1) files.add(g.nodes.get(ids[0]).f);
-  }
-  return [...files].filter((f) => g.nodes.has(f));
-}
+// A touch as overlaps compares it: a leading ./ dropped, a symbol (`src/a.js#run`) read as its file. A bare name
+// ('run') stays itself and so matches only the same name.
+const graphTouchKey = (t) => (typeof t === 'string' ? t.trim().replace(/^\.\//, '').replace(/#.*$/, '') : '');
 
-const graphImports = (g, a, b) => (g.out.get(a) || []).some((e) => e.type === 'imports' && e.to === b);
-
-// Open tasks that touch the same code: the same touch written on both; else, with a map, the same file under
-// different names, or a file of one importing a file of the other.
+// Open tasks that touch the same code, in one place for the server and the page.
+//   tasks: [{ key, holder?, touches: string[] }], every open task the caller cares about; it keeps the pairs it wants.
+//   Two tasks overlap when they share a touch (as graphTouchKey reads it), or, with a map, when a file one touches
+//   imports a file the other touches. A person's own tasks never overlap each other.
+//   Returns { lines, pairs: [{ a, b, shared } | { a, b, imports: [[from, to]] }] }, pairs in task order.
+// Each task's touches are read once, and pairs come from a touch → tasks index, so many tasks stay cheap.
 function graphOverlaps(g, tasks) {
   const list = (Array.isArray(tasks) ? tasks : []).filter((t) => t && Array.isArray(t.touches) && t.touches.length);
+  const keys = list.map((t) => [...new Set(t.touches.map(graphTouchKey).filter(Boolean))]);
+  const tasksOf = new Map();
+  keys.forEach((ks, i) => ks.forEach((k) => graphPush(tasksOf, k, i)));
+  const apart = (i, j) => !!list[i].holder && list[i].holder === list[j].holder;
+  const found = new Map();
+  const meet = (i, j) => { if (i !== j && !apart(i, j)) found.set(Math.min(i, j) * list.length + Math.max(i, j), [Math.min(i, j), Math.max(i, j)]); };
+  for (const ts of tasksOf.values()) for (let x = 0; x < ts.length; x++) for (let y = x + 1; y < ts.length; y++) meet(ts[x], ts[y]);
+  const imports = new Set();
+  for (const [k, ts] of tasksOf) {
+    for (const e of g.out.get(k) || []) {
+      if (e.type !== 'imports' || !tasksOf.has(e.to)) continue;
+      imports.add(`${k}\n${e.to}`);
+      for (const i of ts) for (const j of tasksOf.get(e.to)) meet(i, j);
+    }
+  }
   const who = (t) => (t.holder ? `${t.key} (${t.holder})` : `${t.key}`);
   const lines = [], pairs = [];
-  for (let i = 0; i < list.length; i++) {
-    for (let j = i + 1; j < list.length; j++) {
-      const a = list[i], b = list[j];
-      const shared = [...new Set(a.touches.filter((x) => b.touches.includes(x)))];
-      let what = shared, hops = [];
-      if (!shared.length) {
-        const fa = graphTouchFiles(g, a.touches), fb = graphTouchFiles(g, b.touches);
-        what = fa.filter((f) => fb.includes(f));
-        if (!what.length) {
-          for (const x of fa) for (const y of fb) {
-            if (graphImports(g, x, y)) hops.push([x, y]);
-            else if (graphImports(g, y, x)) hops.push([y, x]);
-          }
-        }
+  for (const [i, j] of [...found.values()].sort((x, y) => x[0] - y[0] || x[1] - y[1])) {
+    const shared = keys[i].filter((k) => keys[j].includes(k)), hops = [];
+    if (!shared.length) {
+      for (const x of keys[i]) for (const y of keys[j]) {
+        if (imports.has(`${x}\n${y}`)) hops.push([x, y]);
+        else if (imports.has(`${y}\n${x}`)) hops.push([y, x]);
       }
-      if (!what.length && !hops.length) continue;
-      lines.push(`${who(a)} ↔ ${who(b)}: ${what.length ? what.join(', ') : hops.map(([x, y]) => `${x} → ${y}`).join(', ')}`);
-      pairs.push({ a: a.key, b: b.key, ...(what.length ? { shared: what } : { imports: hops }) });
     }
+    lines.push(`${who(list[i])} ↔ ${who(list[j])}: ${shared.length ? shared.join(', ') : hops.map(([x, y]) => `${x} → ${y}`).join(', ')}`);
+    pairs.push({ a: list[i].key, b: list[j].key, ...(shared.length ? { shared } : { imports: hops }) });
   }
   return { lines, pairs };
 }
 
 // The part of the map a task needs when it is claimed: its touches, the repo paths its text names, and the symbols
-// it names in backticks or CamelCase, each as its file with what that file is.
+// it names in backticks or CamelCase, each as its file with what that file is. The text is read word by word and
+// only its first 20,000 characters: a spec may be a quarter megabyte, and this runs inside every claim.
 function graphContext(g, task, { limit = 8 } = {}) {
   const t = task || {}, found = new Map();
   const add = (file, name) => {
@@ -4083,18 +4162,21 @@ function graphContext(g, task, { limit = 8 } = {}) {
     const ids = graphFind(g, touch);
     if (ids.length === 1) { const n = g.nodes.get(ids[0]); add(n.f, n.k === 'sym' ? n.n : ''); }
   }
-  const text = [t.title, t.spec, t.acceptance].filter((s) => typeof s === 'string').join('\n');
-  for (const m of text.matchAll(/[\w@~.-]+(?:\/[\w@~.-]+)+|[\w@~-][\w@~.-]*\.[A-Za-z0-9]+/g)) {
-    const p = m[0].replace(/^\.\//, '').replace(/[.,;:]+$/, '');
-    const n = g.nodes.get(p);
-    if (n && (n.k === 'file' || n.k === 'doc')) { add(p, ''); continue; }
-    const ends = p.includes('/') ? g.ids.filter((id) => { const k = g.nodes.get(id).k; return (k === 'file' || k === 'doc') && id.endsWith(`/${p}`); }) : [];
-    if (ends.length === 1) add(ends[0], '');
+  const text = [t.title, t.spec, t.acceptance].filter((x) => typeof x === 'string').join('\n').slice(0, GRAPH_CONTEXT_CHARS);
+  const quoted = [], camel = [];
+  for (const word of text.split(/\s+/)) {
+    const bare = word.replace(/^[("'`[<]+/, '').replace(/[)"'`\]>.,;:!?]+$/, '').replace(/^\.\//, '');
+    if (!bare) continue;
+    if (bare.includes('/') || /\.[A-Za-z0-9]+$/.test(bare)) {
+      const n = g.nodes.get(bare);
+      const ends = n ? [] : bare.includes('/') ? graphEnding(g, bare) : [];
+      if (n && (n.k === 'file' || n.k === 'doc')) add(bare, '');
+      else if (ends.length === 1) add(ends[0], '');
+    }
+    if (word.startsWith('`')) quoted.push(word.replace(/^`+/, '').replace(/[`(].*$/, ''));
+    else if (/^[A-Za-z_$][\w$]*$/.test(bare) && /[a-z0-9][A-Z]/.test(bare)) camel.push(bare);
   }
-  const names = new Set();
-  for (const m of text.matchAll(/`([^`\n]+)`/g)) names.add(m[1].trim().replace(/\(.*\)$/, ''));
-  for (const m of text.matchAll(/\b[A-Za-z_$][\w$]*[a-z0-9][A-Z][\w$]*/g)) names.add(m[0]);
-  for (const name of names) {
+  for (const name of new Set([...quoted, ...camel])) {
     const ids = (g.names.get(name.toLowerCase()) || []).filter((id) => g.nodes.get(id).k === 'sym' && g.nodes.get(id).n === name);
     // a name defined in many places says little about where the work is
     if (ids.length && ids.length <= 3) for (const id of ids) add(g.nodes.get(id).f, name);
@@ -4111,7 +4193,7 @@ function graphContext(g, task, { limit = 8 } = {}) {
 
 function loadGraph(index, chunks) {
   const g = { index: index || {}, nodes: new Map(), out: new Map(), in: new Map(), names: new Map(), lasts: new Map(),
-    files: new Map(), ids: [], degree: new Map(), terms: null };
+    files: new Map(), bases: new Map(), tails: new Map(), ids: [], degree: new Map(), terms: null };
   const edges = [];
   for (const ch of chunks || []) {
     for (const n of (ch && ch.nodes) || []) if (n && typeof n.i === 'string') g.nodes.set(n.i, n);
@@ -4131,6 +4213,11 @@ function loadGraph(index, chunks) {
     if (graphShort(n) !== name) graphPush(g.names, graphShort(n).toLowerCase(), id);
     if (n.k === 'sym' && name.includes('.')) graphPush(g.lasts, name.slice(name.lastIndexOf('.') + 1).toLowerCase(), id);
     if (n.f) graphPush(g.files, n.f, id);
+    if (n.k === 'file' || n.k === 'doc') {
+      const parts = id.split('/');
+      graphPush(g.bases, parts[parts.length - 1], id);
+      if (parts.length > 1) graphPush(g.tails, parts.slice(-2).join('/'), id);
+    }
   }
   return {
     index: g.index,
@@ -4157,8 +4244,10 @@ const SCAN_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 
 const SCAN_LOCKS = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'Cargo.lock', 'poetry.lock', 'go.sum']);
 const SCAN_MAX_BYTES = 1024 * 1024;
 const SCAN_SNIFF_BYTES = 8192;
-// generated code says so near its top; its names belong to the files it was made from
-const SCAN_GENERATED = /\bgenerated\b|\bdo not edit\b/i;
+// Generated code says so in a comment near its top, and its names belong to the files it was made from. Only a comment
+// line counts, and only these phrases: hand-written code says "generated" too (`from './generated/db'`).
+const SCAN_COMMENT = /^\s*(\/\/|#|\/\*|\*|--|<!--|")/;
+const SCAN_GENERATED = /generated (by|from|file|code)|auto-generated|do not edit/i;
 
 async function scanGit(root, args) {
   const { stdout } = await scanExec('git', args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
@@ -4169,7 +4258,7 @@ async function scanWalk(root, dir, out) {
   const entries = await readdir(join(root, dir), { withFileTypes: true }).catch(() => []);
   for (const e of entries) {
     const path = dir ? `${dir}/${e.name}` : e.name;
-    // links are not followed: a link to a parent folder would never end
+    // a link is neither a file nor a folder here: it may point out of the checkout, or at a parent folder
     if (e.isDirectory() && !SCAN_SKIP_DIRS.has(e.name)) await scanWalk(root, path, out);
     else if (e.isFile()) out.push(path);
   }
@@ -4181,18 +4270,19 @@ const scanNamed = (path) => {
   return !parts.slice(0, -1).some((p) => SCAN_SKIP_DIRS.has(p)) && !SCAN_LOCKS.has(base) && !/\.min\.js$/i.test(base);
 };
 
-// A regular file of at most 1 MiB, with no NUL byte near its start (binary files carry no names worth mapping) and
-// no "generated" or "do not edit" in its first five lines.
+// A regular file, not a link (git lists links too, and one may point out of the checkout), of at most 1 MiB, with no
+// NUL byte near its start (binary files carry no names worth mapping), that no comment in its first five lines calls
+// generated.
 async function scanWanted(root, path) {
   try {
-    const st = await stat(join(root, path));
+    const st = await lstat(join(root, path));
     if (!st.isFile() || st.size > SCAN_MAX_BYTES) return false;
     const fh = await open(join(root, path), 'r');
     try {
       const buf = Buffer.alloc(Math.min(SCAN_SNIFF_BYTES, st.size));
       const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
       const head = buf.subarray(0, bytesRead);
-      return head.indexOf(0) < 0 && !SCAN_GENERATED.test(head.toString('utf8').split('\n', 5).join('\n'));
+      return head.indexOf(0) < 0 && !head.toString('utf8').split('\n', 5).some((l) => SCAN_COMMENT.test(l) && SCAN_GENERATED.test(l));
     } finally { await fh.close(); }
   } catch { return false; }
 }
@@ -4207,7 +4297,7 @@ async function scanEach(items, fn, width = 64) {
   return out;
 }
 
-// repo-relative paths with '/' separators, sorted
+// '/' separators and a sorted order whatever the system, so one checkout always gives the same map
 async function listFiles(root) {
   let paths;
   try {
@@ -4228,7 +4318,7 @@ async function readFiles(root, paths) {
   return out;
 }
 
-// the checked-out commit, or undefined outside a git work tree
+// outside a git work tree there is no commit, and the index says none
 async function headCommit(root) {
   try { return (await scanGit(root, ['rev-parse', 'HEAD'])).trim() || undefined; } catch { return undefined; }
 }
@@ -4303,7 +4393,7 @@ function buildExtract(b, files) {
   }
 }
 
-// symbol and section nodes; a name defined twice in one file gets its line appended to the second id
+// a name defined twice in one file gets its line appended to the second id, so every id names one node
 function buildSymbols(b) {
   for (const [p, x] of b.parsed) {
     const doc = !!b.lang.get(p).doc, list = [];
@@ -4338,14 +4428,17 @@ function buildSymbols(b) {
 const buildCut = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 // kinds whose declaration is followed by a body, cut off from the signature
 const BUILD_BODIES = new Set(['fn', 'class', 'method', 'module']);
+// kinds whose value is cut off: a constant may hold a key, and the map is uploaded
+const BUILD_VALUES = new Set(['const', 'var', 'static']);
 
 // The declaration as written, on one line of at most 120 characters: for a function, class or method its line (and
-// the next ones while its brackets are open) up to the body (`{`, `=>`, Python's `:`); for the rest the line itself
-// less a trailing `{`, `(`, `[`, `=` or `;`. Strings are kept whole; a line comment ends it.
+// the next ones while its brackets are open) up to the body (`{`, `=>`, Python's `:`), a string default longer than 20
+// characters shown as "…"; for a constant or variable its line up to the `=`, never its value; for the rest the line
+// less a trailing `{`, `(`, `[`, `=` or `;`. A line comment ends it.
 function buildSig(lines, line, kind, lang) {
-  const body = BUILD_BODIES.has(kind), py = lang.id === 'python';
+  const body = BUILD_BODIES.has(kind), value = BUILD_VALUES.has(kind), py = lang.id === 'python';
   const hash = py || lang.id === 'ruby', dashes = lang.id === 'sql';
-  let out = '', depth = 0, quote = '';
+  let out = '', depth = 0, quote = '', opened = 0;
   const done = () => buildCut(out.replace(/\s+/g, ' ').trim().replace(/[\s{([=;,]+$/, ''), 120);
   for (let k = line - 1; k < Math.min(lines.length, line + 7); k++) {
     const raw = lines[k];
@@ -4354,10 +4447,14 @@ function buildSig(lines, line, kind, lang) {
       if (quote) {
         out += c;
         if (c === '\\') out += raw[++i] || '';
-        else if (c === quote) quote = '';
+        else if (c === quote) {
+          if (body && out.length - opened - 2 > 20) out = `${out.slice(0, opened)}${quote}…${quote}`;
+          quote = '';
+        }
         continue;
       }
-      if (c === '"' || c === "'" || c === '`') { quote = c; out += c; continue; }
+      if (c === '"' || c === "'" || c === '`') { quote = c; opened = out.length; out += c; continue; }
+      if (value && !depth && c === '=' && !'=>'.includes(raw[i + 1] || ' ') && !'=!<>'.includes(raw[i - 1] || ' ')) return done();
       if (spaced && (c === '/' && raw[i + 1] === '/' || hash && c === '#' || dashes && c === '-' && raw[i + 1] === '-')) return done();
       if (c === '(' || c === '[' || c === '{') {
         if (c === '{' && body && !depth) return done();
@@ -4739,8 +4836,8 @@ function buildChunks(nodes, edges, limit) {
   return chunks;
 }
 
-// files: Map of repo-relative path to text (a file with no language may map to ''); opts: { repo, by, commit?,
-// root?, label?, chunkBytes?, langFor? } (langFor picks a file's language; tests hand it a made-up one)
+// files: Map of repo-relative path to text (a file with no language may map to ''); opts: { repo, by, commit?, label?,
+// chunkBytes?, langFor? } (langFor picks a file's language; tests hand it a made-up one)
 function buildGraph(files, opts = {}) {
   const paths = [...files.keys()].sort(buildCmp);
   const b = {
@@ -4778,7 +4875,6 @@ function buildGraph(files, opts = {}) {
     ...(opts.commit ? { commit: opts.commit } : {}),
     builtAt: new Date().toISOString(),
     by: opts.by,
-    ...(opts.root != null ? { root: opts.root } : {}),
     counts: { files: kinds('file'), symbols: kinds('sym'), edges: edges.length, docs: kinds('doc') },
     chunks: chunks.length,
     communities: communities.slice(0, BUILD_COMMUNITIES).map(({ c, name, n, top }) => ({ c, name, n, top })),
@@ -4789,7 +4885,7 @@ function buildGraph(files, opts = {}) {
   return { index, chunks };
 }
 
-// scan a checkout and build its map; the commit is the checked-out one unless opts says otherwise
+// the commit comes from git unless given, so a map says which code it describes
 async function mapRepo(root, opts = {}) {
   const paths = await listFiles(root);
   const texts = await readFiles(root, paths.filter((p) => langFor(p)));
@@ -4816,7 +4912,7 @@ async function codemapMain(argv) {
   // JSON bodies itself would choke on compressed JSON; the server inflates what starts with the gzip magic bytes
   const res = await fetch(`${site}/api/p/${encodeURIComponent(project)}/map`, {
     method: 'POST', headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` },
-    body: gzipSync(JSON.stringify({ repo, index, chunks })),
+    body: gzipSync(JSON.stringify({ repo, index, chunks, root })),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) { console.error(`upload failed (${res.status}): ${body.message || body.error || 'unknown'}`); process.exit(1); }

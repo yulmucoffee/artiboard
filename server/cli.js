@@ -12,6 +12,18 @@ import { makeFlow } from './flow.js';
 import { addMember as joinSite, connectLines, entryFor, removeMember as leaveSite, setPerson as seat } from './members.js';
 import { defaultPage } from './page.js';
 
+const MAP_USAGE = `  map build      --project ID --repo owner/name [--root DIR] [--label L]
+           map a checkout (DIR, else this directory) and keep the map on the board
+  map overview   --project ID [--repo R]    a map's communities and most connected names
+  map query      --project ID TEXT          the files, symbols and docs some words find
+  map explain    --project ID NAME          a symbol or file and what it connects to
+  map file       --project ID PATH
+  map path       --project ID A B           how two names connect
+  map impact     --project ID X             what depends on X
+  map inside     --project ID X             what X calls and uses
+  map drop       --project ID --repo R      delete a repository's map
+           queries take --repo R when a project has several maps, and --limit N`;
+
 const USAGE = `usage: artiboard <command> [options]   (--env FILE loads settings first)
 
   serve    [--port N] [--host H]               run the site (pages, project list, MCP at /mcp)
@@ -39,17 +51,7 @@ const USAGE = `usage: artiboard <command> [options]   (--env FILE loads settings
   import         --project ID --file FILE [--map old=new,...]
            documents exported from a claude.ai artifact board ({"path": data} or {"docs": {...}})
 
-  map build      --project ID --repo owner/name [--root DIR] [--label L]
-           map a checkout (DIR, else this directory) and keep the map on the board
-  map overview   --project ID [--repo R]    a map's communities and most connected names
-  map query      --project ID TEXT          the files, symbols and docs some words find
-  map explain    --project ID NAME          a symbol or file and what it connects to
-  map file       --project ID PATH
-  map path       --project ID A B           how two names connect
-  map impact     --project ID X             what depends on X
-  map inside     --project ID X             what X calls and uses
-  map drop       --project ID --repo R      delete a repository's map
-           queries take --repo R when a project has several maps, and --limit N`;
+${MAP_USAGE}`;
 
 const { positionals: [cmd, sub, ...args], values: o } = parseArgs({
   allowPositionals: true,
@@ -232,9 +234,9 @@ const commands = {
   map: {
     async build() {
       need('project', 'repo');
-      const { index, chunks } = await mapRepo(resolve(o.root || '.'), { repo: o.repo });
+      const root = resolve(o.root || '.'), { index, chunks } = await mapRepo(root, { repo: o.repo });
       // --label names the map where the board's repos give it no label
-      const r = await makeFlow(store).setMap(site(), o.project, { repo: o.repo, index: { ...index, ...(o.label && { label: o.label }) }, chunks });
+      const r = await makeFlow(store).setMap(site(), o.project, { repo: o.repo, index: { ...index, ...(o.label && { label: o.label }) }, chunks, root });
       const c = r.counts || {};
       console.log(`${r.repoKey}: ${c.files ?? 0} files · ${c.symbols ?? 0} symbols · ${c.edges ?? 0} edges · ${r.chunks} chunk${r.chunks === 1 ? '' : 's'}`);
     },
@@ -250,7 +252,7 @@ const commands = {
 };
 
 const run = typeof commands[cmd] === 'function' ? commands[cmd] : commands[cmd]?.[sub];
-if (!run) die(USAGE);
+if (!run) die(cmd === 'map' ? `usage: artiboard map <command> [options]\n\n${MAP_USAGE}` : USAGE);
 try {
   await run();
   if (cmd !== 'serve') { store.close(); }

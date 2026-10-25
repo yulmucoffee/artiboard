@@ -70,7 +70,7 @@ function buildExtract(b, files) {
   }
 }
 
-// symbol and section nodes; a name defined twice in one file gets its line appended to the second id
+// a name defined twice in one file gets its line appended to the second id, so every id names one node
 function buildSymbols(b) {
   for (const [p, x] of b.parsed) {
     const doc = !!b.lang.get(p).doc, list = [];
@@ -105,14 +105,17 @@ function buildSymbols(b) {
 const buildCut = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 // kinds whose declaration is followed by a body, cut off from the signature
 const BUILD_BODIES = new Set(['fn', 'class', 'method', 'module']);
+// kinds whose value is cut off: a constant may hold a key, and the map is uploaded
+const BUILD_VALUES = new Set(['const', 'var', 'static']);
 
 // The declaration as written, on one line of at most 120 characters: for a function, class or method its line (and
-// the next ones while its brackets are open) up to the body (`{`, `=>`, Python's `:`); for the rest the line itself
-// less a trailing `{`, `(`, `[`, `=` or `;`. Strings are kept whole; a line comment ends it.
+// the next ones while its brackets are open) up to the body (`{`, `=>`, Python's `:`), a string default longer than 20
+// characters shown as "…"; for a constant or variable its line up to the `=`, never its value; for the rest the line
+// less a trailing `{`, `(`, `[`, `=` or `;`. A line comment ends it.
 function buildSig(lines, line, kind, lang) {
-  const body = BUILD_BODIES.has(kind), py = lang.id === 'python';
+  const body = BUILD_BODIES.has(kind), value = BUILD_VALUES.has(kind), py = lang.id === 'python';
   const hash = py || lang.id === 'ruby', dashes = lang.id === 'sql';
-  let out = '', depth = 0, quote = '';
+  let out = '', depth = 0, quote = '', opened = 0;
   const done = () => buildCut(out.replace(/\s+/g, ' ').trim().replace(/[\s{([=;,]+$/, ''), 120);
   for (let k = line - 1; k < Math.min(lines.length, line + 7); k++) {
     const raw = lines[k];
@@ -121,10 +124,14 @@ function buildSig(lines, line, kind, lang) {
       if (quote) {
         out += c;
         if (c === '\\') out += raw[++i] || '';
-        else if (c === quote) quote = '';
+        else if (c === quote) {
+          if (body && out.length - opened - 2 > 20) out = `${out.slice(0, opened)}${quote}…${quote}`;
+          quote = '';
+        }
         continue;
       }
-      if (c === '"' || c === "'" || c === '`') { quote = c; out += c; continue; }
+      if (c === '"' || c === "'" || c === '`') { quote = c; opened = out.length; out += c; continue; }
+      if (value && !depth && c === '=' && !'=>'.includes(raw[i + 1] || ' ') && !'=!<>'.includes(raw[i - 1] || ' ')) return done();
       if (spaced && (c === '/' && raw[i + 1] === '/' || hash && c === '#' || dashes && c === '-' && raw[i + 1] === '-')) return done();
       if (c === '(' || c === '[' || c === '{') {
         if (c === '{' && body && !depth) return done();
@@ -506,8 +513,8 @@ function buildChunks(nodes, edges, limit) {
   return chunks;
 }
 
-// files: Map of repo-relative path to text (a file with no language may map to ''); opts: { repo, by, commit?,
-// root?, label?, chunkBytes?, langFor? } (langFor picks a file's language; tests hand it a made-up one)
+// files: Map of repo-relative path to text (a file with no language may map to ''); opts: { repo, by, commit?, label?,
+// chunkBytes?, langFor? } (langFor picks a file's language; tests hand it a made-up one)
 export function buildGraph(files, opts = {}) {
   const paths = [...files.keys()].sort(buildCmp);
   const b = {
@@ -545,7 +552,6 @@ export function buildGraph(files, opts = {}) {
     ...(opts.commit ? { commit: opts.commit } : {}),
     builtAt: new Date().toISOString(),
     by: opts.by,
-    ...(opts.root != null ? { root: opts.root } : {}),
     counts: { files: kinds('file'), symbols: kinds('sym'), edges: edges.length, docs: kinds('doc') },
     chunks: chunks.length,
     communities: communities.slice(0, BUILD_COMMUNITIES).map(({ c, name, n, top }) => ({ c, name, n, top })),
@@ -556,7 +562,7 @@ export function buildGraph(files, opts = {}) {
   return { index, chunks };
 }
 
-// scan a checkout and build its map; the commit is the checked-out one unless opts says otherwise
+// the commit comes from git unless given, so a map says which code it describes
 export async function mapRepo(root, opts = {}) {
   const paths = await listFiles(root);
   const texts = await readFiles(root, paths.filter((p) => langFor(p)));

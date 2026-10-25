@@ -2,7 +2,7 @@
 // They answer in short text lines, check versions on the server and stamp times with the server clock,
 // so an agent spends no tokens on reads before a write, on version numbers or on `date`.
 import { loadGraph } from './codemap/graph.js';
-import { BOARD_RULES, BoardError, cleanRepos, now, repoName, reposOf, stampId, toBoardError } from './core.js';
+import { BOARD_RULES, BoardError, MAP_RULES, cleanRepos, now, repoName, reposOf, stampId, toBoardError } from './core.js';
 import { TASK_STATUSES, boardStatuses, holderOf, isReady, mayChange, statusEffects, statusOf, unmetDeps } from './tasks.js';
 import { VERSION } from './version.js';
 
@@ -71,10 +71,12 @@ function detailLines(det) {
 // how much of a person's own work board_start prints: lines for work at hand, keys for work in review
 const MINE_LINES = 20, MINE_KEYS = 30;
 
-// A code map is an index document per repository, map/<key>, and its chunks, map/<key>/chunks/<n>: at most MAP_CHUNKS
-// of them, each at most MAP_CHUNK bytes of JSON, under the store's document limit with room for how each database
-// spells JSON.
+// A code map is an index document per repository, map/<owner--name>, and its chunks, map/<owner--name>/chunks/<n>: at
+// most MAP_CHUNKS of them (about 25,000 symbols), each at most MAP_CHUNK bytes of JSON, under the store's document
+// limit with room for how each database spells JSON.
 const MAP_CHUNK = 200000, MAP_CHUNKS = 60;
+// how many files and symbols a task's touches keep: enough for a large change, few enough to print and compare
+const TOUCHES = 60;
 // the index documents: the collection map holds nothing else
 const MAPS = { collection: 'map', limit: 50 };
 // open work: held (an owner is a non-empty string, which both databases rank above '') and not done
@@ -89,34 +91,77 @@ const touchesOf = (d) => (Array.isArray(d.touches) ? d.touches : []);
 const touching = (t) => ({ key: t.data.key || t.id, holder: holderOf(t.data), touches: touchesOf(t.data) });
 // a few items and how many more, so a line stays short
 const few = (xs, n = 3) => xs.slice(0, n).join(', ') + (xs.length > n ? ` +${xs.length - n} more` : '');
-const mapName = (m) => m.data.label || m.data.repo || m.id;
-const mapLine = (m) => `${mapName(m)} · ${m.data.counts?.symbols ?? 0} symbols · built ${short(m.data.builtAt).slice(0, 5)} by ${m.data.by || '?'}`;
+// a map's name: its repo's label on the board now, else the label it was built with, else owner/name
+const mapName = (m, repos) => repos.find((r) => repoName(r.repo) === repoName(m.data.repo))?.label || m.data.label || m.data.repo || m.id;
+const mapLine = (m, repos) => `${mapName(m, repos)} · ${m.data.counts?.symbols ?? 0} symbols · built ${short(m.data.builtAt).slice(0, 5)} by ${m.data.by || '?'}`;
 // the call is made by now: a map that cannot be read leaves its lines out rather than turning the answer into an error
 const quiet = (e) => { console.error(e); return []; };
 
-// the maps a repo names, by label, owner/name or key; no repo, every map
-function mapsNamed(maps, repo) {
+// the maps a repo names: a label (the board's, or the one a map was built with) or owner/name; no repo, every map
+function mapsNamed(maps, repo, repos) {
   if (!repo) return maps;
-  const want = repoName(repo);
-  return maps.filter((m) => m.id === repo || m.data.label === repo || (want && repoName(m.data.repo) === want));
+  const want = taskRepo({ repo }, repos);
+  return maps.filter((m) => m.data.label === repo || (want && repoName(m.data.repo) === want));
 }
 
-// a map's document id: the repo's label on the board, else owner--name
-const repoKey = (name, repos) => repos.find((r) => repoName(r.repo) === repoName(name))?.label || repoName(name).replace('/', '--');
+// a map's document id: its repository, which a label added or changed later leaves the same
+const repoKey = (name) => repoName(name).replace('/', '--');
+
+// What a map must look like to be kept: the page and loadGraph read it whole, so one bad field would break it for every
+// reader. One pass over the index and every node and edge; the answer names the first bad field.
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isCount = (v) => Number.isInteger(v) && v >= 0;
+// a string of at most max characters
+const upTo = (max) => (v) => typeof v === 'string' && v.length <= max;
+const NODE = [['i', upTo(1000), 'an id'], ['k', (v) => ['file', 'sym', 'doc', 'sec'].includes(v), 'file, sym, doc or sec'], ['n', upTo(1000), 'a name'],
+  ['f', upTo(1000), 'a path'], ['l', isCount, 'a line'], ['t', upTo(20), 'a type'], ['s', upTo(160), 'a signature of at most 160 characters'],
+  ['d', upTo(200), 'a comment of at most 200 characters'], ['c', isCount, 'a community'], ['q', (v) => v === 't', "'t'"]];
+const OPTIONAL = new Set(['t', 's', 'd', 'c', 'q']);
+const EDGES = new Set(['imports', 'defines', 'calls', 'uses', 'extends', 'mentions', 'contains']);
+function mapProblem(index, chunks) {
+  if (index.label !== undefined && !(upTo(40)(index.label) && !/[/#]/.test(index.label))) return 'index.label is not a name of at most 40 characters without / or #';
+  if (!isObject(index.counts)) return 'index.counts is not {files, symbols, edges, docs}';
+  for (const [k, v] of Object.entries(index.counts)) if (!isCount(v)) return `index.counts.${k} is not a count`;
+  if (index.langs !== undefined && !isObject(index.langs)) return 'index.langs is not {language: files}';
+  for (const [k, v] of Object.entries(index.langs || {})) if (!isCount(v)) return `index.langs.${k} is not a count`;
+  if (!Array.isArray(index.communities) || index.communities.length > 40) return 'index.communities is not a list of at most 40';
+  for (const [i, c] of index.communities.entries()) {
+    if (!isObject(c) || typeof c.name !== 'string' || !isCount(c.n) || !Array.isArray(c.top) || c.top.length > 40 || !c.top.every(upTo(300))) {
+      return `index.communities[${i}] is not {name, n, top: [ids]}`;
+    }
+  }
+  if (!Array.isArray(index.god) || index.god.length > 40) return 'index.god is not a list of at most 40';
+  for (const [i, g] of index.god.entries()) if (!upTo(300)(g)) return `index.god[${i}] is not an id`;
+  for (const [i, c] of chunks.entries()) {
+    if (!isObject(c) || !Array.isArray(c.nodes) || !Array.isArray(c.edges)) return `chunks[${i}] is not {nodes, edges}`;
+    for (const [j, n] of c.nodes.entries()) {
+      if (!isObject(n)) return `chunks[${i}].nodes[${j}] is not a node`;
+      for (const [f, ok, what] of NODE) if (!(n[f] === undefined && OPTIONAL.has(f)) && !ok(n[f])) return `chunks[${i}].nodes[${j}].${f} is not ${what}`;
+    }
+    for (const [j, e] of c.edges.entries()) {
+      if (!Array.isArray(e) || e.length !== 4 || typeof e[0] !== 'string' || typeof e[1] !== 'string' || !EDGES.has(e[2]) || (e[3] !== 'x' && e[3] !== 'i')) {
+        return `chunks[${i}].edges[${j}] is not [from, to, type, x|i]`;
+      }
+    }
+  }
+  return null;
+}
 
 // a map with nothing in it still finds the touches two tasks share
 const NO_MAP = loadGraph({}, []);
 
-// Where open work meets: each of mine against each of others held by someone else. The map decides what an overlap is
-// (a touch both share, the same file under two names, a file of one importing one of the other's); computed when
-// printed, never stored.
+// Where mine meet the rest of the open work held by someone else. The map decides what an overlap is (a touch both
+// share, the same file under two names, a file of one importing one of the other's), given all the open work at once;
+// the lines read from the side of mine. Computed when printed, never stored.
 function overlapLines(mine, others, graphs) {
-  const out = [];
-  for (const a of mine) {
-    for (const b of others) {
-      if (a.key === b.key || a.holder === b.holder) continue;
-      const pair = (graphs.length ? graphs : [NO_MAP]).map((g) => g.overlaps([a, b]).pairs[0]).find(Boolean);
-      if (pair) out.push(`overlap ${a.key} ↔ ${b.key} (${b.holder}): ${pair.shared ? few(pair.shared) : few(pair.imports.map(([x, y]) => `${x} → ${y}`), 2)}`);
+  const keys = new Set(mine.map((t) => t.key)), all = mine.concat(others.filter((t) => !keys.has(t.key)));
+  const holder = new Map(all.map((t) => [t.key, t.holder])), seen = new Set(), out = [];
+  for (const g of graphs.length ? graphs : [NO_MAP]) {
+    for (const p of g.overlaps(all).pairs) {
+      const [a, b] = keys.has(p.a) ? [p.a, p.b] : [p.b, p.a];
+      if (!keys.has(a) || holder.get(a) === holder.get(b) || seen.has(`${a} ${b}`)) continue;
+      seen.add(`${a} ${b}`);
+      out.push(`overlap ${a} ↔ ${b} (${holder.get(b)}): ${p.shared ? few(p.shared) : few(p.imports.map(([x, y]) => `${x} → ${y}`), 2)}`);
     }
   }
   return out.slice(0, OVERLAP_LINES);
@@ -164,8 +209,11 @@ export function makeFlow(store) {
     return done;
   }
 
-  // The project's code maps, one index document per repository.
-  const mapsOf = (project) => query(project, MAPS.collection, MAPS);
+  // The project's code maps, one index document per repository, and its repos, whose labels name them.
+  async function mapsOf(project) {
+    const [config, maps] = await read(project, [{ path: 'meta/config' }, MAPS]);
+    return { maps, repos: reposOf(config?.data) };
+  }
 
   // A map as a graph. The caller has just read its index; the chunks are read only when that index says the map was
   // rebuilt since this process loaded it, and then together with the index, so a rebuild landing in between cannot
@@ -196,8 +244,8 @@ export function makeFlow(store) {
   // What board_claim and board_task add to a task: the code its text and touches name, from its repo's map (every map
   // when it names no repo), and where its touches meet other open work. A board without a map and a task that touches
   // nothing read nothing more.
-  async function codeLines(project, key, d, det, maps) {
-    const mine = { key, holder: holderOf(d), touches: touchesOf(d) }, named = mapsNamed(maps, d.repo);
+  async function codeLines(project, key, d, det, maps, repos) {
+    const mine = { key, holder: holderOf(d), touches: touchesOf(d) }, named = mapsNamed(maps, d.repo, repos);
     const ask = { title: d.title, spec: det?.data?.spec, acceptance: det?.data?.acceptance, touches: mine.touches };
     const code = (await graphsOf(project, named)).flatMap((g) => g.context(ask, { limit: CODE_LINES }).lines).slice(0, CODE_LINES);
     return [...(code.length ? ['code:', ...code] : []), ...await meeting(project, mine.touches.length ? [mine] : [], named)];
@@ -252,9 +300,9 @@ export function makeFlow(store) {
 
     const out = [`${me} · ${project}${config.milestone ? ` · ${config.milestone}` : ''} · artiboard ${VERSION}`];
     if (scope.repos.length) out.push(`repos: ${repoList(scope.repos)}`);
-    out.push(...got.maps.map((m) => `code map: ${mapLine(m)}`));
+    out.push(...got.maps.map((m) => `code map: ${mapLine(m, scope.repos)}`));
     if (scope.stray) out.push(scope.stray);
-    if (rules) out.push(...rulesLines(got.rules, got.notes));
+    if (rules) out.push(...rulesLines(got.rules, got.notes, got.maps.length > 0));
     out.push(...noticeLines(notices, got.latest.length, since));
     out.push(...mineLines(mine, me), ...await meets);
     if (ready) out.push(...readyLines(free, toReview, ready, elsewhere));
@@ -300,10 +348,10 @@ export function makeFlow(store) {
     return { repos, want, stray, here };
   }
 
-  // the board rules, the project's rules in full, and a pointer to its notes: the shared status (schedule, where things
-  // stand) is long and changes daily, so it is pointed at, not printed
-  function rulesLines(own, notes) {
-    const out = [BOARD_RULES];
+  // the board rules (with the code map's rule where there is a map), the project's rules in full, and a pointer to its
+  // notes: the shared status (schedule, where things stand) is long and changes daily, so it is pointed at, not printed
+  function rulesLines(own, notes, mapped) {
+    const out = mapped ? [BOARD_RULES, MAP_RULES] : [BOARD_RULES];
     const r = own?.data;
     if (typeof r?.text === 'string' && r.text.trim()) out.push(`project rules (rev ${r.rev || 1}${r.by ? ` · ${r.by}` : ''}${r.updatedAt ? ` ${short(r.updatedAt).slice(0, 5)}` : ''}):`, r.text.trim());
     else out.push('project rules: none yet');
@@ -366,7 +414,7 @@ export function makeFlow(store) {
   async function task(project, id, { thread = 8 } = {}) {
     // the latest messages come in the same round trip, then those before the summary drop out. A message posted with
     // the summary carries its time, so it stays: it is what the summary's writer said (a fix list, "PR open").
-    const [t, det, maps, latest = []] = await read(project, [{ path: `tasks/${id}` }, { path: `details/${id}` }, MAPS,
+    const [t, det, config, maps, latest = []] = await read(project, [{ path: `tasks/${id}` }, { path: `details/${id}` }, { path: 'meta/config' }, MAPS,
       ...(thread ? [{ collection: `tasks/${id}/messages`, order: [{ field: 'at', dir: 'desc' }], limit: thread }] : [])]);
     if (!t) throw new BoardError('not_found', `no task ${id}`);
     const d = t.data;
@@ -378,7 +426,7 @@ export function makeFlow(store) {
     const dates = [day(d.start) && `start ${d.start}`, day(d.due) && `due ${d.due}`, d.doneAt && `done ${short(d.doneAt)}`, d.archivedAt && `archived ${short(d.archivedAt)}`].filter(Boolean);
     if (dates.length) out.push(dates.join(' · '));
     if (touchesOf(d).length) out.push(`touches: ${touchesOf(d).join(', ')}`);
-    out.push(...detailLines(det), ...await codeLines(project, d.key || id, d, det, maps).catch(quiet));
+    out.push(...detailLines(det), ...await codeLines(project, d.key || id, d, det, maps, reposOf(config?.data)).catch(quiet));
     if (thread) {
       out.push(msgs.length ? `messages${since ? ' after summary' : ''}:` : `messages${since ? ' after summary' : ''}: none`);
       msgs.forEach((m) => out.push(msgLine(m.data)));
@@ -419,7 +467,7 @@ export function makeFlow(store) {
       ]);
       return from ? `took over ${id} from ${from}` : `claimed ${id}`;
     });
-    return [result, ...detailLines(det), ...await codeLines(project, claimed.key || id, claimed, det, maps).catch(quiet)].join('\n');
+    return [result, ...detailLines(det), ...await codeLines(project, claimed.key || id, claimed, det, maps, reposOf(config?.data)).catch(quiet)].join('\n');
   }
 
   // Finished tasks leave every dependent's waitingOn. A dependent changed in the same call takes the key out with its own
@@ -452,8 +500,10 @@ export function makeFlow(store) {
   // they meet other open work.
   async function post(member, project, { task: id, tasks, text, type, status, branch, pr, start, due, repo, summary, touches, override }) {
     const me = member.person;
-    // a leading ./ names the same file
-    const touched = touches === undefined ? undefined : [...new Set((touches || []).map((x) => x.trim().replace(/^\.\//, '')).filter(Boolean))];
+    // only "" or [] clears; a blank name is no name, and a leading ./ names the same file
+    const clears = touches === '' || (Array.isArray(touches) && !touches.length);
+    const named = clears || touches === undefined ? [] : [...new Set(touches.map((x) => x.trim().replace(/^\.\//, '')).filter(Boolean))];
+    const touched = clears ? [] : named.length ? named : undefined;
     // the asked-for change, empty strings clearing a field
     const change = Object.fromEntries(Object.entries({ status, branch, pr, start, due, repo, summary, touches: touched }).filter(([, v]) => v !== undefined));
     const asked = Object.keys(change);
@@ -489,7 +539,11 @@ export function makeFlow(store) {
         const patch = { updatedAt: at, lastMessageAt: at, lastMessageBy: me };
         for (const f of ['branch', 'pr', 'start', 'due', 'repo']) if (f in change) patch[f] = change[f] || null;
         if (status !== undefined) Object.assign(patch, { status }, statusEffects(d, status, at));
-        if (touched) patch.touches = touched.length ? [...new Set([...touchesOf(d), ...touched])] : null;
+        if (touched) {
+          const all = touched.length ? [...new Set([...touchesOf(d), ...touched])] : [];
+          if (all.length > TOUCHES) throw new BoardError('invalid_argument', `${key} would touch ${all.length} files and symbols; a task keeps at most ${TOUCHES}: name files rather than each symbol, or clear the list with touches ""`);
+          patch.touches = all.length ? all : null;
+        }
         if (touched?.length) posted = { ...touching({ id: t.id, data: { ...d, ...patch } }), repo: 'repo' in patch ? patch.repo : d.repo };
         // with no text, the thread still says what changed
         const said = `${text?.trim() || [
@@ -517,7 +571,7 @@ export function makeFlow(store) {
       return [`ok ${keys.join(', ')}${status ? ` → ${status}` : ''}`, unblocked.length && `unblocked ${unblocked.sort(keyOrder).join(', ')}`].filter(Boolean).join(' · ');
     });
     if (!posted) return line;
-    return [line, ...await meeting(project, [posted], mapsOf(project).then((maps) => mapsNamed(maps, posted.repo))).catch(quiet)].join('\n');
+    return [line, ...await meeting(project, [posted], mapsOf(project).then(({ maps, repos }) => mapsNamed(maps, posted.repo, repos))).catch(quiet)].join('\n');
   }
 
   // An agent's batch writes; the database holds them to the task rules. With override (only when the agent's person
@@ -545,33 +599,41 @@ export function makeFlow(store) {
   async function map(project, { repo, explain, file, path: pair, query: words, impact, inside, limit } = {}) {
     const asked = Object.entries({ explain, file, path: pair, query: words, impact, inside }).filter(([, v]) => v !== undefined);
     if (asked.length > 1) throw new BoardError('invalid_argument', 'ask one of explain, file, path, query, impact and inside at a time');
-    const all = await mapsOf(project), maps = mapsNamed(all, repo);
+    const { maps: all, repos } = await mapsOf(project), maps = mapsNamed(all, repo, repos), name = (m) => mapName(m, repos);
     if (!all.length) return `no code map on ${project}; one is built from a checkout with the artiboard skill's scripts/codemap.mjs`;
-    if (!maps.length) throw new BoardError('not_found', `no code map for ${repo}; maps: ${all.map(mapName).join(', ')}`);
+    if (!maps.length) throw new BoardError('not_found', `no code map for ${repo}; maps: ${all.map(name).join(', ')}`);
     if (maps.length > 1) {
-      if (asked.length) throw new BoardError('invalid_argument', `${maps.length} code maps here (${maps.map(mapName).join(', ')}); pass repo`);
-      return [...maps.map(mapLine), 'pass repo for one map\'s overview'].join('\n');
+      if (asked.length) throw new BoardError('invalid_argument', `${maps.length} code maps here (${maps.map(name).join(', ')}); pass repo`);
+      return [...maps.map((m) => mapLine(m, repos)), 'pass repo for one map\'s overview'].join('\n');
     }
     const graph = await readMap(project, maps[0]);
-    if (!graph) throw new BoardError('not_found', `the code map of ${mapName(maps[0])} was just dropped`);
+    if (!graph) throw new BoardError('not_found', `the code map of ${name(maps[0])} was just dropped`);
     const [how, arg] = asked[0] || ['overview'], opts = limit ? { limit } : {};
     const answer = how === 'path' ? graph.path(arg[0], arg[1]) : how === 'overview' ? graph.overview(opts) : graph[how](arg, opts);
     return answer.lines.join('\n') || 'nothing found';
   }
 
   // A repository's map as the build script made it: its chunks, the last build's chunks beyond the new count deleted,
-  // then the index that says how many, in one write, so a reader sees one build whole. The key, who built it and when
-  // are the board's to say. A rebuild replaces the map; one racing another rereads and writes again.
-  async function setMap(member, project, { repo, index, chunks } = {}) {
+  // then the index that says how many, in one write, so a reader sees one build whole. The key, the label, who built it
+  // and when are the board's to say. A rebuild replaces the map; one racing another rereads and writes again. root,
+  // where the map was built from, only names the folder when a map with no files is refused: a wrong --root must not
+  // replace a good map with an empty one.
+  async function setMap(member, project, { repo, index, chunks, root } = {}) {
     const [{ repo: name }] = cleanRepos([repo]);
-    if (index?.version !== 1) throw new BoardError('invalid_argument', 'index.version must be 1: build the map with this site\'s version of artiboard');
-    if (!Array.isArray(chunks) || chunks.length > MAP_CHUNKS) throw new BoardError('invalid_argument', `chunks must be a list of at most ${MAP_CHUNKS}`);
+    if (!isObject(index) || index.version !== 1) throw new BoardError('invalid_argument', 'index.version must be 1: build the map with this site\'s version of artiboard');
+    if (!Array.isArray(chunks)) throw new BoardError('invalid_argument', 'chunks must be a list');
+    if (chunks.length > MAP_CHUNKS) {
+      throw new BoardError('invalid_argument', `a map holds at most ${MAP_CHUNKS} chunks (about 25,000 symbols), not ${chunks.length}: map the part that matters with --root <subdirectory>`);
+    }
     chunks.forEach((c, i) => {
       if (Buffer.byteLength(JSON.stringify(c) ?? '') > MAP_CHUNK) throw new BoardError('invalid_argument', `chunk ${i} is over ${MAP_CHUNK} bytes of JSON; build smaller chunks`, i);
     });
+    const problem = mapProblem(index, chunks);
+    if (problem) throw new BoardError('invalid_argument', problem);
+    if (!index.counts.files) throw new BoardError('invalid_argument', `the map of ${name} has no files: is ${root || 'the folder it was built from'} the repository's root?`);
+    const key = repoKey(name);
     const write = async () => {
-      const [config, maps] = await read(project, [{ path: 'meta/config' }, MAPS]);
-      const repos = reposOf(config?.data), key = repoKey(name, repos), old = maps.find((m) => m.id === key);
+      const { maps, repos } = await mapsOf(project), old = maps.find((m) => m.id === key);
       const label = repos.find((r) => repoName(r.repo) === repoName(name))?.label || index.label;
       const writes = chunks.map((data, n) => ({ op: 'set', path: `map/${key}/chunks/${n}`, data }));
       for (let n = chunks.length; n < (old?.data.chunks || 0); n++) writes.push({ op: 'delete', path: `map/${key}/chunks/${n}` });
@@ -586,13 +648,13 @@ export function makeFlow(store) {
     }
   }
 
-  // A repository's map and its chunks, gone in one write.
+  // one write, so a reader never finds an index without its chunks or chunks without their index
   async function dropMap(member, project, repo) {
-    const [m, ...more] = mapsNamed(await mapsOf(project), repo);
+    const { maps, repos } = await mapsOf(project), [m, ...more] = mapsNamed(maps, repo, repos);
     if (!m || more.length) throw new BoardError('not_found', `no single code map for ${repo}`);
     const chunks = Array.from({ length: m.data.chunks || 0 }, (_, n) => ({ op: 'delete', path: `map/${m.id}/chunks/${n}` }));
     await apply(member, project, [...chunks, { op: 'delete', path: `map/${m.id}`, if_version: m.version }]);
-    return `dropped the code map of ${mapName(m)}`;
+    return `dropped the code map of ${mapName(m, repos)}`;
   }
 
   return { start, task, claim, post, batch, projectFor, map, setMap, dropMap };

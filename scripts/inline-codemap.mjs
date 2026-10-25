@@ -52,7 +52,7 @@ async function codemapMain(argv) {
   // JSON bodies itself would choke on compressed JSON; the server inflates what starts with the gzip magic bytes
   const res = await fetch(\`\${site}/api/p/\${encodeURIComponent(project)}/map\`, {
     method: 'POST', headers: { 'Content-Type': 'application/octet-stream', Authorization: \`Bearer \${token}\` },
-    body: gzipSync(JSON.stringify({ repo, index, chunks })),
+    body: gzipSync(JSON.stringify({ repo, index, chunks, root })),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) { console.error(\`upload failed (\${res.status}): \${body.message || body.error || 'unknown'}\`); process.exit(1); }

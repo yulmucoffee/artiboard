@@ -31,6 +31,8 @@ test('symbols: exact names, kinds, lines and exported flags', () => {
     { name: 'Invoice.Line.amount', kind: 'method', line: 92, exported: true },
     { name: 'Discount', kind: 'class', line: 98, exported: false },
     { name: 'Discount.applyTo', kind: 'method', line: 99, exported: false },
+    { name: 'Discount.getX', kind: 'method', line: 102, exported: true },
+    { name: 'Discount.n', kind: 'method', line: 103, exported: false },
   ]);
 });
 
@@ -119,7 +121,7 @@ test('resolve: wildcards and the JDK are not repo files', () => {
   assert.equal(javaLang.resolve('com.acme.util.*', 'app/Main.java', files), null);
   assert.equal(javaLang.resolve('java.util.List', 'app/Main.java', files), null, 'java.* is never a repo file');
   assert.equal(javaLang.resolve('javax.annotation.Nullable', 'app/Main.java', files), null);
-  assert.equal(javaLang.resolve('org.junit.Test', 'app/Main.java', files), null, 'a package outside the repo');
+  assert.equal(javaLang.resolve('org.example.check.Test', 'app/Main.java', files), null, 'a package outside the repo');
 });
 
 test('empty, comment-only and malformed input give empty results without throwing', () => {
