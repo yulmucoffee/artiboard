@@ -99,7 +99,7 @@
  },
  {
   "name": "board_post",
-  "description": "Post to a task thread and/or change your task: status, branch, pr, start, due, repo, summary. status todo releases it. No task: a notice.",
+  "description": "Post to a task thread and/or change your task: status, branch, pr, start, due, repo, summary, touches. status todo releases it. No task: a notice.",
   "inputSchema": {
    "type": "object",
    "properties": {
@@ -159,6 +159,21 @@
      "description": "≤5 lines: state, decisions, what is left",
      "type": "string"
     },
+    "touches": {
+     "description": "Files or symbols you touch, added to the list; \"\" clears",
+     "anyOf": [
+      {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      {
+       "type": "string",
+       "const": ""
+      }
+     ]
+    },
     "override": {
      "description": "Only when your person says so",
      "type": "boolean"
@@ -170,6 +185,51 @@
   },
   "annotations": {
    "destructiveHint": false,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "board_map",
+  "description": "The project's code map: files, symbols and how they connect. Ask it before grepping: explain a name, file a path, path [a, b], query words, impact (what depends on X). No question: overview.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "Project id"
+    },
+    "repo": {
+     "description": "Label or owner/name, when there are several maps",
+     "type": "string"
+    },
+    "explain": {
+     "type": "string"
+    },
+    "file": {
+     "type": "string"
+    },
+    "path": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    },
+    "query": {
+     "type": "string"
+    },
+    "impact": {
+     "type": "string"
+    },
+    "limit": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "project"
+   ]
+  },
+  "annotations": {
+   "readOnlyHint": true,
    "openWorldHint": false
   }
  },

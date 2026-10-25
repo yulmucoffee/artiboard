@@ -14,6 +14,10 @@
     {
       "source": "/api/members/:person/:action",
       "destination": "/api/members?person=:person&action=:action"
+    },
+    {
+      "source": "/api/p/:project/map",
+      "destination": "/api/map?project=:project"
     }
   ],
   "functions": {

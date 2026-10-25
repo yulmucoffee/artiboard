@@ -27,5 +27,7 @@ export const CHANGE_CASES = [
   [done, 'ben', { status: 'doing' }, false, false, 'reopening is the holder\'s'],
   [{ status: 'todo', owner: 'ana' }, 'ben', { status: 'doing', owner: 'ben' }, false, false, 'an assignment holds it too'],
   [doing, 'ben', { spec: 'docs/other.md' }, false, false, 'its details are the holder\'s'],
+  [doing, 'ana', { touches: ['server/flow.js'] }, false, true, 'the holder says what code the work touches'],
+  [doing, 'ben', { touches: ['server/flow.js'] }, false, false, 'nobody else does'],
 ];
 

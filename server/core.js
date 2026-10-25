@@ -89,6 +89,7 @@ export const stampId = (at, person) => `${at.replace(/:/g, '-')}-${person}`;
 export const BOARD_RULES = `board rules (every board):
 - Work on a task only after board_claim {id}; it returns spec, acceptance and summary. taken: someone has it, pick another.
 - Continue with board_task {id}. Post with board_post {task, text} when you decide a design, touch a file or interface another task touches, or get stuck (status "blocked").
+- With a code map: board_map {query|explain|file|impact} before grepping; board_post {task, touches:[files]} as you touch code, so overlapping tasks warn each other.
 - PR open: board_post {task, text, status "review", branch, pr, summary}. After a person merges: status "done" and summary, by the holder or the reviewer; it unblocks dependents.
 - Leaving a task unfinished: board_post {task, type "handoff", summary, status "todo"} releases it for anyone. Keep it (status doing) only if you will continue in a later session.
 - A task someone else holds (its owner, by claim or assignment): post text in its thread; anyone may move its due day (board_post {task, due}). In review, anyone reviews it (board_start lists them): status "done" after the merge, or "doing" with what to fix. The rest only when your person tells you to: add override true to board_post or board_batch, or board_claim it to take it over; the thread records it.
@@ -100,7 +101,7 @@ export const BOARD_RULES = `board rules (every board):
 // The board rules come with artiboard, so agents never write them into a project's own documents:
 // meta/rules holds what is particular to the project and meta/notes its shared status, neither how to use the board.
 // meta/protocol, where both used to mix, is retired: agents may only delete it.
-const BOARD_TALK = /\bboard_(start|task|claim|post|get|query|batch|page|projects|whoami|create_project|login_link)\b|\bif_version\b/;
+const BOARD_TALK = /\bboard_(start|task|claim|post|get|query|batch|page|map|projects|whoami|create_project|login_link)\b|\bif_version\b/;
 export function checkAgentWrite(w, index) {
   if (w.op === 'delete') return;
   if (w.path === 'meta/protocol') {

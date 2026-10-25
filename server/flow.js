@@ -1,7 +1,8 @@
 // The everyday agent actions, each one tool call: start a session, read a task, claim, post.
 // They answer in short text lines, check versions on the server and stamp times with the server clock,
 // so an agent spends no tokens on reads before a write, on version numbers or on `date`.
-import { BOARD_RULES, BoardError, now, repoName, reposOf, stampId, toBoardError } from './core.js';
+import { loadGraph } from './codemap/graph.js';
+import { BOARD_RULES, BoardError, cleanRepos, now, repoName, reposOf, stampId, toBoardError } from './core.js';
 import { TASK_STATUSES, boardStatuses, holderOf, isReady, mayChange, statusEffects, statusOf, unmetDeps } from './tasks.js';
 import { VERSION } from './version.js';
 
@@ -70,6 +71,57 @@ function detailLines(det) {
 // how much of a person's own work board_start prints: lines for work at hand, keys for work in review
 const MINE_LINES = 20, MINE_KEYS = 30;
 
+// A code map is an index document per repository, map/<key>, and its chunks, map/<key>/chunks/<n>: at most MAP_CHUNKS
+// of them, each at most MAP_CHUNK bytes of JSON, under the store's document limit with room for how each database
+// spells JSON.
+const MAP_CHUNK = 200000, MAP_CHUNKS = 60;
+// the index documents: the collection map holds nothing else
+const MAPS = { collection: 'map', limit: 50 };
+// open work: held (an owner is a non-empty string, which both databases rank above '') and not done
+const OPEN = { collection: 'tasks', where: [{ field: 'owner', op: '>', value: '' }, { field: 'status', op: '!=', value: 'done' }], limit: 200 };
+// what a map adds to the everyday answers stays a few lines: the code a task names, and where its work meets others'
+const CODE_LINES = 7, OVERLAP_LINES = 5;
+// Maps loaded in this process, by project and key, kept while their index says the same build (builtAt); a few at
+// most, the least recently used going first.
+const loaded = new Map(), LOADED = 8;
+
+const touchesOf = (d) => (Array.isArray(d.touches) ? d.touches : []);
+const touching = (t) => ({ key: t.data.key || t.id, holder: holderOf(t.data), touches: touchesOf(t.data) });
+// a few items and how many more, so a line stays short
+const few = (xs, n = 3) => xs.slice(0, n).join(', ') + (xs.length > n ? ` +${xs.length - n} more` : '');
+const mapName = (m) => m.data.label || m.data.repo || m.id;
+const mapLine = (m) => `${mapName(m)} · ${m.data.counts?.symbols ?? 0} symbols · built ${short(m.data.builtAt).slice(0, 5)} by ${m.data.by || '?'}`;
+// the call is made by now: a map that cannot be read leaves its lines out rather than turning the answer into an error
+const quiet = (e) => { console.error(e); return []; };
+
+// the maps a repo names, by label, owner/name or key; no repo, every map
+function mapsNamed(maps, repo) {
+  if (!repo) return maps;
+  const want = repoName(repo);
+  return maps.filter((m) => m.id === repo || m.data.label === repo || (want && repoName(m.data.repo) === want));
+}
+
+// a map's document id: the repo's label on the board, else owner--name
+const repoKey = (name, repos) => repos.find((r) => repoName(r.repo) === repoName(name))?.label || repoName(name).replace('/', '--');
+
+// a map with nothing in it still finds the touches two tasks share
+const NO_MAP = loadGraph({}, []);
+
+// Where open work meets: each of mine against each of others held by someone else. The map decides what an overlap is
+// (a touch both share, the same file under two names, a file of one importing one of the other's); computed when
+// printed, never stored.
+function overlapLines(mine, others, graphs) {
+  const out = [];
+  for (const a of mine) {
+    for (const b of others) {
+      if (a.key === b.key || a.holder === b.holder) continue;
+      const pair = (graphs.length ? graphs : [NO_MAP]).map((g) => g.overlaps([a, b]).pairs[0]).find(Boolean);
+      if (pair) out.push(`overlap ${a.key} ↔ ${b.key} (${b.holder}): ${pair.shared ? few(pair.shared) : few(pair.imports.map(([x, y]) => `${x} → ${y}`), 2)}`);
+    }
+  }
+  return out.slice(0, OVERLAP_LINES);
+}
+
 export function makeFlow(store) {
   const get = (project, path) => store.get(project, path);
   const query = (project, collection, opts) => store.query(project, collection, opts);
@@ -112,6 +164,45 @@ export function makeFlow(store) {
     return done;
   }
 
+  // The project's code maps, one index document per repository.
+  const mapsOf = (project) => query(project, MAPS.collection, MAPS);
+
+  // A map as a graph. The caller has just read its index; the chunks are read only when that index says the map was
+  // rebuilt since this process loaded it, and then together with the index, so a rebuild landing in between cannot
+  // mix two builds.
+  async function readMap(project, index) {
+    const key = `${project}/${index.id}`, hit = loaded.get(key);
+    loaded.delete(key);
+    if (hit && hit.builtAt === index.data.builtAt) { loaded.set(key, hit); return hit.graph; }
+    const [fresh, chunks] = await read(project, [{ path: `map/${index.id}` }, { collection: `map/${index.id}/chunks`, limit: 200 }]);
+    if (!fresh) return null;
+    const graph = loadGraph(fresh.data, chunks.filter((c) => +c.id < fresh.data.chunks).sort((a, b) => a.id - b.id).map((c) => c.data));
+    loaded.set(key, { builtAt: fresh.data.builtAt, graph });
+    if (loaded.size > LOADED) loaded.delete(loaded.keys().next().value);
+    return graph;
+  }
+  const graphsOf = async (project, maps) => (await Promise.all(maps.map((m) => readMap(project, m)))).filter(Boolean);
+
+  // Where these tasks' touches meet the rest of the open work; only a task that touches something costs a read, and a
+  // map for the import hop is loaded only when other work touches something too.
+  // maps: the map documents, or their read still under way.
+  async function meeting(project, mine, maps) {
+    if (!mine.length) return [];
+    const [open, docs] = await Promise.all([query(project, OPEN.collection, OPEN).then((first) => rest(project, first, OPEN)), maps]);
+    const others = open.map(touching).filter((t) => t.touches.length);
+    return others.length ? overlapLines(mine, others, await graphsOf(project, docs)) : [];
+  }
+
+  // What board_claim and board_task add to a task: the code its text and touches name, from its repo's map (every map
+  // when it names no repo), and where its touches meet other open work. A board without a map and a task that touches
+  // nothing read nothing more.
+  async function codeLines(project, key, d, det, maps) {
+    const mine = { key, holder: holderOf(d), touches: touchesOf(d) }, named = mapsNamed(maps, d.repo);
+    const ask = { title: d.title, spec: det?.data?.spec, acceptance: det?.data?.acceptance, touches: mine.touches };
+    const code = (await graphsOf(project, named)).flatMap((g) => g.context(ask, { limit: CODE_LINES }).lines).slice(0, CODE_LINES);
+    return [...(code.length ? ['code:', ...code] : []), ...await meeting(project, mine.touches.length ? [mine] : [], named)];
+  }
+
   // Ready work: todo tasks nobody holds whose deps are all done. waitingOn is the stored answer the page and the
   // ready query rely on; here it is checked against the dep tasks themselves and repaired in passing, so a task
   // written without it, or a dep finished while no page was open, still shows up (and a stale one stays out).
@@ -148,21 +239,24 @@ export function makeFlow(store) {
     const newest = notices.map((n) => n.data.at).filter((a) => typeof a === 'string').sort().pop();
     const moving = !peek && newest && (!since || newest > since) ? moveCursor(member, project, got.cursor, newest).catch(() => {}) : null;
     const config = got.config?.data || {}, scope = repoScope(repo, project, config);
+    // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
+    const mine = got.owned.filter((t) => statusOf(t.data) !== 'done');
+    // where your work meets others', read alongside the ready work
+    const meets = meeting(project, mine.map(touching).filter((t) => t.touches.length), got.maps).catch(quiet);
     let free = (ready ? await readyWork(member, project, got.todo) : []).sort(byDocKey);
     await moving;
     const elsewhere = scope.want ? free.filter((t) => { const r = taskRepo(t.data, scope.repos); return r && r !== scope.want; }).length : 0;
     if (scope.want) free = free.filter(scope.here);
     // someone else's work waiting for a review, which anyone may finish after the merge or send back
     const toReview = got.inReview.filter((t) => holderOf(t.data) !== me && scope.here(t)).sort(byDocKey);
-    // a todo task you own was assigned to you and not started: it is listed as yours, not as anyone's ready work
-    const mine = got.owned.filter((t) => statusOf(t.data) !== 'done');
 
     const out = [`${me} · ${project}${config.milestone ? ` · ${config.milestone}` : ''} · artiboard ${VERSION}`];
     if (scope.repos.length) out.push(`repos: ${repoList(scope.repos)}`);
+    out.push(...got.maps.map((m) => `code map: ${mapLine(m)}`));
     if (scope.stray) out.push(scope.stray);
     if (rules) out.push(...rulesLines(got.rules, got.notes));
     out.push(...noticeLines(notices, got.latest.length, since));
-    out.push(...mineLines(mine, me));
+    out.push(...mineLines(mine, me), ...await meets);
     if (ready) out.push(...readyLines(free, toReview, ready, elsewhere));
     return out.join('\n');
   }
@@ -178,6 +272,7 @@ export function makeFlow(store) {
       notes: rules && { path: 'meta/notes' },
       latest: { collection: 'notices', order: [{ field: 'at', dir: 'desc' }], limit: 20 },
       inReview: ready && { collection: 'tasks', where: [{ field: 'status', op: '==', value: 'review' }], limit: 200 },
+      maps: MAPS,
     };
     const names = Object.keys(wanted).filter((k) => wanted[k]);
     const results = await read(project, names.map((k) => wanted[k]));
@@ -271,7 +366,7 @@ export function makeFlow(store) {
   async function task(project, id, { thread = 8 } = {}) {
     // the latest messages come in the same round trip, then those before the summary drop out. A message posted with
     // the summary carries its time, so it stays: it is what the summary's writer said (a fix list, "PR open").
-    const [t, det, latest = []] = await read(project, [{ path: `tasks/${id}` }, { path: `details/${id}` },
+    const [t, det, maps, latest = []] = await read(project, [{ path: `tasks/${id}` }, { path: `details/${id}` }, MAPS,
       ...(thread ? [{ collection: `tasks/${id}/messages`, order: [{ field: 'at', dir: 'desc' }], limit: thread }] : [])]);
     if (!t) throw new BoardError('not_found', `no task ${id}`);
     const d = t.data;
@@ -282,7 +377,8 @@ export function makeFlow(store) {
     if (d.deps?.length) out.push(`deps ${d.deps.join(', ')}${d.waitingOn?.length ? ` · waiting on ${d.waitingOn.join(', ')}` : ''}`);
     const dates = [day(d.start) && `start ${d.start}`, day(d.due) && `due ${d.due}`, d.doneAt && `done ${short(d.doneAt)}`, d.archivedAt && `archived ${short(d.archivedAt)}`].filter(Boolean);
     if (dates.length) out.push(dates.join(' · '));
-    out.push(...detailLines(det));
+    if (touchesOf(d).length) out.push(`touches: ${touchesOf(d).join(', ')}`);
+    out.push(...detailLines(det), ...await codeLines(project, d.key || id, d, det, maps).catch(quiet));
     if (thread) {
       out.push(msgs.length ? `messages${since ? ' after summary' : ''}:` : `messages${since ? ' after summary' : ''}: none`);
       msgs.forEach((m) => out.push(msgLine(m.data)));
@@ -294,11 +390,13 @@ export function makeFlow(store) {
   // override takes over a task someone else holds (not a done one), when the agent's person says so.
   async function claim(member, project, id, { text, session, override } = {}) {
     const me = member.person;
-    const [det, config] = await read(project, [{ path: `details/${id}` }, { path: 'meta/config' }]);
+    const [det, config, maps] = await read(project, [{ path: `details/${id}` }, { path: 'meta/config' }, MAPS]);
+    let claimed;
     const result = await retrying(async () => {
       const t = await get(project, `tasks/${id}`);
       if (!t) throw new BoardError('not_found', `no task ${id}`);
       const d = t.data, status = statusOf(d), holder = holderOf(d);
+      claimed = { ...d, owner: me };
       // done work is nobody's to take, so it names no holder
       const taken = () => new BoardError('taken', `${d.key || id} is ${status}${holder && status !== 'done' ? `, held by ${holder}` : ''}; pick another`);
       if (status === 'done') throw taken();
@@ -321,7 +419,7 @@ export function makeFlow(store) {
       ]);
       return from ? `took over ${id} from ${from}` : `claimed ${id}`;
     });
-    return [result, ...detailLines(det)].join('\n');
+    return [result, ...detailLines(det), ...await codeLines(project, claimed.key || id, claimed, det, maps).catch(quiet)].join('\n');
   }
 
   // Finished tasks leave every dependent's waitingOn. A dependent changed in the same call takes the key out with its own
@@ -350,15 +448,19 @@ export function makeFlow(store) {
   // the key out of every dependent's waitingOn.
   // tasks, in place of task, gives several tasks one status and one message in one write, all or none (a deploy
   // finishing a list of reviews).
-  async function post(member, project, { task: id, tasks, text, type, status, branch, pr, start, due, repo, summary, override }) {
+  // touches adds files and symbols to what the task's work touches ("" or [] clears them), and the answer says where
+  // they meet other open work.
+  async function post(member, project, { task: id, tasks, text, type, status, branch, pr, start, due, repo, summary, touches, override }) {
     const me = member.person;
+    // a leading ./ names the same file
+    const touched = touches === undefined ? undefined : [...new Set((touches || []).map((x) => x.trim().replace(/^\.\//, '')).filter(Boolean))];
     // the asked-for change, empty strings clearing a field
-    const change = Object.fromEntries(Object.entries({ status, branch, pr, start, due, repo, summary }).filter(([, v]) => v !== undefined));
+    const change = Object.fromEntries(Object.entries({ status, branch, pr, start, due, repo, summary, touches: touched }).filter(([, v]) => v !== undefined));
     const asked = Object.keys(change);
     if (tasks && (id || asked.some((k) => k !== 'status'))) throw new BoardError('invalid_argument', 'tasks takes status and text only, and no task');
     const ids = tasks ? [...new Set(tasks)] : id ? [id] : null;
     if (!ids) {
-      if (asked.length) throw new BoardError('invalid_argument', 'status, branch, pr, start, due, repo and summary need a task');
+      if (asked.length) throw new BoardError('invalid_argument', 'status, branch, pr, start, due, repo, summary and touches need a task');
       if (!text?.trim()) throw new BoardError('invalid_argument', 'a notice needs text');
       const at = now();
       await apply(member, project, [{ op: 'set', path: `notices/n-${stampId(at, me)}`, if_absent: true,
@@ -371,7 +473,8 @@ export function makeFlow(store) {
       const statuses = boardStatuses((await get(project, 'meta/config'))?.data);
       if (statuses.indexOf(status) < 0) throw new BoardError('invalid_argument', `status ${status} is not on this board (${statuses.join(', ')}); a board adds statuses in meta/config.statuses`);
     }
-    return retrying(async () => {
+    let posted = null;
+    const line = await retrying(async () => {
       const got = await read(project, [...ids.map((i) => ({ path: `tasks/${i}` })), ...(summary !== undefined ? [{ path: `details/${id}` }] : [])]);
       const ts = got.slice(0, ids.length), det = got[ids.length] ?? null;
       const at = now(), patches = new Map(), writes = [], keys = [];
@@ -386,12 +489,14 @@ export function makeFlow(store) {
         const patch = { updatedAt: at, lastMessageAt: at, lastMessageBy: me };
         for (const f of ['branch', 'pr', 'start', 'due', 'repo']) if (f in change) patch[f] = change[f] || null;
         if (status !== undefined) Object.assign(patch, { status }, statusEffects(d, status, at));
+        if (touched) patch.touches = touched.length ? [...new Set([...touchesOf(d), ...touched])] : null;
+        if (touched?.length) posted = { ...touching({ id: t.id, data: { ...d, ...patch } }), repo: 'repo' in patch ? patch.repo : d.repo };
         // with no text, the thread still says what changed
         const said = `${text?.trim() || [
           status && `status ${status}`, branch !== undefined && `branch ${branch || 'none'}`, pr !== undefined && `pr ${pr || 'none'}`,
           start !== undefined && `start ${start || 'none'}${day(d.start) ? ` (was ${d.start})` : ''}`,
           due !== undefined && `due ${due || 'none'}${day(d.due) ? ` (was ${d.due})` : ''}`,
-          repo !== undefined && `repo ${repo || 'none'}`, summary !== undefined && 'summary updated',
+          repo !== undefined && `repo ${repo || 'none'}`, touched && `touches ${touched.join(', ') || 'none'}`, summary !== undefined && 'summary updated',
         ].filter(Boolean).join(' · ') || 'updated'}${overriding ? ` (override; held by ${holder})` : ''}`;
         const update = { op: 'update', path: `tasks/${t.id}`, if_version: t.version, data: patch, ...(overriding && { override: true }) };
         patches.set(t.id, patch);
@@ -411,6 +516,8 @@ export function makeFlow(store) {
       await apply(member, project, writes);
       return [`ok ${keys.join(', ')}${status ? ` → ${status}` : ''}`, unblocked.length && `unblocked ${unblocked.sort(keyOrder).join(', ')}`].filter(Boolean).join(' · ');
     });
+    if (!posted) return line;
+    return [line, ...await meeting(project, [posted], mapsOf(project).then((maps) => mapsNamed(maps, posted.repo))).catch(quiet)].join('\n');
   }
 
   // An agent's batch writes; the database holds them to the task rules. With override (only when the agent's person
@@ -433,5 +540,60 @@ export function makeFlow(store) {
     return apply(member, project, out);
   }
 
-  return { start, task, claim, post, batch, projectFor };
+  // board_map: one question to one repository's map, answered in lines; no question, the map's overview. repo picks
+  // the map by label or owner/name when the project has several.
+  async function map(project, { repo, explain, file, path: pair, query: words, impact, limit } = {}) {
+    const asked = Object.entries({ explain, file, path: pair, query: words, impact }).filter(([, v]) => v !== undefined);
+    if (asked.length > 1) throw new BoardError('invalid_argument', 'ask one of explain, file, path, query and impact at a time');
+    const all = await mapsOf(project), maps = mapsNamed(all, repo);
+    if (!all.length) return `no code map on ${project}; one is built from a checkout with the artiboard skill's scripts/codemap.mjs`;
+    if (!maps.length) throw new BoardError('not_found', `no code map for ${repo}; maps: ${all.map(mapName).join(', ')}`);
+    if (maps.length > 1) {
+      if (asked.length) throw new BoardError('invalid_argument', `${maps.length} code maps here (${maps.map(mapName).join(', ')}); pass repo`);
+      return [...maps.map(mapLine), 'pass repo for one map\'s overview'].join('\n');
+    }
+    const graph = await readMap(project, maps[0]);
+    if (!graph) throw new BoardError('not_found', `the code map of ${mapName(maps[0])} was just dropped`);
+    const [how, arg] = asked[0] || ['overview'], opts = limit ? { limit } : {};
+    const answer = how === 'path' ? graph.path(arg[0], arg[1]) : how === 'overview' ? graph.overview(opts) : graph[how](arg, opts);
+    return answer.lines.join('\n') || 'nothing found';
+  }
+
+  // A repository's map as the build script made it: its chunks, the last build's chunks beyond the new count deleted,
+  // then the index that says how many, in one write, so a reader sees one build whole. The key, who built it and when
+  // are the board's to say. A rebuild replaces the map; one racing another rereads and writes again.
+  async function setMap(member, project, { repo, index, chunks } = {}) {
+    const [{ repo: name }] = cleanRepos([repo]);
+    if (index?.version !== 1) throw new BoardError('invalid_argument', 'index.version must be 1: build the map with this site\'s version of artiboard');
+    if (!Array.isArray(chunks) || chunks.length > MAP_CHUNKS) throw new BoardError('invalid_argument', `chunks must be a list of at most ${MAP_CHUNKS}`);
+    chunks.forEach((c, i) => {
+      if (Buffer.byteLength(JSON.stringify(c) ?? '') > MAP_CHUNK) throw new BoardError('invalid_argument', `chunk ${i} is over ${MAP_CHUNK} bytes of JSON; build smaller chunks`, i);
+    });
+    const write = async () => {
+      const [config, maps] = await read(project, [{ path: 'meta/config' }, MAPS]);
+      const repos = reposOf(config?.data), key = repoKey(name, repos), old = maps.find((m) => m.id === key);
+      const label = repos.find((r) => repoName(r.repo) === repoName(name))?.label || index.label;
+      const writes = chunks.map((data, n) => ({ op: 'set', path: `map/${key}/chunks/${n}`, data }));
+      for (let n = chunks.length; n < (old?.data.chunks || 0); n++) writes.push({ op: 'delete', path: `map/${key}/chunks/${n}` });
+      writes.push({ op: 'set', path: `map/${key}`, ...(old ? { if_version: old.version } : { if_absent: true }),
+        data: { ...index, repo: name, ...(label && { label }), builtAt: now(), by: member.person, chunks: chunks.length } });
+      await apply(member, project, writes);
+      return { repoKey: key, counts: index.counts, chunks: chunks.length };
+    };
+    try { return await write(); } catch (e) {
+      if (!['version_conflict', 'already_exists'].includes(toBoardError(e).code)) throw e;
+      return write();
+    }
+  }
+
+  // A repository's map and its chunks, gone in one write.
+  async function dropMap(member, project, repo) {
+    const [m, ...more] = mapsNamed(await mapsOf(project), repo);
+    if (!m || more.length) throw new BoardError('not_found', `no single code map for ${repo}`);
+    const chunks = Array.from({ length: m.data.chunks || 0 }, (_, n) => ({ op: 'delete', path: `map/${m.id}/chunks/${n}` }));
+    await apply(member, project, [...chunks, { op: 'delete', path: `map/${m.id}`, if_version: m.version }]);
+    return `dropped the code map of ${mapName(m)}`;
+  }
+
+  return { start, task, claim, post, batch, projectFor, map, setMap, dropMap };
 }

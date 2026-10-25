@@ -6,7 +6,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const FILES = ['skills/artiboard/assets/board.html', 'server/public/index.html', 'tests/smoke.cjs'];
 const OPTIONS = { parser: 'babel', printWidth: 120, singleQuote: true, trailingComma: 'none' };
-const START = '  // ---------- task rules:', END = '  // ---------- end of task rules ----------';
+// the copies the page carries of server modules are left as their inline scripts write them
+const COPIES = [
+  ['  // ---------- task rules:', '  // ---------- end of task rules ----------'],
+  ['  // ---------- code map graph:', '  // ---------- end of code map graph ----------'],
+];
 
 let prettier;
 try { prettier = await import('prettier'); } catch { console.error('prettier is not installed: npm install --no-save prettier@3.9.10'); process.exit(1); }
@@ -15,14 +19,16 @@ try { prettier = await import('prettier'); } catch { console.error('prettier is 
 async function shaped(src, html) {
   if (!html) return prettier.format(src, OPTIONS);
   const open = src.lastIndexOf('<script>\n') + '<script>\n'.length, close = src.lastIndexOf('</script>');
-  let script = src.slice(open, close), rules = null;
-  const a = script.indexOf(START), b = script.indexOf(END);
-  if (a >= 0 && b > a) {
-    rules = script.slice(a, b + END.length);
-    script = script.slice(0, a) + '// __TASK_RULES__' + script.slice(b + END.length);
-  }
+  let script = src.slice(open, close);
+  const kept = [];
+  COPIES.forEach(([start, end], i) => {
+    const a = script.indexOf(start), b = script.indexOf(end);
+    if (a < 0 || b < a) return;
+    kept[i] = script.slice(a, b + end.length);
+    script = script.slice(0, a) + `// __COPY_${i}__` + script.slice(b + end.length);
+  });
   let out = await prettier.format(script, OPTIONS);
-  if (rules) out = out.replace(/^[ \t]*\/\/ __TASK_RULES__[ \t]*$/m, () => rules);
+  kept.forEach((text, i) => { out = out.replace(new RegExp(`^[ \\t]*// __COPY_${i}__[ \\t]*$`, 'm'), () => text); });
   return src.slice(0, open) + out + src.slice(close);
 }
 

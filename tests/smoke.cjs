@@ -84,6 +84,7 @@ function boot({
     writes = [],
     errors = [],
     listened = [],
+    reads = [],
     vers = {};
   const notify = () => subs.slice().forEach((s) => s());
   const put = (p, f, o) => {
@@ -107,6 +108,11 @@ function boot({
     return {
       orderBy: (f, d) => coll(p, { ...o, order: f, dir: d }),
       limit: (n) => coll(p, { ...o, limit: n }),
+      // one read, as a hosted site's runtime offers: the page reads a code map's chunks this way
+      get: async () => {
+        reads.push(p);
+        return snapColl(p, o);
+      },
       onSnapshot(cb) {
         listened.push(p);
         const run = () => cb(snapColl(p, o));
@@ -179,6 +185,7 @@ function boot({
     writes,
     errors,
     listened,
+    reads,
     notify,
     sneak,
     key: (k) => w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, bubbles: true })),
@@ -988,6 +995,177 @@ const meLane = (d) => {
     'the status menu lists it before done, and a task in it shows as such'
   );
   b.key('Escape');
+
+  console.log('# code: what tasks touch, where they overlap, the code map');
+  const codemap = (d) => d.querySelector('section[data-fold="codemap"]');
+  const touched = (d) => [...d.querySelectorAll('.sheet .touch > span')].map((x) => x.textContent).join();
+  const search = (d, v) => {
+    const q = d.querySelector('#codemapBody .mapsearch');
+    if (q) {
+      q.value = v;
+      q.dispatchEvent(new d.defaultView.Event('input'));
+    }
+  };
+  b = boot({
+    versions: true,
+    docs: {
+      'tasks/M1-5': {
+        key: 'M1-5',
+        title: 'Units',
+        feature: 'Data',
+        status: 'doing',
+        owner: 'ana',
+        deps: [],
+        waitingOn: [],
+        claimedBy: { who: 'ana', agent: true, at: T0 },
+        touches: ['shared/units.ts', 'server/flow.js#start'],
+        updatedAt: T0
+      },
+      'tasks/M1-6': {
+        key: 'M1-6',
+        title: 'Totals',
+        feature: 'UI',
+        status: 'review',
+        owner: 'ben',
+        deps: [],
+        waitingOn: [],
+        claimedBy: { who: 'ben', agent: true, at: T0 },
+        touches: ['web/total.tsx', 'shared/units.ts'],
+        updatedAt: T0
+      },
+      // done work that touched the same file overlaps nothing any more
+      'tasks/M1-4': { ...seed()['tasks/M1-4'], touches: ['shared/units.ts'] },
+      'map/api': {
+        repo: 'acme/api',
+        label: 'api',
+        commit: '0123456789abcdef',
+        builtAt: T0,
+        by: 'ben',
+        root: '',
+        counts: { files: 6, symbols: 1, edges: 3, docs: 0 },
+        chunks: 1,
+        communities: [
+          { c: 0, name: 'shared', n: 3, top: ['shared/units.ts', 'shared/units.ts#toMeters', 'web/total.tsx'] },
+          { c: 1, name: 'server', n: 3, top: ['server/flow.js'] }
+        ],
+        god: ['shared/units.ts#toMeters', 'shared/units.ts'],
+        langs: { ts: 4, js: 2 },
+        version: 1
+      },
+      'map/api/chunks/0': {
+        nodes: [
+          { i: 'server/flow.js', k: 'file', n: 'flow.js', f: 'server/flow.js', l: 0, c: 1 },
+          { i: 'shared/units.ts', k: 'file', n: 'units.ts', f: 'shared/units.ts', l: 0, c: 0 },
+          { i: 'shared/units.ts#toMeters', k: 'sym', n: 'toMeters', f: 'shared/units.ts', l: 3, t: 'fn', c: 0, e: 1 },
+          { i: 'web/total.tsx', k: 'file', n: 'total.tsx', f: 'web/total.tsx', l: 0, c: 0 }
+        ],
+        edges: [
+          ['shared/units.ts', 'shared/units.ts#toMeters', 'defines', 'x'],
+          ['web/total.tsx', 'shared/units.ts', 'imports', 'x'],
+          ['web/total.tsx', 'shared/units.ts#toMeters', 'calls', 'x']
+        ]
+      }
+    }
+  });
+  all.push(b);
+  await tick();
+  await heal();
+  b.pick('ana');
+  await tick();
+  ok(
+    !!codemap(b.d) && codemap(b.d).classList.contains('folded') && !b.listened.includes('map'),
+    'the code map section starts folded and reads nothing'
+  );
+  const flagged = (sel) =>
+    [...b.d.querySelectorAll(sel)]
+      .filter((x) => x.querySelector('.overlap'))
+      .map((x) => x.dataset.k)
+      .join();
+  ok(flagged('tr.item') === 'M1-5,M1-6', 'item rows flag the open tasks that touch the same file');
+  codemap(b.d)?.querySelector('.fold').click();
+  await tick();
+  const mapText = () => b.d.getElementById('codemapBody')?.textContent || '';
+  ok(
+    b.listened.includes('map') &&
+      /shared · 3 files · units\.ts, units\.ts#toMeters, total\.tsx/.test(mapText()) &&
+      /server · 3 files · flow\.js/.test(mapText()) &&
+      /by Ben · 0123456/.test(mapText()) &&
+      /Most connected: shared\/units\.ts#toMeters/.test(mapText()),
+    "unfolded, it shows each repository's map: its groups of files, who built it, the most connected names"
+  );
+  search(b.d, 'toM');
+  search(b.d, 'toMeters');
+  await tick();
+  search(b.d, 'toMeters');
+  await tick();
+  ok(
+    b.reads.filter((p) => p === 'map/api/chunks').length === 1 &&
+      !b.listened.some((p) => /chunks/.test(p)) &&
+      /toMeters/.test(b.d.querySelector('#codemapBody .maplines')?.textContent),
+    "a search reads the map's chunks once, without listening, and answers in lines"
+  );
+  b.d.querySelector('tr.item[data-k="M1-5"]').click();
+  await tick();
+  ok(touched(b.d) === 'shared/units.ts,server/flow.js#start', "the sheet's Code block lists what the task touches");
+  ok(
+    b.d.querySelector('.sheet .overlaps')?.textContent === 'overlaps with M1-6 (Ben): shared/units.ts',
+    'and the other open task touching the same file, not the done one'
+  );
+  b.sneak('tasks/M1-5', (c) => ({ ...c, touches: c.touches.concat(['docs/units.md']) }));
+  const touchInput = b.d.getElementById('fTouch');
+  if (touchInput) {
+    touchInput.value = 'server/app.js';
+    b.d.querySelector('.sheet .code .form-row .btn').click();
+  }
+  await tick();
+  await tick();
+  const saidLast = Object.keys(b.store)
+    .filter((k) => k.startsWith('tasks/M1-5/messages/'))
+    .map((k) => b.store[k])
+    .pop();
+  ok(
+    JSON.stringify(b.store['tasks/M1-5'].touches) ===
+      '["shared/units.ts","server/flow.js#start","docs/units.md","server/app.js"]' &&
+      !!saidLast &&
+      saidLast.author === 'ana' &&
+      /^Touches .* → .*server\/app\.js$/.test(saidLast.text),
+    'a person adds a touch: the task keeps what an agent added meanwhile, and the thread says what changed'
+  );
+  [...b.d.querySelectorAll('.sheet .touch')]
+    .find((x) => x.querySelector('span').textContent === 'server/flow.js#start')
+    ?.querySelector('button')
+    .click();
+  await tick();
+  await tick();
+  ok(
+    JSON.stringify(b.store['tasks/M1-5'].touches) === '["shared/units.ts","docs/units.md","server/app.js"]',
+    'and takes one away from its chip'
+  );
+  b.key('Escape');
+  b.key('2');
+  await tick();
+  ok(
+    flagged('.card') === 'M1-5,M1-6' &&
+      b.d.querySelector('.card[data-k="M1-5"] .overlap').title === 'overlaps with M1-6 (Ben): shared/units.ts',
+    'kanban cards carry the same flag, which says what overlaps'
+  );
+
+  b = boot();
+  all.push(b);
+  await tick();
+  await heal();
+  b.pick('ana');
+  await tick();
+  b.d.querySelector('tr.item[data-k="M1-1"]').click();
+  await tick();
+  const noCode = !!b.d.querySelector('.sheet') && !b.d.querySelector('.sheet .code');
+  b.key('Escape');
+  codemap(b.d)?.querySelector('.fold').click();
+  await tick();
+  ok(
+    noCode && b.d.getElementById('codemapBody')?.textContent === 'No code map yet.',
+    'a project without a map or touches shows no Code block, and the section says there is no map yet'
+  );
 
   console.log('# view-only viewer');
   b = boot({ user: fakeUser('u_ana', false) });

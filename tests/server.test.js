@@ -4,14 +4,19 @@
 // (`supabase start` gives a local one); it adds a smoke-<random> project and members, and removes them afterwards.
 // Run: npm test
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { createServer, request } from 'node:http';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { gzipSync } from 'node:zlib';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { makeApp } from '../server/app.js';
+import { buildGraph } from '../server/codemap/build.js';
 import { loadConfig, openStore } from '../server/config.js';
 import { toBoardError } from '../server/core.js';
 import { openSqlite } from '../server/store/sqlite.js';
@@ -20,6 +25,14 @@ import { entryFor, setPerson } from '../server/members.js';
 import { CHANGE_CASES } from './task-cases.js';
 
 const backends = [{ name: 'sqlite', env: { ARTIBOARD_BACKEND: 'sqlite' } }];
+// A small checkout to map: report.js imports orders.js, which imports units.js; a doc names a function and a file.
+const SHOP = new Map(Object.entries({
+  'shared/units.js': 'export function toCents(amount) {\n  return Math.round(amount * 100);\n}\n\nexport function fromCents(cents) {\n  return cents / 100;\n}\n',
+  'api/orders.js': "import { toCents } from '../shared/units.js';\n\nexport function orderTotal(items) {\n  return toCents(items.reduce((sum, i) => sum + i.price, 0));\n}\n",
+  'api/report.js': "import { orderTotal } from './orders.js';\n\nexport function monthlyReport(orders) {\n  return orders.map((o) => orderTotal(o.items));\n}\n",
+  'docs/money.md': '# Money\n\nAmounts go through `toCents` in shared/units.js before they are stored.\n',
+}));
+const runCli = promisify(execFile);
 if (process.env.AB_SUPABASE === '1') backends.push({ name: 'supabase', env: { ARTIBOARD_BACKEND: 'supabase' } });
 
 for (const backend of backends) {
@@ -27,6 +40,8 @@ for (const backend of backends) {
     const R = Math.random().toString(36).slice(2, 8);
     const P = `smoke-${R}`;
     const C = `scratch-${R}`;
+    // a project with a code map of SHOP, which the code map tests share
+    const M = `map-${R}`, SHOP_REPO = `acme-${R}/shop`;
     const K = (n) => `S${R}-${n}`;
     let dir, store, http, BASE, cfg, tokens = {}, people = {}, board;
 
@@ -67,6 +82,7 @@ for (const backend of backends) {
     after(async () => {
       await board?.close();
       await store.dropProject(P).catch(() => {});
+      await store.dropProject(M).catch(() => {});
       for (const m of Object.values(people)) await store.removeMember(m.uid).catch(() => {});
       store.close();
       http.closeAllConnections();
@@ -88,10 +104,11 @@ for (const backend of backends) {
     test('lists the tools, the projects and who is connected', async () => {
       const { tools } = await board.listTools();
       assert.deepEqual(tools.map((t) => t.name).sort(), ['board_batch', 'board_claim', 'board_create_project', 'board_get', 'board_login_link',
-        'board_page', 'board_post', 'board_projects', 'board_query', 'board_start', 'board_task', 'board_whoami']);
+        'board_map', 'board_page', 'board_post', 'board_projects', 'board_query', 'board_start', 'board_task', 'board_whoami']);
       assert.ok(!JSON.stringify(tools).includes('$schema'), 'listed schemas carry no boilerplate');
       assert.ok(!JSON.stringify(tools).includes('"pattern"'), 'nor patterns zod enforces on the call');
-      assert.ok(JSON.stringify(tools).length < 7200, `every session reads the listing, so it stays small (${JSON.stringify(tools).length} chars)`);
+      // 7200 until board_map and board_post's touches added 862 chars: one tool in place of grepping a checkout
+      assert.ok(JSON.stringify(tools).length < 8100, `every session reads the listing, so it stays small (${JSON.stringify(tools).length} chars)`);
       assert.ok(!tools.find((t) => t.name === 'board_login_link').annotations.readOnlyHint, 'a sign-in link is minted, so clients must not auto-approve it as a read');
       // the listing is the agents' protocol: it changes only on purpose, with UPDATE_SNAPSHOTS=1 npm test and the diff in review
       const snap = new URL('./tools.snapshot.json', import.meta.url), now = JSON.stringify(tools, null, 1) + '\n';
@@ -618,7 +635,8 @@ for (const backend of backends) {
       assert.match(s, new RegExp(`^repos: ${api} \\(api\\) · ${web}$`, 'm'));
       assert.match(s, /^board rules \(every board\):$/m);
       const rules = /^board rules \(every board\):\n(?:- .*\n)+/m.exec(s)[0];
-      assert.ok(rules.length < 1800, `every session that does board work reads the board rules once, so they stay short (${rules.length} chars)`);
+      // 1800 until the code map bullet added 166 chars: agents ask the map before grepping and post what they touch
+      assert.ok(rules.length < 2000, `every session that does board work reads the board rules once, so they stay short (${rules.length} chars)`);
       assert.match(s, new RegExp(`^project rules \\(rev 2 · ${people.admin.person} \\d\\d-\\d\\d\\):\n1\\. Roles\n- the api is ours$`, 'm'));
       assert.match(s, new RegExp(`^${K('r1')} \\[?.*repo:api.* repo 1$`, 'm'));
       assert.match(s, new RegExp(`^${K('r3')} repo 3$`, 'm'), 'tasks that name no repo are anyone\'s');
@@ -769,6 +787,189 @@ for (const backend of backends) {
       assert.match(bundled, /<title>Project Board<\/title>/);
       assert.match(bundled, /^<!doctype html>[\s\S]*<meta name="viewport"[\s\S]*<script src="\/shim.js"><\/script>\n<\/head>/, 'the bundled page is wrapped in a document with a viewport, its <header> notwithstanding');
       assert.equal((await api('/p/no-such-project')).status, 200, 'unknown projects look like any other board until sign-in');
+    });
+
+    test('a post says what code a task touches, and two open tasks touching one file warn both holders', async () => {
+      const id = `tc-${R}`, at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
+      await store.createProject(null, { id, title: 'Touches', lang: 'en' });
+      const other = await connect(tokens.member);
+      try {
+        const task = (n) => ({ op: 'set', path: `tasks/${n}`, data: { key: n, title: `touch ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at } });
+        await store.apply(null, id, [task('T-1'), task('T-2'), { op: 'set', path: 'details/T-1', data: { spec: 'round in shared/units.js' } }]);
+        assert.doesNotMatch((await call(board, 'board_claim', { project: id, id: 'T-1' })).value, /^(code|overlap)/m, 'a board without a map adds nothing to a claim');
+        await call(other, 'board_claim', { project: id, id: 'T-2' });
+        const post = async (c, args) => (await call(c, 'board_post', { project: id, ...args })).value;
+        const touches = async (n) => (await call(board, 'board_get', { project: id, path: `tasks/${n}` })).value.data.touches;
+        const said = async (n) => (await call(board, 'board_query', { project: id, collection: `tasks/${n}/messages`, order_by: [{ field: 'at', dir: 'desc' }], limit: 1 })).value.docs[0].data.text;
+        const start = async (c) => (await call(c, 'board_start', { project: id, ready: 0, rules: false, peek: true })).value;
+
+        assert.equal(await post(board, { task: 'T-1', touches: ['shared/units.js', './api/orders.js'] }), 'ok T-1', 'nothing else touches them yet');
+        assert.deepEqual(await touches('T-1'), ['shared/units.js', 'api/orders.js']);
+        assert.equal(await said('T-1'), 'touches shared/units.js, api/orders.js', 'the thread says what the work touches');
+        assert.match(await post(other, { task: 'T-1', touches: ['web/app.js'] }), /^not_yours: /, 'a task\'s touches are its holder\'s');
+        assert.equal(await post(other, { task: 'T-2', text: 'rounding half up', touches: ['shared/units.js'] }), `ok T-2\noverlap T-2 ↔ T-1 (${me}): shared/units.js`,
+          'the second holder hears of the first');
+        assert.equal(await post(board, { task: 'T-1', touches: ['web/app.js'] }), `ok T-1\noverlap T-1 ↔ T-2 (${them}): shared/units.js`, 'and the first of the second');
+        assert.deepEqual(await touches('T-1'), ['shared/units.js', 'api/orders.js', 'web/app.js'], 'a post adds to the list');
+        assert.match(await start(board), new RegExp(`^mine:\\nT-1 doing touch T-1\\noverlap T-1 ↔ T-2 \\(${them}\\): shared/units\\.js$`, 'm'), 'the start shows each holder');
+        assert.match(await start(other), new RegExp(`^overlap T-2 ↔ T-1 \\(${me}\\): shared/units\\.js$`, 'm'));
+        assert.doesNotMatch(await start(board), /^code map/m, 'no map, no map line');
+        const shown = (await call(board, 'board_task', { project: id, id: 'T-1', thread: 0 })).value;
+        assert.match(shown, /^touches: shared\/units\.js, api\/orders\.js, web\/app\.js$/m);
+        assert.match(shown, new RegExp(`^overlap T-1 ↔ T-2 \\(${them}\\): shared/units\\.js$`, 'm'));
+        assert.doesNotMatch(shown, /^code:/m);
+
+        assert.equal(await post(board, { task: 'T-1', touches: '' }), 'ok T-1', '"" clears them');
+        assert.equal(await touches('T-1'), undefined);
+        assert.equal(await said('T-1'), 'touches none');
+        assert.doesNotMatch(await start(other), /^overlap/m, 'and the overlap is gone');
+        assert.equal(await post(other, { task: 'T-2', touches: [] }), 'ok T-2', '[] clears too');
+        assert.match(await post(board, { tasks: ['T-1', 'T-2'], touches: ['x.js'] }), /^invalid_argument: /, 'several tasks at once take status and text only');
+        assert.match(await post(board, { touches: ['x.js'] }), /^invalid_argument: /, 'a notice touches nothing');
+      } finally {
+        await other.close();
+        await store.dropProject(id);
+      }
+    });
+
+    test('a member uploads a code map through the API; a viewer cannot, nor a chunk over 200,000 bytes', async () => {
+      await store.createProject(null, { id: M, title: 'Map', lang: 'en', repos: [{ repo: SHOP_REPO, label: 'shop' }] });
+      const { index, chunks } = buildGraph(SHOP, { repo: SHOP_REPO, by: 'build' });
+      const up = (token, body, path = `/api/p/${M}/map`) => api(path, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body });
+      const r = await up(tokens.member, { repo: SHOP_REPO, index, chunks });
+      assert.equal(r.status, 200);
+      assert.deepEqual(await r.json(), { repoKey: 'shop', counts: index.counts, chunks: chunks.length }, 'the map is kept under the repo\'s label');
+      const stored = (await call(board, 'board_get', { project: M, path: 'map/shop' })).value.data;
+      assert.equal(stored.by, people.member.person, 'the uploader is who built it');
+      assert.equal(stored.repo, SHOP_REPO);
+      assert.equal(stored.chunks, chunks.length);
+      assert.match(stored.builtAt, /^\d{4}-\d\d-\d\dT/, 'stamped with the server clock');
+
+      const refused = async (body, why, status = 400) => assert.equal((await up(tokens.member, body)).status, status, why);
+      assert.equal((await up(tokens.viewer, { repo: SHOP_REPO, index, chunks })).status, 403, 'a viewer reads maps, not writes them');
+      const big = { nodes: [{ i: 'x'.repeat(200000), k: 'file', n: 'x', f: 'x', l: 0 }], edges: [] };
+      const tooBig = await up(tokens.member, { repo: SHOP_REPO, index, chunks: [big] });
+      assert.equal(tooBig.status, 400);
+      assert.match((await tooBig.json()).message, /^chunk 0 is over 200000 bytes/);
+      await refused({ repo: SHOP_REPO, index: { ...index, version: 2 }, chunks }, 'a layout this site does not read');
+      await refused({ repo: 'not a repo', index, chunks }, 'a repo is owner/name');
+      await refused({ repo: SHOP_REPO, index, chunks: Array.from({ length: 61 }, () => ({ nodes: [], edges: [] })) }, 'at most 60 chunks');
+      await refused({ repo: SHOP_REPO, index }, 'chunks are a list');
+
+      const small = { nodes: [], edges: [] };
+      assert.equal((await up(tokens.member, { repo: SHOP_REPO, index, chunks: [small, small, small] })).status, 200);
+      assert.equal((await up(tokens.member, { repo: SHOP_REPO, index, chunks: [small] })).status, 200);
+      assert.equal(await store.get(M, 'map/shop/chunks/1'), null, 'a rebuild with fewer chunks leaves none of the old ones behind');
+      assert.equal((await store.get(M, 'map/shop')).data.chunks, 1);
+      assert.equal((await up(tokens.member, { repo: SHOP_REPO, index, chunks }, `/api/map?project=${M}`)).status, 200, 'the form Vercel rewrites the route to');
+      assert.equal((await store.get(M, 'map/shop')).data.chunks, chunks.length);
+      // the skill's uploader gzips the body: a map's JSON is large and hosts cap a request well under it
+      const zipped = await fetch(`${BASE}/api/p/${M}/map`, { method: 'POST', body: gzipSync(JSON.stringify({ repo: SHOP_REPO, index, chunks: [small] })),
+        headers: { Authorization: `Bearer ${tokens.member}`, 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' } });
+      assert.equal(zipped.status, 200, 'a gzipped upload');
+      assert.equal((await store.get(M, 'map/shop')).data.chunks, 1);
+      const bomb = await fetch(`${BASE}/api/p/${M}/map`, { method: 'POST', body: gzipSync(Buffer.alloc(17 * 1048576, 0x20)),
+        headers: { Authorization: `Bearer ${tokens.member}`, 'Content-Type': 'application/json', 'Content-Encoding': 'gzip' } });
+      assert.equal(bomb.status, 400, 'what inflates past the limit is refused too');
+      assert.equal((await up(tokens.member, { repo: SHOP_REPO, index, chunks })).status, 200);
+    });
+
+    test('the start names each code map; a project without one prints nothing extra, and board_map says so in one line', async () => {
+      const s = (await call(board, 'board_start', { project: M, ready: 0, rules: false, peek: true })).value;
+      assert.match(s, new RegExp(`^repos: ${SHOP_REPO} \\(shop\\)\\ncode map: shop · \\d+ symbols · built \\d\\d-\\d\\d by ${people.member.person}$`, 'm'));
+      assert.doesNotMatch((await call(board, 'board_start', { project: P, ready: 50, peek: true })).value, /^code map/m);
+      const none = (await call(board, 'board_map', { project: P })).value;
+      assert.match(none, new RegExp(`^no code map on ${P}; `));
+      assert.ok(!none.includes('\n'), none);
+      assert.equal((await call(board, 'board_map', { project: M, repo: 'web' })).value, 'not_found: no code map for web; maps: shop');
+      assert.match((await call(board, 'board_map', { project: M, explain: 'toCents', query: 'cents' })).value, /^invalid_argument: /, 'one question at a time');
+      const overview = (await call(board, 'board_map', { project: M })).value;
+      assert.equal((await call(board, 'board_map', { project: M, repo: 'shop' })).value, overview, 'repo picks a map by its label');
+      assert.equal((await call(board, 'board_map', { project: M, repo: SHOP_REPO.toUpperCase() })).value, overview, 'or by owner/name');
+
+      // the map is read whole once per build: later calls read only the index, with the task
+      await store.apply(null, M, [{ op: 'set', path: 'tasks/S-1', data: { key: 'S-1', title: 'cache', status: 'todo', deps: [], waitingOn: [] } }]);
+      const calls = [];
+      const counting = Object.fromEntries(Object.entries(store).map(([k, f]) => [k, typeof f === 'function' && ['get', 'query', 'readMany', 'apply'].includes(k)
+        ? (...a) => { calls.push(k); return f(...a); } : f]));
+      const flow = makeFlow(counting);
+      const count = async (run) => { calls.length = 0; await run(); return calls.join(' '); };
+      await flow.task(M, 'S-1');
+      assert.equal(await count(() => flow.task(M, 'S-1')), 'readMany', 'board_task on a board with a map: still one request');
+      const rebuilt = await api(`/api/p/${M}/map`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.admin}` }, body: { repo: SHOP_REPO, ...buildGraph(SHOP, { repo: SHOP_REPO, by: 'x' }) } });
+      assert.equal(rebuilt.status, 200);
+      assert.equal(await count(() => flow.task(M, 'S-1')), 'readMany readMany', 'a rebuilt map is read again');
+      assert.equal(await count(() => flow.task(M, 'S-1')), 'readMany');
+    });
+
+    test('board_map answers from the map: overview, explain, file, query, path and impact', async () => {
+      const ask = async (args) => (await call(board, 'board_map', { project: M, ...args })).value;
+      assert.match(await ask({}), /shared\/units\.js/, 'the overview names the most connected code');
+      const toCents = await ask({ explain: 'toCents' });
+      assert.match(toCents, /^toCents · \S+ · shared\/units\.js:1 · /m);
+      assert.match(toCents, /^called by:$/m);
+      assert.match(toCents, /api\/orders\.js#orderTotal \[[xi]\]/);
+      assert.match(await ask({ file: 'shared/units.js' }), /fromCents/);
+      assert.match(await ask({ query: 'cents' }), /shared\/units\.js/);
+      assert.match(await ask({ path: ['api/report.js', 'shared/units.js'] }), /api\/report\.js.*api\/orders\.js.*shared\/units\.js/);
+      const impact = await ask({ impact: 'shared/units.js' });
+      assert.match(impact, /api\/orders\.js/);
+      assert.match(impact, /api\/report\.js/, 'two imports away');
+    });
+
+    test('a claim on a board with a map brings the code its task names, and overlaps reach across an import', async () => {
+      const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
+      const task = (n, spec) => [{ op: 'set', path: `tasks/${n}`, data: { key: n, title: `code ${n}`, status: 'todo', deps: [], waitingOn: [], updatedAt: at } },
+        { op: 'set', path: `details/${n}`, data: { spec } }];
+      await store.apply(null, M, [...task('S-2', 'Round `orderTotal` in api/orders.js half up'), ...task('S-3', 'Store cents as integers')]);
+      const claimed = (await call(board, 'board_claim', { project: M, id: 'S-2' })).value;
+      const code = /^code:\n(?:(?!overlap ).*(?:\n|$))*/m.exec(claimed)?.[0] || '';
+      assert.match(code, /api\/orders\.js/, `the claim names the file the spec names (${claimed})`);
+      assert.ok(code.trim().split('\n').length <= 8, 'in a few lines');
+      assert.match((await call(board, 'board_task', { project: M, id: 'S-2', thread: 0 })).value, /^code:\n(?:.*\n)*.*api\/orders\.js/m, 'and so does board_task');
+      const other = await connect(tokens.member);
+      try {
+        await call(other, 'board_claim', { project: M, id: 'S-3' });
+        await call(other, 'board_post', { project: M, task: 'S-3', touches: ['shared/units.js'] });
+        const posted = (await call(board, 'board_post', { project: M, task: 'S-2', touches: ['api/orders.js'] })).value;
+        assert.match(posted, new RegExp(`^overlap S-2 .*↔ S-3 \\(${them}\\): .*api/orders\\.js`, 'm'), 'orders.js imports units.js: one hop is an overlap');
+        assert.match((await call(other, 'board_start', { project: M, ready: 0, rules: false, peek: true })).value, new RegExp(`^overlap S-3 .*↔ S-2 \\(${me}\\)`, 'm'));
+      } finally {
+        await other.close();
+      }
+    });
+
+    test('artiboard map builds a map from a checkout, and drops it', async (t) => {
+      if (store.kind !== 'sqlite') return t.skip('the command line runs on the SQLite file this test opens');
+      const root = join(dir, 'shop'), id = `cli-${R}`;
+      for (const [path, text] of SHOP) { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); }
+      const env = { ...process.env, ARTIBOARD_BACKEND: 'sqlite', ARTIBOARD_DB: join(dir, 'board.db'), BOARD_URL: BASE };
+      const cli = async (...args) => (await runCli(process.execPath, [fileURLToPath(new URL('../server/cli.js', import.meta.url)), ...args], { env })).stdout.trim();
+      await store.createProject(null, { id, title: 'Command line', lang: 'en' });
+      try {
+        assert.match(await cli('map', 'build', '--project', id, '--repo', SHOP_REPO, '--root', root, '--label', 'shop'),
+          new RegExp(`^acme-${R}--shop: \\d+ files · \\d+ symbols · \\d+ edges · \\d+ chunks?$`), 'a repo the board does not list is kept as owner--name');
+        const index = (await store.get(id, `map/acme-${R}--shop`)).data;
+        assert.deepEqual([index.by, index.label, index.repo], ['admin', 'shop', SHOP_REPO]);
+        assert.match((await call(board, 'board_start', { project: id, ready: 0, rules: false, peek: true })).value, /^code map: shop · \d+ symbols · built \d\d-\d\d by admin$/m);
+        assert.equal(await cli('map', 'overview', '--project', id), (await call(board, 'board_map', { project: id })).value, 'the command line prints what board_map does');
+        assert.equal(await cli('map', 'drop', '--project', id, '--repo', 'shop'), 'dropped the code map of shop');
+        assert.equal(await store.get(id, `map/acme-${R}--shop`), null);
+        assert.deepEqual(await store.query(id, `map/acme-${R}--shop/chunks`), [], 'with its chunks');
+        assert.match(await cli('map', 'overview', '--project', id), /^no code map on /);
+      } finally {
+        await store.dropProject(id);
+      }
+    });
+
+    test('artiboard map query answers from the map built at the command line', async (t) => {
+      if (store.kind !== 'sqlite') return t.skip('the command line runs on the SQLite file this test opens');
+      const env = { ...process.env, ARTIBOARD_BACKEND: 'sqlite', ARTIBOARD_DB: join(dir, 'board.db'), BOARD_URL: BASE };
+      const cli = async (...args) => (await runCli(process.execPath, [fileURLToPath(new URL('../server/cli.js', import.meta.url)), ...args], { env })).stdout.trim();
+      const q = await cli('map', 'query', '--project', M, 'cents');
+      assert.match(q, /shared\/units\.js/);
+      assert.equal(q, (await call(board, 'board_map', { project: M, query: 'cents' })).value);
+      assert.match(await cli('map', 'path', '--project', M, 'api/report.js', 'shared/units.js'), /api\/orders\.js/);
     });
 
     test('refuses requests without a valid token', async () => {

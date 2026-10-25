@@ -101,6 +101,8 @@ Las vistas las dibuja el código, nunca un modelo. Los agentes leen solo la part
 </tr>
 </table>
 
+**Mapa de código.** Un tablero autoalojado puede guardar un mapa de los archivos, funciones e imports de cada repositorio. Los agentes consultan `board_map` antes de usar grep, y el tablero avisa cuando dos tareas abiertas tocan el mismo código. Se crea con un solo comando ([Autoalojamiento](#autoalojamiento)). Los tableros artifact de claude.ai todavía no lo tienen.
+
 ## Inicio rápido
 
 Un tablero vive en uno de dos sitios. Los dos usan la misma página, los mismos documentos y las mismas reglas, y la skill prepara cualquiera de ellos.
@@ -229,6 +231,12 @@ approval_mode = "approve"
 
 Luego pide al agente "prepara el tablero para este repositorio".
 
+**Mapa de código** (opcional, solo autoalojado). Desde el checkout del repositorio, crea su mapa y súbelo. Vuelve a crearlo después de cambios grandes:
+
+```bash
+node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api
+```
+
 **Personaliza** exactamente como en claude.ai. El título, el idioma y cualquier texto de la interfaz viven en `meta/config` y cambian en vivo; quién está en un tablero lo deciden los administradores (`member join`, `member remove`). La página en sí es por proyecto: un administrador ejecuta `artiboard page set --project acme --file page.html` (estados, campos, vistas), y `page reset` vuelve a la página incluida, que se actualiza con el sitio. El código de la página se ejecuta para cada miembro, así que los agentes solo leen las páginas (`board_page` con `find`) salvo que el sitio defina `ARTIBOARD_AGENT_PAGE_EDITS=1`; entonces el agente de un administrador puede cambiar una página con ediciones pequeñas y exactas.
 
 | Ajuste | Por defecto | Significado |
@@ -251,6 +259,7 @@ artiboard member add|token|link|revoke|access|join|remove|list
 artiboard project add|repos|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
+artiboard map build|drop --project ID --repo R
 ```
 
 Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins hacen lo mismo desde el sitio: la página de proyectos tiene un panel **Miembros** (añadir, nuevo token, enlace de acceso, nivel, revocar, quitar), y cada persona fija su propio nombre y rol en **Perfil**, que se muestra en todos los tableros donde está. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y valen para todo el sitio: cada miembro ve todos los proyectos. Los miembros nunca reciben contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador. `member revoke` también cierra esas sesiones. Solo los administradores cambian quién es quién (`meta/config.people`, `people/`), y los mensajes y avisos siempre llevan el nombre de quien los escribe.
@@ -265,7 +274,8 @@ Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins
 | `board_start {project o repo}` | Las reglas del tablero y del proyecto, avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas (marcadas donde otra persona escribió lo último; las que están en revisión, en una línea), tareas disponibles, tareas ajenas esperando revisión. Con `repo` (un git remote) encuentra el proyecto y muestra el trabajo de ese repositorio |
 | `board_claim {id, text, override?}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación y resumen. `override` toma la tarea de otra persona cuando tu persona lo pide |
 | `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen |
-| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, override?}` | Un mensaje en el hilo más cambios en tu tarea; cualquiera puede mover el `due` de una tarea. `done` registra `doneAt` y desbloquea las que dependen de ella; `todo` libera la tarea para cualquiera. Sin `task`: un aviso. `tasks` da a varias tareas un mismo estado y mensaje en una sola escritura, todo o nada (un despliegue que cierra sus revisiones). Una tarea en revisión queda abierta a quien la revisa (`done` o de vuelta a `doing`); `override` cambia la tarea de otra persona cuando tu persona lo pide, y el hilo nombra a quien la tenía |
+| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | Un mensaje en el hilo más cambios en tu tarea; cualquiera puede mover el `due` de una tarea. `done` registra `doneAt` y desbloquea las que dependen de ella; `todo` libera la tarea para cualquiera. Sin `task`: un aviso. `tasks` da a varias tareas un mismo estado y mensaje en una sola escritura, todo o nada (un despliegue que cierra sus revisiones). Una tarea en revisión queda abierta a quien la revisa (`done` o de vuelta a `doing`); `override` cambia la tarea de otra persona cuando tu persona lo pide, y el hilo nombra a quien la tenía. `touches` añade los archivos o símbolos que tocas (`""` lo borra); un tablero autoalojado avisa cuando las tareas abiertas se solapan |
+| `board_map {explain, file, path, query, impact}` | El mapa de código de un tablero autoalojado. Pregúntalo antes de usar grep: explicar un nombre, mostrar un archivo, `path [a, b]`, palabras de consulta, impacto (lo que depende de X). Sin pregunta: resumen |
 | `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData`. Las escrituras en lote sobre tareas siguen la misma regla de responsable que `board_post` |
 | `board_page` | La página del proyecto: tamaño, `find`, `read` y, para administradores, `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio; cada proyecto muestra sus repositorios de GitHub |

@@ -7,8 +7,9 @@ const found = [];
 
 // functions declared in a page script and never mentioned again (a call, a handler or a reference)
 for (const page of ['skills/artiboard/assets/board.html', 'server/public/index.html', 'server/public/shim.js']) {
-  // the page's copy of server/tasks.js is that module's; its unused parts are checked there
-  const src = read(page).replace(/\/\/ -+ task rules:[\s\S]*?\/\/ -+ end of task rules -+/, '');
+  // the page's copies of server/tasks.js and server/codemap/graph.js are those modules'; their unused parts are checked there
+  const src = read(page).replace(/\/\/ -+ task rules:[\s\S]*?\/\/ -+ end of task rules -+/, '')
+    .replace(/\/\/ -+ code map graph:[\s\S]*?\/\/ -+ end of code map graph -+/, '');
   for (const [, name] of src.matchAll(/\bfunction ([A-Za-z_$][\w$]*)\s*\(/g)) {
     const uses = src.split(new RegExp(`(?<![\\w$])${name.replace(/\$/g, '\\$')}(?![\\w$])`)).length - 1;
     if (uses < 2) found.push(`${page}: function ${name}`);
@@ -37,7 +38,8 @@ for (const page of ['skills/artiboard/assets/board.html', 'server/public/index.h
 const files = readdirSync(new URL('../server/', import.meta.url), { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => `server/${f}`);
 // the page counts as a user of server/tasks.js: it carries that module's code
 const all = files.concat(['tests/server.test.js', 'tests/tasks.test.js', 'scripts/bench.mjs', 'api/_app.js', 'skills/artiboard/assets/board.html'])
-  .map((f) => [f, f.endsWith('board.html') ? read(f).replace(/\/\/ -+ task rules:[\s\S]*?\/\/ -+ end of task rules -+/, '') : read(f)]);
+  .map((f) => [f, f.endsWith('board.html') ? read(f).replace(/\/\/ -+ task rules:[\s\S]*?\/\/ -+ end of task rules -+/, '')
+    .replace(/\/\/ -+ code map graph:[\s\S]*?\/\/ -+ end of code map graph -+/, '') : read(f)]);
 for (const [f, src] of all.filter(([f]) => f.startsWith('server/'))) {
   for (const [, name] of src.matchAll(/^export (?:async )?(?:function|const|class) ([A-Za-z_$][\w$]*)/gm)) {
     if (!all.some(([g, other]) => g !== f && new RegExp(`\\b${name}\\b`).test(other))) found.push(`${f}: export ${name}`);
