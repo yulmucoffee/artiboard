@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.15.3",
+      "date": "2026-10-25",
+      "prs": [
+        41
+      ],
+      "lines": {
+        "en": [
+          "On a claude.ai artifact board, tasks keep their ids again: opening a card, Claim, recent activity and the waitingOn repair work as before. Self-hosted boards were not affected.",
+          "Artifact boards get the fix when the page is upgraded from the skill. Reported, with the fix, by a contributor."
+        ],
+        "ko": [
+          "claude.ai 아티팩트 보드에서 태스크 id가 사라지던 문제를 고쳤어요. 카드 열기, 집기, 최근 활동, waitingOn 수리가 다시 동작해요. 자체 호스팅 보드는 영향이 없었어요.",
+          "아티팩트 보드는 스킬로 페이지를 업그레이드하면 반영돼요. 기여자가 수정안과 함께 알려 주셨어요."
+        ]
+      }
+    },
+    {
       "version": "1.15.2",
       "date": "2026-10-24",
       "prs": [
