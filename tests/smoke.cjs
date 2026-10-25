@@ -83,6 +83,7 @@ function boot({
     subs = [],
     writes = [],
     errors = [],
+    listened = [],
     vers = {};
   const notify = () => subs.slice().forEach((s) => s());
   const put = (p, f, o) => {
@@ -98,7 +99,7 @@ function boot({
   function snapColl(p, o) {
     let docs = Object.keys(store)
       .filter((k) => k.startsWith(p + '/') && !k.slice(p.length + 1).includes('/'))
-      .map((k) => ({ id: k.slice(p.length + 1), data: () => store[k] }));
+      .map((k) => ({ id: k.slice(p.length + 1), data: () => Object.freeze({ ...store[k] }) }));
     if (o.order) docs.sort((a, b) => (a.data()[o.order] > b.data()[o.order] ? 1 : -1) * (o.dir === 'desc' ? -1 : 1));
     return { docs: o.limit ? docs.slice(0, o.limit) : docs };
   }
@@ -107,6 +108,7 @@ function boot({
       orderBy: (f, d) => coll(p, { ...o, order: f, dir: d }),
       limit: (n) => coll(p, { ...o, limit: n }),
       onSnapshot(cb) {
+        listened.push(p);
         const run = () => cb(snapColl(p, o));
         subs.push(run);
         run();
@@ -119,7 +121,11 @@ function boot({
     return {
       get: async () => {
         const seen = store[p],
-          r = { exists: !!seen, version: versioned ? vers[p] || 0 : undefined, data: () => seen };
+          r = {
+            exists: !!seen,
+            version: versioned ? vers[p] || 0 : undefined,
+            data: () => (seen ? Object.freeze({ ...seen }) : seen)
+          };
         if (race === p) {
           race = null;
           await put(p, (c) => ({
@@ -136,7 +142,8 @@ function boot({
         return r;
       },
       onSnapshot(cb) {
-        const run = () => cb({ exists: !!store[p], data: () => store[p] });
+        const run = () =>
+          cb({ exists: !!store[p], data: () => (store[p] ? Object.freeze({ ...store[p] }) : store[p]) });
         subs.push(run);
         run();
         return () => subs.splice(subs.indexOf(run), 1);
@@ -171,6 +178,7 @@ function boot({
     store,
     writes,
     errors,
+    listened,
     notify,
     sneak,
     key: (k) => w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, bubbles: true })),
@@ -213,7 +221,7 @@ const meLane = (d) => {
 (async () => {
   console.log('# no viewer identity (user capability absent)');
   let b = boot();
-  const { d, store, key, w } = b;
+  const { d, store, key, w, listened } = b;
   await tick();
   await heal();
   ok(d.getElementById('hTitle').textContent === 'Test Board', 'title comes from meta/config');
@@ -279,6 +287,12 @@ const meLane = (d) => {
         .querySelector('.line .text').textContent
     ),
     "with each task's latest message on one line"
+  );
+  // the page adds the id to a copy of each snapshot's data, which the artifact runtime freezes: with the id lost,
+  // every listener went to tasks/undefined/messages and was reopened on each render
+  ok(
+    listened.filter((p) => /\/messages$/.test(p)).length === 4 && !listened.some((p) => /undefined/.test(p)),
+    'one message listener per task in recent activity, each to the task by id'
   );
   ok(d.querySelectorAll('#activity .line.quiet').length === 3, 'and says when a task has no message yet');
   d.querySelectorAll('#themeSel button')[2].click();

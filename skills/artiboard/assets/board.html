@@ -3920,7 +3920,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
           .onSnapshot(
             function (s) {
               msgs = s.docs.map(function (d) {
-                var o = d.data();
+                // a copy: the artifact runtime freezes what data() returns, and the id goes on the task
+                var o = Object.assign({}, d.data());
                 o.id = d.id;
                 return o;
               });
@@ -4564,7 +4565,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
         var s = lastTasks;
         // archived tasks (done, moved off the board) stay known for dependencies but leave every list but the archive
         allTasks = s.docs.map(function (x) {
-          var o = x.data();
+          var o = Object.assign({}, x.data());
           o.id = x.id;
           return o;
         });
