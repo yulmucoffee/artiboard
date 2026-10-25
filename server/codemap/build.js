@@ -1,6 +1,6 @@
 // Builds a code map from a checkout's files: nodes for files, symbols and doc sections, the edges between them, and
 // communities of files that belong together. No model calls and no clock but builtAt: the same files give the same map.
-import { mapDegrees } from './graph.js';
+import { communityLinks, mapDegrees } from './graph.js';
 import { langFor } from './lang/index.js';
 import { headCommit, listFiles, readFiles } from './scan.js';
 
@@ -556,6 +556,7 @@ export function buildGraph(files, opts = {}) {
     chunks: chunks.length,
     communities: communities.slice(0, BUILD_COMMUNITIES).map(({ c, name, n, top }) => ({ c, name, n, top })),
     god,
+    links: communityLinks(nodes, edges),
     langs,
     version: 1,
   };

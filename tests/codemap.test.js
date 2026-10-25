@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { buildGraph, mapRepo } from '../server/codemap/build.js';
-import { loadGraph } from '../server/codemap/graph.js';
+import { communityLinks, loadGraph } from '../server/codemap/graph.js';
 import { langFor } from '../server/codemap/lang/index.js';
 import { jsLang } from '../server/codemap/lang/js.js';
 import { htmlLang } from '../server/codemap/lang/html.js';
@@ -942,6 +942,32 @@ test('inside: what a symbol or file calls, uses and extends, by depth; the oppos
   assert.deepEqual(G.inside('src/cart.ts#Price').lines, ['src/cart.ts#Price calls and uses nothing in the map']);
   assert.deepEqual(G.inside('formatPrice').ambiguous, ['src/legacy/orphan.js#formatPrice', 'src/util/format.js#formatPrice']);
   assert.equal(G.inside('nope').missing, true);
+});
+
+test('links: how many code edges join each pair of communities, in the index and from the chunks alike', () => {
+  // read from the fixture: src (index.js) ↔ src (cart.ts) share 8 edges, cart ↔ api 7, index ↔ api 4
+  assert.deepEqual(built.index.links, [[0, 1, 8], [1, 2, 7], [0, 2, 4]]);
+  assert.deepEqual(G.groups(), { communities: built.index.communities, links: built.index.links });
+  const older = loadGraph({ ...built.index, links: undefined }, built.chunks);
+  assert.deepEqual(older.groups().links, built.index.links, 'a map built before links were kept gets them from its chunks');
+  const nodes = [{ i: 'a', c: 0 }, { i: 'b', c: 1 }, { i: 'b#f', c: 1 }, { i: 'c', c: 2 }, { i: 'loose' }];
+  assert.deepEqual(communityLinks(nodes, [['a', 'b', 'imports', 'x'], ['a', 'b#f', 'calls', 'i'], ['b', 'b#f', 'defines', 'x'], ['c', 'a', 'mentions', 'i'],
+    ['loose', 'a', 'imports', 'x'], ['b', 'c', 'uses', 'x'], ['c', 'b', 'extends', 'x'], 'not an edge']),
+  [[0, 1, 2], [1, 2, 2], [0, 2, 1]], 'defines and contains do not count, nor a node of no community; a < b whichever way the edge points');
+});
+
+test('the page-facing API: a name\'s nodes, one node with its edges and degree, a file\'s symbols by line, a community\'s files', () => {
+  assert.deepEqual(G.find('Cart'), ['src/cart.ts#Cart']);
+  assert.deepEqual(G.find('nothing-here'), []);
+  assert.equal(G.node('src/cart.ts#Cart').t, 'class');
+  assert.equal(G.node('nope'), null);
+  const { out, in: into } = G.edges('src/cart.ts#Cart');
+  assert.deepEqual(out.map((e) => `${e.type} ${e.to}`), ['extends src/store.ts#Store']);
+  assert.ok(into.some((e) => e.type === 'calls' && e.from === 'src/index.js#main'));
+  assert.equal(G.degree('src/cart.ts#Cart'), 4);
+  assert.deepEqual(G.inFile('src/cart.ts').slice(0, 4), ['src/cart.ts#Price', 'src/cart.ts#Currency', 'src/cart.ts#CartItem', 'src/cart.ts#Cart']);
+  assert.deepEqual(G.files(2), ['src/api/client.js', 'src/api/index.js', 'docs/guide.md'].sort(), 'files and docs of the community, by path');
+  assert.deepEqual(G.files(9), []);
 });
 
 test('overview: counts, languages, communities and the most connected nodes', () => {

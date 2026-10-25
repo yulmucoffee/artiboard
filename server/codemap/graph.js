@@ -421,15 +421,44 @@ function graphContext(g, task, { limit = 8 } = {}) {
   return { lines, files: [...found.keys()].slice(0, limit) };
 }
 
+// How communities connect: how many code edges (imports, calls, uses, extends, mentions) join files of one to files of
+// another, as [a, b, n] with a < b, strongest first, at most GRAPH_LINKS. The builder writes them into the index so the
+// page draws the groups from that one small document; a map built before they existed gets them from its chunks.
+const GRAPH_LINKS = 200;
+export function communityLinks(nodes, edges) {
+  const com = new Map();
+  for (const n of nodes) if (n && typeof n.i === 'string' && Number.isInteger(n.c)) com.set(n.i, n.c);
+  const count = new Map();
+  for (const e of edges) {
+    if (!Array.isArray(e) || GRAPH_STRUCTURE[e[2]]) continue;
+    const a = com.get(e[0]), b = com.get(e[1]);
+    if (a === undefined || b === undefined || a === b) continue;
+    const key = a < b ? `${a}\n${b}` : `${b}\n${a}`;
+    count.set(key, (count.get(key) || 0) + 1);
+  }
+  return [...count].map(([k, n]) => [...k.split('\n').map(Number), n])
+    .sort((x, y) => y[2] - x[2] || x[0] - y[0] || x[1] - y[1]).slice(0, GRAPH_LINKS);
+}
+
+// the file and doc ids of one community, by path; found once per community
+function graphFiles(g, c) {
+  if (!g.byCommunity) {
+    g.byCommunity = new Map();
+    for (const id of g.ids) { const n = g.nodes.get(id); if ((n.k === 'file' || n.k === 'doc') && Number.isInteger(n.c)) graphPush(g.byCommunity, n.c, id); }
+  }
+  return g.byCommunity.get(c) || [];
+}
+
 export function loadGraph(index, chunks) {
   const g = { index: index || {}, nodes: new Map(), out: new Map(), in: new Map(), names: new Map(), lasts: new Map(),
-    files: new Map(), bases: new Map(), tails: new Map(), ids: [], degree: new Map(), terms: null };
+    files: new Map(), bases: new Map(), tails: new Map(), ids: [], degree: new Map(), terms: null, byCommunity: null, edges: [] };
   const edges = [];
   for (const ch of chunks || []) {
     for (const n of (ch && ch.nodes) || []) if (n && typeof n.i === 'string') g.nodes.set(n.i, n);
     for (const e of (ch && ch.edges) || []) if (Array.isArray(e)) edges.push(e);
   }
   const kept = edges.filter(([from, to]) => g.nodes.has(from) && g.nodes.has(to));
+  g.edges = kept;
   for (const [from, to, type, conf] of kept) {
     const e = { from, to, type, conf };
     graphPush(g.out, from, e);
@@ -460,5 +489,15 @@ export function loadGraph(index, chunks) {
     overview: (opts) => graphOverview(g, opts || {}),
     overlaps: (tasks) => graphOverlaps(g, tasks),
     context: (task, opts) => graphContext(g, task, opts || {}),
+    // what the page's graph view reads: the nodes a name may mean, one node, its edges, a file's symbols, a
+    // community's files, and the communities with the links between them
+    find: (q) => graphFind(g, q),
+    node: (id) => g.nodes.get(id) || null,
+    edges: (id) => ({ out: g.out.get(id) || [], in: g.in.get(id) || [] }),
+    degree: (id) => graphDeg(g, id),
+    inFile: (f) => (g.files.get(f) || []).filter((id) => id !== f).sort(graphByLine(g)),
+    files: (c) => graphFiles(g, c),
+    groups: () => ({ communities: Array.isArray(g.index.communities) ? g.index.communities : [],
+      links: Array.isArray(g.index.links) ? g.index.links : communityLinks([...g.nodes.values()], g.edges) }),
   };
 }
