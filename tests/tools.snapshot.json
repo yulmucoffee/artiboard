@@ -190,7 +190,7 @@
  },
  {
   "name": "board_map",
-  "description": "The project's code map: files, symbols and how they connect. Ask it before grepping: explain a name, file a path, path [a, b], query words, impact (what depends on X). No question: overview.",
+  "description": "The project's code map: files, symbols and how they connect. Ask it before grepping (it knows names, not text): explain a name, file a path, path [a, b], query words, impact (what depends on X). No question: overview.",
   "inputSchema": {
    "type": "object",
    "properties": {

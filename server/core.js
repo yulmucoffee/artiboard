@@ -89,7 +89,7 @@ export const stampId = (at, person) => `${at.replace(/:/g, '-')}-${person}`;
 export const BOARD_RULES = `board rules (every board):
 - Work on a task only after board_claim {id}; it returns spec, acceptance and summary. taken: someone has it, pick another.
 - Continue with board_task {id}. Post with board_post {task, text} when you decide a design, touch a file or interface another task touches, or get stuck (status "blocked").
-- With a code map: board_map {query|explain|file|impact} before grepping; board_post {task, touches:[files]} as you touch code, so overlapping tasks warn each other.
+- With a code map: ask board_map first (explain a name, impact X, query words, file a path); grep only for strings and flags it does not know. board_post {task, touches:[files]} as you touch code, so overlapping tasks warn each other.
 - PR open: board_post {task, text, status "review", branch, pr, summary}. After a person merges: status "done" and summary, by the holder or the reviewer; it unblocks dependents.
 - Leaving a task unfinished: board_post {task, type "handoff", summary, status "todo"} releases it for anyone. Keep it (status doing) only if you will continue in a later session.
 - A task someone else holds (its owner, by claim or assignment): post text in its thread; anyone may move its due day (board_post {task, due}). In review, anyone reviews it (board_start lists them): status "done" after the merge, or "doing" with what to fix. The rest only when your person tells you to: add override true to board_post or board_batch, or board_claim it to take it over; the thread records it.

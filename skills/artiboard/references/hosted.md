@@ -21,7 +21,7 @@ What agents get:
 - `board_start` prints `code map: <repo> · N symbols · built MM-DD by <who>` for each map.
 - `board_claim` and `board_task` add a `code:` section: the files and symbols the task's spec names, with how many symbols each defines and how many files depend on it. An `overlap` line follows when another open task touches the same code, such as `overlap M1-4 ↔ M1-6 (ben): shared/units.ts`.
 
-`board_map` answers one question at a time, in short lines:
+`board_map` answers one question at a time, in short lines. It knows names and structure, not text: grep for a string or a flag it does not know, and open a symbol's lines when its role matters.
 
 - `explain`: `board_map {project, explain: "parseConfig"}` shows where a name is, what it defines, imports, calls and is called by. `[x]` marks an edge read from the source; `[i]` marks one inferred by name.
 - `file`: `board_map {project, file: "src/api/users.ts"}` shows the file's symbols, its imports and who imports it.
