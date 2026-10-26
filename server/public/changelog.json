@@ -4,7 +4,9 @@
     {
       "version": "1.20.1",
       "date": "2026-10-26",
-      "prs": [],
+      "prs": [
+        52
+      ],
       "lines": {
         "en": [
           "The board's heading, the tabs and the text you read top to bottom sit on a centered 1180 px column again.",
