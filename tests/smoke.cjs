@@ -387,19 +387,35 @@ const meLane = (d) => {
   await tick();
   ok(scrolls.join() === '-350,-140', 'a toolbar that scrolled away comes back with the view');
   toolbarPosition = 'sticky';
-  // the toolbar spans the window with the kanban, and only there
+  // the kanban scrolls with the page instead of inside a box of its own; the toolbar spans the window there, keeping
+  // its content on the page's column, and column headers stick under it
   d.querySelector('.page').getBoundingClientRect = () => ({ left: 24, right: 1000 });
   Object.defineProperty(d.documentElement, 'clientWidth', { value: 1024, configurable: true });
+  Object.defineProperty(d.getElementById('toolbar'), 'offsetHeight', { value: 50, configurable: true });
   key('2');
   await tick();
-  const toolbar = d.getElementById('toolbar');
+  const bodyStyle = d.body.style;
   ok(
-    toolbar.style.marginLeft === '-24px' && toolbar.style.paddingRight === '24px',
-    'the toolbar spans the window with the kanban'
+    d.body.dataset.view === 'kanban' && d.getElementById('kanban').style.height === '',
+    'the kanban has no height of its own, so the page scrolls'
   );
+  ok(
+    bodyStyle.getPropertyValue('--vw') === '1024px' &&
+      bodyStyle.getPropertyValue('--page-l') === '24px' &&
+      bodyStyle.getPropertyValue('--page-r') === '24px',
+    'the toolbar spans the window with the kanban, its content on the page column'
+  );
+  ok(bodyStyle.getPropertyValue('--tb-h') === '50px', 'column headers stick under a sticky toolbar');
   key('1');
   await tick();
-  ok(toolbar.style.marginLeft === '' && toolbar.style.paddingRight === '', 'and keeps the page width elsewhere');
+  ok(d.body.dataset.view === 'doc', 'and the page keeps its width elsewhere');
+  toolbarPosition = 'static';
+  key('2');
+  await tick();
+  ok(bodyStyle.getPropertyValue('--tb-h') === '0px', 'on a narrow window, where the toolbar scrolls away, headers stick at the top');
+  toolbarPosition = 'sticky';
+  key('1');
+  await tick();
   key('2');
   await tick();
   key('j');
