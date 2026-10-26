@@ -91,7 +91,7 @@ Confirm that `SKILL.md`, `assets/board.html`, `references/protocol.md`, `referen
 
 ## Step 4. Run it
 
-If the user wants a board now, follow `SKILL.md` from "Setup". It asks where the board lives, team size (1, 2, 3 or a number), how work is split, the board language and where tasks come from, then drafts tasks and the project's rules, publishes or creates the board, seeds it and adds a short pointer to `CLAUDE.md` (and `AGENTS.md`). On a self-hosted site it also offers a code map when the project names repositories: `node <skill directory>/scripts/codemap.mjs --site <site> --project <id> --repo owner/name` (`references/hosted.md`, "Code map"). A map says which commit it describes, and CI or a git hook keeps it current (`references/hosted.md`, "Keeping the map current").
+If the user wants a board now, follow `SKILL.md` from "Setup". It asks where the board lives, team size (1, 2, 3 or a number), how work is split, the board language and where tasks come from, then drafts tasks and the project's rules, publishes or creates the board, seeds it and adds a short pointer to `CLAUDE.md` (and `AGENTS.md`). On a self-hosted site it also offers a code map when the project names repositories: `node <skill directory>/scripts/codemap.mjs --site <site> --project <id> --repo owner/name` (`references/hosted.md`, "Code map"). A map says which commit it describes; `--workflow` (CI on a shared default branch) or `--hook` (git hooks in a checkout only you commit to) keeps it current, one per repository (`references/hosted.md`, "Keeping the map current").
 
 ## Step 5. Report
 

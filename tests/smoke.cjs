@@ -1131,9 +1131,16 @@ const meLane = (d) => {
   await tick();
   const mapText = () => b.d.getElementById('codemapBody')?.textContent || '';
   const nodeIds = () => [...b.d.querySelectorAll('#codemapBody .cnode')].map((x) => x.dataset.id).join();
-  const crumb = () => b.d.querySelector('#codemapBody .crumb')?.textContent.replace(/−\+⤢$/, '') || '';
+  // the levels the crumb names, without Back and the zoom buttons around them
+  const crumb = () =>
+    [...(b.d.querySelector('#codemapBody .crumb')?.children || [])]
+      .filter((x) => !x.matches('.back, .zoom'))
+      .map((x) => x.textContent)
+      .join('');
+  const back = () => b.d.querySelector('#codemapBody .crumb .back');
   const node = (id) => b.d.querySelector('#codemapBody .cnode[data-id="' + id + '"]');
   const click = (x) => x.dispatchEvent(new b.w.MouseEvent('click', { bubbles: true }));
+  const press = (x, key) => x.dispatchEvent(new b.w.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
   ok(
     b.listened.includes('map') &&
       nodeIds() === 'c:0,c:1' &&
@@ -1142,6 +1149,18 @@ const meLane = (d) => {
       /Most connectedshared\/units\.ts#toMeters/.test(mapText()) &&
       crumb() === 'All groups',
     "unfolded, it draws each repository's groups from the index, says who built it from which commit, and offers the most connected names"
+  );
+  const head = b.d.querySelector('#codemapBody .cmap-head');
+  ok(
+    head.children.length === 2 &&
+      head.children[0].textContent === 'apiacme/api6 files · 1 symbols · 3 edges · 0 docs' &&
+      /^built .+ by Ben · main@0123456uncommitted changes$/.test(head.children[1].textContent),
+    "a map's head is two lines: what it is with its counts, then who built it from which commit"
+  );
+  ok(
+    [...b.d.querySelector('#codemapBody .cmap-detail').querySelectorAll('p')].map((x) => x.textContent).join('|') ===
+      'Groups of files that belong together|Thicker links mean more imports and calls.|Most connected',
+    'with nothing picked, the panel explains the groups in one short line before the most connected names'
   );
   ok(
     [...b.d.querySelectorAll('#codemapBody .cmap-head h3')].map((x) => x.textContent).join() === 'apiacme/api,bad' &&
@@ -1178,7 +1197,7 @@ const meLane = (d) => {
     hits === 'toMetersfn · shared/units.ts:3' &&
       crumb() === 'All groups›shared›units.ts›toMeters' &&
       nodeIds() === 'shared/units.ts#toMeters,shared/units.ts,web/total.tsx' &&
-      /called by:\s+web\/total\.tsx \[x\]/.test(b.d.querySelector('#codemapBody .maplines')?.textContent) &&
+      /called by:\s+web\/total\.tsx/.test(b.d.querySelector('#codemapBody .maplines')?.textContent) &&
       b.reads.filter((p) => p === 'map/api/chunks').length === 1,
     'a search offers the names it matches; picking one draws that symbol with its neighbors and explains it as board_map would'
   );
@@ -1190,9 +1209,57 @@ const meLane = (d) => {
     crumb() === 'All groups›shared›units.ts' && !!b.d.querySelector('.sheet') === false && !b.errors.length,
     'Esc on the picture goes up one level and closes no sheet'
   );
-  b.d.querySelector('#codemapBody .crumb button').click();
+  b.d.querySelector('#codemapBody .crumb > button:not(.back)').click();
   await tick();
   ok(crumb() === 'All groups' && nodeIds() === 'c:0,c:1', 'the first crumb goes back to the groups');
+  const noBackAtTop = !back();
+  search(b.d, 'toM');
+  b.d.querySelector('#codemapBody .cmap-hit')?.click();
+  await tick();
+  [...b.d.querySelectorAll('#codemapBody .crumb > button')].find((x) => x.textContent === 'units.ts')?.click();
+  await tick();
+  const inFile = crumb(),
+    backText = back()?.textContent,
+    backTo = back()?.title;
+  back()?.click();
+  await tick();
+  ok(
+    noBackAtTop &&
+      inFile === 'All groups›shared›units.ts' &&
+      backText === '‹Back' &&
+      backTo === 'shared' &&
+      crumb() === 'All groups›shared' &&
+      nodeIds() === 'shared/units.ts,web/total.tsx,web/chart.tsx,c:1' &&
+      b.d.activeElement === b.d.querySelector('#codemapBody .cmap-pic'),
+    'an earlier crumb goes back to its level; below the groups, Back goes up one level and its title says where to'
+  );
+  const elsewhere = press(b.d.querySelector('#codemapBody .mapsearch'), 'Backspace') && press(b.d.body, 'Backspace');
+  await tick();
+  const stayed = crumb(),
+    taken = !press(node('shared/units.ts'), 'Backspace');
+  await tick();
+  ok(
+    elsewhere && stayed === 'All groups›shared' && taken && crumb() === 'All groups' && !back(),
+    'Backspace on a node in the picture goes up one level like Esc; in the search box or elsewhere it does nothing'
+  );
+  const help = () => b.d.querySelector('#codemapBody .cmap-legend .cmap-help');
+  const hint = () => b.d.querySelector('#codemapBody .cmap-hint');
+  const hintAtFirst = !!hint(),
+    tip = help()?.title;
+  help()?.click();
+  const shown = hint()?.textContent,
+    opened = help()?.getAttribute('aria-expanded');
+  help()?.click();
+  ok(
+    !hintAtFirst &&
+      tip ===
+        'Click a node to read about it, again to open it. Esc or Backspace goes up. Drag to pan; ⌘ or Ctrl + wheel zooms.' &&
+      shown === tip &&
+      opened === 'true' &&
+      !hint() &&
+      help().getAttribute('aria-expanded') === 'false',
+    'the hint waits behind a ? at the end of the legend: its tooltip, and a click shows it under the legend, another hides it'
+  );
   b.d.querySelector('tr.item[data-k="M1-5"]').click();
   await tick();
   ok(touched(b.d) === 'shared/units.ts,server/flow.js#start', "the sheet's Code block lists what the task touches");
@@ -1320,7 +1387,7 @@ const meLane = (d) => {
   await tick();
   ok(
     b.reads.filter((p) => p === 'map/web/chunks').length === 1 &&
-      b.d.querySelector('#codemapBody .crumb').textContent.replace(/−\+⤢$/, '') === 'All groups›shared›units.ts' &&
+      crumb() === 'All groups›shared›units.ts' &&
       b.d.activeElement === b.d.querySelector('#codemapBody .cmap-pic'),
     'a most connected name read before the chunks loads them once and then goes there, with the keyboard on the picture'
   );

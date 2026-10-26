@@ -20,31 +20,23 @@ The skill directory is usually `~/.claude/skills/artiboard` or `.claude/skills/a
 
 A map says which commit and branch it describes, and whether the checkout had uncommitted changes. The page shows it, and `board_start`'s `code map:` line and `board_map`'s overview end with it: `· main@3f2a1c7`, then `· uncommitted changes` when there were any. `--if-changed` asks the site first and builds only when its map describes another commit, or when the map or the checkout had uncommitted changes; a clean checkout at the commit the map describes sends nothing.
 
-Pick one way to keep it current. When the board describes the shared default branch, the usual case, let CI rebuild on each push. A site serves the uploader of its own version at `<board url>/codemap.mjs`; save it outside the checkout, or the map counts it as an uncommitted change. Store a member's token (a viewer's cannot write maps) as the repository secret `ARTIBOARD_TOKEN`:
+One command keeps a map current. Each repository gets one of the two, never both: two writers flip the map between the branches they build.
 
-```yaml
-# .github/workflows/codemap.yml (name your default branch)
-on: { push: { branches: [main] } }
-jobs:
-  codemap:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - env: { ARTIBOARD_TOKEN: ${{ secrets.ARTIBOARD_TOKEN }} }
-        run: |
-          curl -fsSL <board url>/codemap.mjs -o "$RUNNER_TEMP/codemap.mjs"
-          node "$RUNNER_TEMP/codemap.mjs" --site <board url> --project <id> --repo ${{ github.repository }}
-```
+- **A team board** describes the shared default branch, so CI is its one writer. From the checkout:
 
-For a checkout only you commit to, a `post-commit` hook rebuilds in the background after each commit, with the token from `ARTIBOARD_TOKEN`. It sits out a rebase, which commits many times in a row, and the uploader itself skips a build whose commit moved on while it read. Save it as `.git/hooks/post-commit`, make it executable, and read `.git/codemap.log` when the map lags:
+  ```bash
+  node <skill directory>/scripts/codemap.mjs --workflow --site <board url> --project <id> --repo owner/name [--label api]
+  gh secret set ARTIBOARD_TOKEN --repo owner/name
+  ```
 
-```bash
-#!/bin/sh
-[ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] && exit 0
-node <skill directory>/scripts/codemap.mjs --site <board url> --project <id> --repo owner/name --if-changed >> "$(git rev-parse --git-dir)/codemap.log" 2>&1 &
-```
+  `--workflow` writes `.github/workflows/artiboard-codemap.yml` and never replaces one that exists. On each push to the default branch (`origin/HEAD` when it is set, else `main`), the job fetches the uploader of the site's own version from `<board url>/codemap.mjs` into the runner's temp folder, outside the checkout, and builds. The secret is a member's token; a viewer's cannot write maps. Commit the workflow.
+- **A checkout only you commit to** uses git hooks:
+
+  ```bash
+  node <skill directory>/scripts/codemap.mjs --hook --site <board url> --project <id> --repo owner/name --token abt_…
+  ```
+
+  `--hook` adds one marked line to the repository's `post-commit` and `post-merge` hooks, after any lines they already have, and builds once now. After each commit and each merge (a pull that merges, too), the line runs this same script with `--if-changed` in the background. Run the skill's copy: the hooks call it by its path, so a copy in a temp folder is refused. The token goes to `.git/artiboard-codemap.env`, readable only by you; with no `--token` or `ARTIBOARD_TOKEN`, the hooks take `ARTIBOARD_TOKEN` from wherever git runs. The hooks sit out a rebase, which commits many times in a row, and the uploader skips a build whose commit moved on while it read. Running `--hook` again replaces the line. Read `.git/codemap.log` when the map lags.
 
 What people get: the page's Code map section draws each map as nodes and links. The groups of files come first, joined by thicker lines where more imports and calls cross between them; one click on a node says what it is and which open tasks touch it, a second opens it (a group's files and the groups they reach, a file's symbols with the files it imports and that import it, a symbol with what calls it and what it calls). A search box finds a name and jumps there. Nodes that open tasks touch are ringed in the holder's color with the task's key, and the detail text is what `board_map` prints, so people and agents read the same map.
 
@@ -55,7 +47,7 @@ What agents get:
 
 `board_map` answers one question at a time, in short lines. It knows names and structure, not text: grep for a string or a flag it does not know, and open a symbol's lines when its role matters.
 
-- `explain`: `board_map {project, explain: "parseConfig"}` shows where a name is, what it defines, imports, calls and is called by. `[x]` marks an edge read from the source; `[i]` marks one inferred by name.
+- `explain`: `board_map {project, explain: "parseConfig"}` shows where a name is, what it defines, imports, calls and is called by. Names are listed by file (`src/api/users.ts: createUser, deleteUser`; `here` is the subject's own file); a name followed by `?` was matched by name, not read from the source.
 - `file`: `board_map {project, file: "src/api/users.ts"}` shows the file's symbols, its imports and who imports it.
 - `path`: `board_map {project, path: ["src/api/users.ts", "src/db/users.ts"]}` shows how two things connect.
 - `query`: `board_map {project, query: "login rate limit"}` lists the files, symbols and docs a question touches.
@@ -67,7 +59,8 @@ Record what your work touches with `board_post {task, touches: [...]}`. The tool
 
 Limits:
 
-- Extraction is deterministic and line-based, not a compiler. Calls match by name, so a common name can point at the wrong definition; such edges are marked `[i]`.
+- Extraction is deterministic and line-based, not a compiler. Calls match by name, so a common name can point at the wrong definition; such names end in `?`.
+- An answer is short on purpose: thirty names a group, and at most about 3,000 characters unless `limit` asks for more. Ask a narrower name before asking for more.
 - Languages: JavaScript and TypeScript, Python, Go, Rust, Java, Kotlin, C#, Swift, Ruby, PHP, C/C++, SQL and Markdown.
 - A stale map misleads. Keep it current with CI or a git hook, as [Keeping the map current](#keeping-the-map-current) shows.
 - A map holds at most 60 chunks, about 25,000 symbols. For a larger repository, map the part that matters with `--root <subdirectory>`; a project with several repositories keeps one map for each.

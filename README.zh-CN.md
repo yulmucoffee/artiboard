@@ -231,7 +231,7 @@ approval_mode = "approve"
 
 然后让 agent "为这个仓库设置看板"。
 
-**代码地图**（可选，仅自托管）。地图会注明它描述的是哪个提交和分支。可以用 CI 或 git 钩子让它保持最新，加上 `--if-changed` 时，只在检出自上次生成地图后有变化时才生成（见自托管指南的 [Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current)）。在仓库的检出目录中生成并上传地图：
+**代码地图**（可选，仅自托管）。地图会注明它描述的是哪个提交和分支。在下面的命令上加一个参数即可让它保持最新：`--workflow` 为默认分支写一个 CI 工作流（需要仓库机密 `ARTIBOARD_TOKEN`），`--hook` 在只有你提交的检出中安装 git 钩子；每个仓库只用其中一个，不要两个都用（见自托管指南的 [Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current)）。在仓库的检出目录中生成并上传地图：
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api

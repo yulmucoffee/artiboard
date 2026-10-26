@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createServer, request } from 'node:http';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
@@ -34,6 +34,8 @@ const SHOP = new Map(Object.entries({
   'docs/money.md': '# Money\n\nAmounts go through `toCents` in shared/units.js before they are stored.\n',
 }));
 const runCli = promisify(execFile);
+const UPLOADER = fileURLToPath(new URL('../skills/artiboard/scripts/codemap.mjs', import.meta.url));
+const literal = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 if (process.env.AB_SUPABASE === '1') backends.push({ name: 'supabase', env: { ARTIBOARD_BACKEND: 'supabase' } });
 
 for (const backend of backends) {
@@ -950,9 +952,8 @@ for (const backend of backends) {
       const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
       const commit = () => git('-c', 'user.email=a@b', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'x');
       const head = () => `${git('rev-parse', '--abbrev-ref', 'HEAD')}@${git('rev-parse', 'HEAD').slice(0, 7)}`;
-      const literal = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       // not execFileSync: the script talks to this process's own server, which must keep answering
-      const upload = async () => (await runCli(process.execPath, [fileURLToPath(new URL('../skills/artiboard/scripts/codemap.mjs', import.meta.url)),
+      const upload = async () => (await runCli(process.execPath, [UPLOADER,
         '--site', BASE, '--project', id, '--repo', SHOP_REPO, '--root', root, '--token', tokens.member, '--if-changed'])).stdout.trim().split('\n')[0];
       const stored = async () => (await store.get(id, `map/${SHOP_KEY}`)).data;
       await store.createProject(null, { id, title: 'Uploader', lang: 'en', repos: [{ repo: SHOP_REPO, label: 'shop' }] });
@@ -983,6 +984,76 @@ for (const backend of backends) {
         assert.match(await upload(), /^up to date: /);
       } finally {
         await store.dropProject(id).catch(() => {});
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    test('--hook installs git hooks that rebuild the map after each commit, beside a hook\'s own lines', async () => {
+      const id = `hook-${R}`, root = mkdtempSync(join(tmpdir(), 'artiboard-repo-')), downloads = mkdtempSync(join(tmpdir(), 'artiboard-dl-'));
+      const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+      // not execFileSync: a commit runs the hook, and this process's own server must answer its upload
+      const commit = (...args) => runCli('git', ['-c', 'user.email=a@b', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', ...args], { cwd: root });
+      const hook = async (script = UPLOADER) => (await runCli(process.execPath, [script, '--hook',
+        '--site', BASE, '--project', id, '--repo', SHOP_REPO, '--root', root, '--token', tokens.member])).stdout;
+      const mapped = async () => (await (await api(`/api/p/${id}/map`, { headers: { Authorization: `Bearer ${tokens.viewer}` } })).json()).maps[0]?.commit;
+      await store.createProject(null, { id, title: 'Hook', lang: 'en', repos: [{ repo: SHOP_REPO, label: 'shop' }] });
+      try {
+        writeFileSync(join(root, 'units.js'), 'export function toCents(amount) {\n  return Math.round(amount * 100);\n}\n');
+        git('init', '-q');
+        git('add', '.');
+        await commit('-m', 'x');
+        const gitDir = git('rev-parse', '--absolute-git-dir'), hooks = ['post-commit', 'post-merge'].map((h) => join(gitDir, 'hooks', h));
+        const own = '#!/bin/sh\necho own >> "$(git rev-parse --git-dir)/own.log"\n';
+        writeFileSync(hooks[0], own, { mode: 0o755 });
+
+        copyFileSync(UPLOADER, join(downloads, 'codemap.mjs'));
+        await assert.rejects(hook(join(downloads, 'codemap.mjs')), (e) => e.code === 2 && /temp folder/.test(e.stderr), 'a copy that will vanish is refused');
+        assert.equal(readFileSync(hooks[0], 'utf8'), own, 'and installs nothing');
+
+        assert.match(await hook(), new RegExp(`^${literal(`${SHOP_REPO} → ${BASE}/p/${id}`)}: 1 files`, 'm'), 'it builds once now');
+        assert.equal(await mapped(), git('rev-parse', 'HEAD'), 'so the map exists before the next commit');
+        const installed = hooks.map((f) => readFileSync(f, 'utf8'));
+        for (const [i, text] of installed.entries()) {
+          assert.ok(statSync(hooks[i]).mode & 0o100, `${hooks[i]} is executable`);
+          assert.match(text, /^\( .* --if-changed >> .* 2>&1 & \) # artiboard code map$/m, 'one marked line runs the uploader in the background');
+        }
+        assert.ok(installed[0].startsWith(own), 'a hook\'s own lines stay, and the marked line follows them');
+        const env = join(gitDir, 'artiboard-codemap.env');
+        assert.equal(statSync(env).mode & 0o777, 0o600, 'the token file is its owner\'s alone');
+        assert.equal(readFileSync(env, 'utf8'), `ARTIBOARD_TOKEN=${tokens.member}\n`);
+        assert.match(await hook(), /^up to date: /m, 'installing again builds nothing new');
+        assert.deepEqual(hooks.map((f) => readFileSync(f, 'utf8')), installed, 'and changes no hook');
+
+        writeFileSync(join(root, 'units.js'), 'export function toCents(amount) {\n  return Math.round(amount * 1000) / 10;\n}\n');
+        await commit('-am', 'x');
+        const want = git('rev-parse', 'HEAD');
+        for (const until = Date.now() + 15000; (await mapped()) !== want && Date.now() < until;) await new Promise((r) => setTimeout(r, 200));
+        assert.equal(await mapped(), want, 'the hook rebuilt the map for the new commit');
+        assert.equal(readFileSync(join(gitDir, 'own.log'), 'utf8'), 'own\n', 'and the hook\'s own line ran too');
+      } finally {
+        await store.dropProject(id).catch(() => {});
+        rmSync(root, { recursive: true, force: true });
+        rmSync(downloads, { recursive: true, force: true });
+      }
+    });
+
+    test('--workflow writes the CI job that keeps a team board\'s map current, and never replaces one', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'artiboard-repo-'));
+      const workflow = () => runCli(process.execPath, [UPLOADER, '--workflow', '--site', BASE, '--project', M, '--repo', SHOP_REPO, '--label', 'shop', '--root', root]);
+      try {
+        execFileSync('git', ['init', '-q'], { cwd: root });
+        execFileSync('git', ['remote', 'add', 'origin', 'https://example.invalid/acme/shop.git'], { cwd: root });
+        const { stdout } = await workflow();
+        const file = join(root, '.github/workflows/artiboard-codemap.yml'), yaml = readFileSync(file, 'utf8');
+        assert.match(yaml, /^ {4}branches: \[main\]$/m, 'with no origin HEAD, the default branch is main');
+        assert.match(yaml, new RegExp(`^ {10}curl -fsSL ${literal(BASE)}/codemap\\.mjs -o "\\$RUNNER_TEMP/codemap\\.mjs"$`, 'm'), 'the uploader of the site\'s own version');
+        assert.match(yaml, new RegExp(`^ {10}node "\\$RUNNER_TEMP/codemap\\.mjs" --site ${literal(BASE)} --project ${M} --repo ${literal(SHOP_REPO)} --label shop$`, 'm'));
+        assert.match(yaml, /^ {6}- env:\n {10}ARTIBOARD_TOKEN: \$\{\{ secrets\.ARTIBOARD_TOKEN \}\}\n {8}run: \|$/m, 'with the token from a secret');
+        assert.match(stdout, new RegExp(`gh secret set ARTIBOARD_TOKEN --repo ${literal(SHOP_REPO)}`), 'and says how to store it');
+        writeFileSync(file, 'ours\n');
+        await assert.rejects(workflow(), (e) => e.code === 1 && /exists; not overwritten/.test(e.stderr), 'a second run refuses');
+        assert.equal(readFileSync(file, 'utf8'), 'ours\n', 'and leaves the file as it was');
+      } finally {
         rmSync(root, { recursive: true, force: true });
       }
     });
@@ -1075,7 +1146,7 @@ for (const backend of backends) {
       const toCents = await ask({ explain: 'toCents' });
       assert.match(toCents, /^toCents · \S+ · shared\/units\.js:1 · /m);
       assert.match(toCents, /^called by:$/m);
-      assert.match(toCents, /api\/orders\.js#orderTotal \[[xi]\]/);
+      assert.match(toCents, /^  api\/orders\.js: orderTotal$/m, 'callers by file, no marker on an edge read from the source');
       assert.match(await ask({ file: 'shared/units.js' }), /fromCents/);
       assert.match(await ask({ query: 'cents' }), /shared\/units\.js/);
       assert.match(await ask({ path: ['api/report.js', 'shared/units.js'] }), /api\/report\.js.*api\/orders\.js.*shared\/units\.js/);
@@ -1088,8 +1159,40 @@ for (const backend of backends) {
       const inside = (await call(board, 'board_map', { project: M, inside: 'monthlyReport' })).value;
       assert.match(inside, /^inside api\/report\.js#monthlyReport: \d+ \w+ within 2 steps$/m);
       const [one = '', two = ''] = inside.split(/^depth 2:$/m);
-      assert.match(one, /^depth 1:\n(?:  .*\n)*  api\/orders\.js#orderTotal \[[xi]\] calls$/m, 'what it calls');
-      assert.match(two, /^  shared\/units\.js#toCents \[[xi]\] calls$/m, 'and what that calls');
+      assert.match(one, /^depth 1:\n(?:  .*\n)*  api\/orders\.js: orderTotal$/m, 'what it calls');
+      assert.match(two, /^  shared\/units\.js: toCents$/m, 'and what that calls');
+    });
+
+    test('an unsized board_map answer stops near 3,000 characters and says how to ask for more', async () => {
+      const id = `cut-${R}`;
+      await store.createProject(null, { id, title: 'Cut', lang: 'en', repos: [{ repo: SHOP_REPO, label: 'shop' }] });
+      try {
+        // a hub with 400 callers in one file: every caller is a line of an unsized answer without the cut
+        const files = new Map([['lib/el.js', 'export function el() {}\n'],
+          ['big.js', "import { el } from './lib/el.js';\n" + Array.from({ length: 400 }, (_, k) => `export function big${k}(a) { return el(a); }`).join('\n') + '\n']]);
+        const { index, chunks } = buildGraph(files, { repo: SHOP_REPO, by: 'x' });
+        assert.equal((await api(`/api/p/${id}/map`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.member}` }, body: { repo: SHOP_REPO, index, chunks } })).status, 200);
+        const ask = async (args) => (await call(board, 'board_map', { project: id, ...args })).value;
+        const unsized = await ask({ explain: 'el', limit: undefined });
+        assert.ok(unsized.length < 1000, `thirty callers by file: ${unsized.length} chars`);
+        const file = await ask({ file: 'big.js' });
+        assert.ok(file.length < 2200 && /… 370 more \(limit 400\)$/m.test(file), `thirty symbols: ${file.length} chars`);
+        const all = await ask({ file: 'big.js', limit: 200 });
+        assert.ok(all.length > 6000 && !/cut at/.test(all), 'limit asks for more on purpose, uncut');
+        const wide = await ask({ impact: 'el', limit: 200 });
+        assert.ok(wide.length > 1500 && !/cut at/.test(wide));
+        // thirty long declarations and forty importers run past the cap: the cut keeps the answer to a screen
+        const long = new Map([['long.js', Array.from({ length: 30 }, (_, k) => `export function long${k}(${Array.from({ length: 8 }, (_, j) => `parameterNumber${j}`).join(', ')}) {}`).join('\n') + '\n']]);
+        for (let k = 0; k < 40; k++) long.set(`users/importer${k}.js`, "import { long0 } from '../long.js';\nexport const u = long0;\n");
+        const big = buildGraph(long, { repo: SHOP_REPO, by: 'x' });
+        assert.equal((await api(`/api/p/${id}/map`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.member}` }, body: { repo: SHOP_REPO, index: big.index, chunks: big.chunks } })).status, 200);
+        const cut = await ask({ file: 'long.js' });
+        assert.ok(cut.length <= 3100 && /\n… cut at 3000 characters: ask a narrower name, or pass limit$/.test(cut), `cut: ${cut.length} chars`);
+        const whole = await ask({ file: 'long.js', limit: 100 });
+        assert.ok(whole.length > 3100 && !/cut at/.test(whole), 'limit lifts the cut');
+      } finally {
+        await store.dropProject(id);
+      }
     });
 
     test('a claim on a board with a map brings the code its task names, and overlaps reach across an import', async () => {
@@ -1156,7 +1259,7 @@ for (const backend of backends) {
       assert.equal(q, (await call(board, 'board_map', { project: M, query: 'cents' })).value);
       assert.match(await cli('map', 'path', '--project', M, 'api/report.js', 'shared/units.js'), /api\/orders\.js/);
       const inside = await cli('map', 'inside', '--project', M, 'monthlyReport');
-      assert.match(inside, /api\/orders\.js#orderTotal/);
+      assert.match(inside, /api\/orders\.js: orderTotal/);
       assert.equal(inside, (await call(board, 'board_map', { project: M, inside: 'monthlyReport' })).value);
     });
 
