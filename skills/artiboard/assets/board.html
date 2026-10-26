@@ -68,12 +68,11 @@ h2{font-size:18px;font-weight:650;letter-spacing:-.015em;margin:0;text-wrap:bala
 h3{font-size:14.5px;font-weight:700;margin:0}
 p{margin:0}
 .muted{color:var(--muted)}
-/* below the tabs the page uses the window's width: the kanban, the item table, people's lanes, the code map and the
-   graph gain from it. The board's heading, the tabs and the text people read top to bottom stay on a centered
-   1180 px column, so a line of text keeps an easy length and the top of the page does not stretch. */
+/* the board's heading, the tabs and the document view stay on a centered 1180 px column, so a line keeps an easy
+   length and nothing stretches across a wide window; only the kanban and the graph grow past it when their columns
+   need the room */
 .page{display:flex;flex-direction:column;gap:28px}
-header.top,.toolbar,section[data-fold="now"],section[data-fold="activity"],section[data-fold="notices"],
-section[data-fold="notes"],section[data-fold="rules"],section[data-fold="guide"]{width:100%;max-width:1180px;margin-inline:auto}
+header.top,#viewDoc>section,footer{width:100%;max-width:1180px;margin-inline:auto}
 .board{display:flex;flex-direction:column;gap:28px;min-width:0}
 .view{display:flex;flex-direction:column;gap:36px;min-width:0}
 section{display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -123,8 +122,9 @@ header.top{display:flex;flex-direction:column;gap:14px}
 .legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:12.5px;color:var(--muted)}
 .legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
 
-/* sticky toolbar */
-.toolbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-block:10px;border-bottom:1px solid var(--line);margin-top:-6px}
+/* sticky toolbar: it spans the window, so what scrolls under it never shows beside it, while its content stays on
+   the heading's column */
+.toolbar{position:sticky;top:env(safe-area-inset-top,0px);left:0;z-index:5;background:var(--bg);display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;align-self:flex-start;width:var(--vw,100%);max-width:none;margin:-6px 0 0 calc(-1 * var(--page-l,0px));padding:10px var(--col-r,0px) 10px var(--col-l,0px);border-bottom:1px solid var(--line)}
 .toolbar .seg button{min-height:30px;padding:0 14px;font-size:13px}
 .search{flex:1 1 220px;max-width:360px;display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:0 6px 0 10px;min-height:34px}
 .search:focus-within{border-color:var(--accent)}
@@ -183,7 +183,7 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border
 .rows .t:hover{text-decoration:underline;text-underline-offset:3px}
 .rows .side{display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:12.5px;color:var(--muted);white-space:nowrap;min-width:0;overflow:hidden}
 .rows .side a{font-size:12.5px}
-@media (max-width:640px){.rows>li,.rows.ready>li{grid-template-columns:auto minmax(0,1fr)}.rows .t{grid-column:1/-1;white-space:normal}.rows .side{justify-content:flex-start}}
+@media (max-width:640px){.rows>li,.rows.ready>li{grid-template-columns:auto minmax(0,1fr)}.rows .t{grid-column:1/-1;white-space:normal}.rows .side{justify-content:flex-start;flex-wrap:wrap;white-space:normal}.rows.ready .side{grid-column:1/-1}}
 .btn{min-height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:500}
 .btn:hover{background:var(--sunk)}
 .btn.primary{border-color:transparent;background:var(--accent);color:var(--on-accent)}
@@ -297,12 +297,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 .back:hover{color:var(--ink)}
 
 /* kanban: the page itself scrolls both ways, so a wheel or a swipe anywhere moves it and no box traps the scroll.
-   The board grows to the columns' width, which leaves the toolbar room to stick to the window's left edge; it spans
-   the window so cards passing under it do not show beside it, and column headers stick right under it. Columns keep
+   The board grows to the columns' width, which leaves the toolbar room to stick to the window's left edge, and column
+   headers stick right under the toolbar. Columns keep
    one width or take two card columns. A card is two lines: what it is with who has it (or that it is free) at the
    right, then its title. */
 body[data-view="kanban"] .board{width:max-content;min-width:100%}
-body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);max-width:none;margin-left:calc(-1 * var(--page-l));padding-inline:var(--col-l) var(--col-r)}
 .kanban{--colw:296px;padding-bottom:12px}
 /* the kanban and the graph sit in the window's middle, at least as wide as the heading's column and wider when their
    columns need it; their descriptions wrap to that width instead of setting it */
@@ -311,10 +310,10 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 #viewKanban .sec-head p,#viewGraph .sec-head p{flex:1 1 320px}
 /* arrows at the edges move a wide kanban or graph about a screen sideways, for a mouse without a sideways wheel; each
    shows while there is more on its side, halfway down the part of the board in view. Touch screens swipe instead. */
-.side{position:fixed;z-index:4;width:36px;height:36px;margin-top:-18px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-hi);display:grid;place-items:center}
-.side:hover{border-color:var(--edge)}
-.side[hidden]{display:none}
-@media (pointer:coarse){.side{display:none}}
+.pan{position:fixed;z-index:4;width:36px;height:36px;margin-top:-18px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-hi);display:grid;place-items:center}
+.pan:hover{border-color:var(--edge)}
+.pan[hidden]{display:none}
+@media (pointer:coarse){.pan{display:none}}
 /* a touch browser meets a page wider than the screen by widening its layout viewport, which unpins the toolbar, so
    there the board swipes sideways in its own box and only the vertical scroll is the page's */
 @media (pointer:coarse){
@@ -375,7 +374,8 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .crit{font-size:13.5px;color:var(--text2)}
 .crit b{color:var(--ink)}
 .crit .path{font-family:var(--f-mono);font-size:12.5px;color:var(--accent);overflow-wrap:anywhere}
-.graph-wrap{overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:min(78vh,900px)}
+/* the page does not anchor its scroll inside the graph, so zooming it keeps the page still */
+.graph-wrap{overflow:auto;overflow-anchor:none;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:min(78vh,900px)}
 .graph{position:relative;margin-inline:auto}
 .graph svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 .gcol{position:absolute;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
@@ -551,7 +551,7 @@ td.what .overlap{margin-left:8px}
   h1{font-size:24px}
   .box,.lane{padding:16px}
   .toolbar{position:static}
-  .feed li,.activity li{grid-template-columns:1fr}
+  .feed li,.activity li{grid-template-columns:minmax(0,1fr)}
   .feed .at{flex-direction:row;flex-wrap:wrap;align-items:center}
 }
 @media (prefers-reduced-motion:reduce){.node,.graph path.e,.cnode,.cmap-pic .e{transition:none}.agent-mark.live::before{animation:none}}
@@ -652,8 +652,8 @@ td.what .overlap{margin-left:8px}
       <section aria-labelledby="h-kanban">
         <div class="sec-head"><h2 id="h-kanban"></h2><p id="kanbanSub"></p></div>
         <div class="kanban" id="kanban"></div>
-        <button type="button" class="side" id="kanbanPrev" hidden></button>
-        <button type="button" class="side" id="kanbanNext" hidden></button>
+        <button type="button" class="pan" id="kanbanPrev" hidden></button>
+        <button type="button" class="pan" id="kanbanNext" hidden></button>
       </section>
     </div>
 
@@ -665,8 +665,8 @@ td.what .overlap{margin-left:8px}
           <div class="legend" id="glegend"></div>
         </div>
         <div class="graph-wrap" id="graphWrap" tabindex="0"></div>
-        <button type="button" class="side" id="graphPrev" hidden></button>
-        <button type="button" class="side" id="graphNext" hidden></button>
+        <button type="button" class="pan" id="graphPrev" hidden></button>
+        <button type="button" class="pan" id="graphNext" hidden></button>
       </section>
     </div>
   </div>
@@ -891,7 +891,7 @@ td.what .overlap{margin-left:8px}
       startShort: 'start {d} passed',
       h_graph: 'Dependency graph',
       graphSub:
-        'A column unlocks when the columns to its left are done. Hover a task to keep only what it depends on and unlocks.',
+        'A column unlocks when the columns to its left are done. Hover a task to keep only what it depends on and unlocks. Zoom with ⌘ or Ctrl and the wheel.',
       nowSub: 'In progress {a} · review {b} · blocked {c}',
       noneYet: 'Nothing claimed yet',
       meTag: 'me',
@@ -1210,7 +1210,8 @@ td.what .overlap{margin-left:8px}
       waitShort: '선행 {k}',
       startShort: '{d} 착수 지남',
       h_graph: '선행 그래프',
-      graphSub: '왼쪽 단계가 끝나야 오른쪽이 풀려요. 태스크에 마우스를 올리면 앞뒤로 이어진 것만 남아요.',
+      graphSub:
+        '왼쪽 단계가 끝나야 오른쪽이 풀려요. 태스크에 마우스를 올리면 앞뒤로 이어진 것만 남아요. ⌘ 또는 Ctrl+휠로 확대·축소해요.',
       nowSub: '진행 중 {a} · 검토 {b} · 막힘 {c}',
       noneYet: '아직 집은 일 없음',
       meTag: '나',
@@ -5781,7 +5782,6 @@ td.what .overlap{margin-left:8px}
   function sizeBoard() {
     var tb = $('toolbar'),
       style = document.body.style;
-    if (view !== 'kanban') return;
     var page = document.querySelector('.page').getBoundingClientRect(),
       column = document.querySelector('header.top').getBoundingClientRect(),
       cw = document.documentElement.clientWidth,
@@ -5954,6 +5954,28 @@ td.what .overlap{margin-left:8px}
     return d && !d.archivedAt ? d : null;
   }
   var GRAPH = { W: 224, H: 98, GX: 68, GY: 12, PAD: 18, TOP: 38 };
+  // ⌘ or Ctrl with the wheel zooms the graph around the pointer (a trackpad pinch arrives the same way); the zoom
+  // stays while the page is open
+  var graphZoom = 1;
+  $('graphWrap').addEventListener(
+    'wheel',
+    function (e) {
+      var wrap = $('graphWrap'),
+        g = wrap.querySelector('.graph');
+      if (!(e.ctrlKey || e.metaKey) || !g) return;
+      e.preventDefault();
+      var r = wrap.getBoundingClientRect(),
+        px = e.clientX - r.left - wrap.clientLeft,
+        py = e.clientY - r.top - wrap.clientTop,
+        next = Math.min(2, Math.max(0.3, graphZoom * Math.exp(-e.deltaY * 0.0025))),
+        k = next / graphZoom;
+      graphZoom = next;
+      g.style.zoom = next;
+      wrap.scrollLeft = (wrap.scrollLeft + px) * k - px;
+      wrap.scrollTop = (wrap.scrollTop + py) * k - py;
+    },
+    { passive: false }
+  );
   var graphRel = null;
   function graphModel() {
     var ts = tasks.slice().sort(byKey),
@@ -6141,7 +6163,7 @@ td.what .overlap{margin-left:8px}
     });
     var Wd = GRAPH.PAD * 2 + n * GRAPH.W + (n - 1) * GRAPH.GX,
       Ht = GRAPH.TOP + maxRows * (GRAPH.H + GRAPH.GY) - GRAPH.GY + GRAPH.PAD;
-    var g = el('div', { class: 'graph', style: 'width:' + Wd + 'px;height:' + Ht + 'px' });
+    var g = el('div', { class: 'graph', style: 'width:' + Wd + 'px;height:' + Ht + 'px;zoom:' + graphZoom });
     function cardX(t) {
       return GRAPH.PAD + m.lvl[t.id] * (GRAPH.W + GRAPH.GX);
     }
@@ -6388,6 +6410,7 @@ td.what .overlap{margin-left:8px}
     }
     if (cursor && order.indexOf(cursor) < 0) cursor = null;
     applyCursor();
+    sizeBoard();
     sideArrows();
   }
   function applyCursor(scroll) {

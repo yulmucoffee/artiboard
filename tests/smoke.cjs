@@ -335,6 +335,10 @@ const meLane = (d) => {
   writeNotice(d).click();
   await tick();
   ok(!!d.getElementById('noticeText'), 'the notice form opens on demand');
+  ok(
+    [...d.querySelectorAll('.rows .side')].every((x) => w.getComputedStyle(x).position !== 'fixed'),
+    'the rows keep their right-hand detail in line: the sideways arrows share no class with it'
+  );
   d.querySelector('.rows.ready .btn').click();
   await tick();
   await tick();

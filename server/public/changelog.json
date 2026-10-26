@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.21.1",
+      "date": "2026-10-26",
+      "prs": [
+        55
+      ],
+      "lines": {
+        "en": [
+          "No more stray round bubbles over the document view: the sideways arrows had taken the look of each row's right-hand detail.",
+          "People's lanes, the item table, the code map and the footer stay on the centered column, and the pinned toolbar spans the window, so nothing shows beside it while you scroll.",
+          "Zoom the dependency graph with ⌘ or Ctrl and the wheel. On a phone, recent activity no longer runs off the screen and the claim button stays whole."
+        ],
+        "ko": [
+          "문서 보기에 떠 있던 둥근 '풀려요.' 동그라미가 사라졌어요. 좌우 화살표 모양이 행 오른쪽 정보에 잘못 입혀져 있었어요.",
+          "누가 무엇을, 항목판, 코드 지도, 바닥글이 가운데 칸에 맞춰지고, 고정된 툴바가 창 전체를 덮어 스크롤할 때 옆으로 내용이 비치지 않아요.",
+          "선행 그래프를 ⌘ 또는 Ctrl+휠로 확대·축소할 수 있어요. 휴대폰에서 최근 활동이 화면 밖으로 넘치지 않고, 집기 버튼도 잘리지 않아요."
+        ]
+      }
+    },
+    {
       "version": "1.21.0",
       "date": "2026-10-26",
       "prs": [
