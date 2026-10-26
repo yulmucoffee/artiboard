@@ -2347,6 +2347,25 @@ td.what .overlap{margin-left:8px}
       renderView();
     });
   });
+  // the click handler of anything that stands for a task: it opens the task's sheet
+  function opens(t) {
+    return function () {
+      openSheet(t.id);
+    };
+  }
+  function titleOf(t) {
+    return t.title || T('untitled');
+  }
+  function loadingText() {
+    return failed || T('loading');
+  }
+  function emptyNote(text) {
+    return el('p', { class: 'empty', text: text });
+  }
+  // a list's one line when it has nothing (or nothing yet) to show, under the column the dates take
+  function emptyItem(text) {
+    return el('li', {}, [el('span', {}), el('span', { class: 'empty', text: text })]);
+  }
   function moreBtn(on, n, toggle) {
     return button({
       class: 'morebtn',
@@ -2907,7 +2926,7 @@ td.what .overlap{margin-left:8px}
       c[knownStatus(t)]++;
     });
     $('mCount').textContent = !loaded
-      ? failed || T('loading')
+      ? loadingText()
       : T('tasksCount', { n: allTasks.length, d: c.done }) +
         (archived.length ? ' · ' + T('archivedCount', { n: archived.length }) : '');
     var last = tasks
@@ -3133,11 +3152,9 @@ td.what .overlap{margin-left:8px}
   function titleButton(t) {
     return button({
       class: 't',
-      text: t.title || T('untitled'),
+      text: titleOf(t),
       title: t.title || '',
-      onclick: function () {
-        openSheet(t.id);
-      }
+      onclick: opens(t)
     });
   }
   // a few rows, the rest behind "more"; which lists stay open is kept in nowExpanded by name
@@ -3216,11 +3233,11 @@ td.what .overlap{margin-left:8px}
         (late ? ' · ' + T('lateN', { n: late }) : '')
       : '';
     if (!loaded) {
-      box.appendChild(el('p', { class: 'empty', text: failed || T('loading') }));
+      box.appendChild(emptyNote(loadingText()));
       return;
     }
     if (!tasks.length) {
-      box.appendChild(el('p', { class: 'empty', text: T('noTasks') }));
+      box.appendChild(emptyNote(T('noTasks')));
       box.appendChild(el('p', { class: 'muted', style: 'font-size:13.5px', text: T('emptyHint') }));
       return;
     }
@@ -3248,7 +3265,7 @@ td.what .overlap{margin-left:8px}
       el('div', { class: 'subhead' }, [T('ready'), el('span', { class: 'n', text: String(pickable.length) })])
     );
     if (!pickable.length) {
-      box.appendChild(el('p', { class: 'empty', text: T('readyNone') }));
+      box.appendChild(emptyNote(T('readyNone')));
       return;
     }
     nowRows('ready', 'rows ready', pickable, readyRow).forEach(function (n) {
@@ -3342,14 +3359,14 @@ td.what .overlap{margin-left:8px}
       return;
     }
     if (!loaded) {
-      ul.appendChild(el('li', {}, [el('span', {}), el('span', { class: 'empty', text: failed || T('loading') })]));
+      ul.appendChild(emptyItem(loadingText()));
       return;
     }
     var ids = recentIds();
     watchActivity(ids);
     $('activityN').textContent = ids.length ? String(ids.length) : '';
     if (!ids.length) {
-      ul.appendChild(el('li', {}, [el('span', {}), el('span', { class: 'empty', text: T('noActivity') })]));
+      ul.appendChild(emptyItem(T('noActivity')));
       return;
     }
     ids.forEach(function (id) {
@@ -3374,10 +3391,8 @@ td.what .overlap{margin-left:8px}
             el('div', { class: 'head' }, [
               el('span', { class: 'key', text: t.key }),
               button({
-                text: t.title || T('untitled'),
-                onclick: function () {
-                  openSheet(t.id);
-                }
+                text: titleOf(t),
+                onclick: opens(t)
               }),
               statusChip(knownStatus(t)),
               t.owner ? personChip(t.owner) : null,
@@ -3417,10 +3432,8 @@ td.what .overlap{margin-left:8px}
               el('span', { class: 'key', text: t.key }),
               button({
                 class: 'link',
-                text: t.title || T('untitled'),
-                onclick: function () {
-                  openSheet(t.id);
-                }
+                text: titleOf(t),
+                onclick: opens(t)
               }),
               dateChip(t),
               agentMark(t),
@@ -3456,10 +3469,8 @@ td.what .overlap{margin-left:8px}
                     el('span', { class: 'key', text: t.key }),
                     button({
                       class: 'link',
-                      text: t.title || T('untitled'),
-                      onclick: function () {
-                        openSheet(t.id);
-                      }
+                      text: titleOf(t),
+                      onclick: opens(t)
                     }),
                     dateChip(t)
                   ]);
@@ -3477,10 +3488,10 @@ td.what .overlap{margin-left:8px}
             el('span', { class: 'muted', text: T('laneOpen', { n: openAll.length }) })
           ]),
           !loaded
-            ? el('p', { class: 'empty', text: failed || T('loading') })
+            ? emptyNote(loadingText())
             : openList.length
               ? ul
-              : el('p', { class: 'empty', text: openAll.length ? T('laneNoMatch') : T('laneEmpty') }),
+              : emptyNote(openAll.length ? T('laneNoMatch') : T('laneEmpty')),
           !filtering() && openList.length > LANE_MAX
             ? moreBtn(!!laneExpanded[p.id], openList.length - LANE_MAX, function () {
                 laneExpanded[p.id] = !laneExpanded[p.id];
@@ -3547,7 +3558,7 @@ td.what .overlap{margin-left:8px}
     body.textContent = '';
     order = [];
     if (!loaded) {
-      body.appendChild(el('tr', {}, [el('td', { colspan: '7', class: 'empty', text: failed || T('loading') })]));
+      body.appendChild(el('tr', {}, [el('td', { colspan: '7', class: 'empty', text: loadingText() })]));
       return;
     }
     (featureFilter === 'all' ? fs : [featureFilter]).forEach(function (f) {
@@ -3616,14 +3627,12 @@ td.what .overlap{margin-left:8px}
               class: 'item',
               'data-k': t.id,
               'aria-current': String(openId === t.id),
-              onclick: function () {
-                openSheet(t.id);
-              }
+              onclick: opens(t)
             },
             [
               el('td', { class: 'keycell' }, [el('span', { class: 'key', text: t.key }), newDot(isNew(t))]),
               el('td', { class: 'what' }, [
-                button({ text: t.title || T('untitled') }),
+                button({ text: titleOf(t) }),
                 overlapFlag(t),
                 t.repo || t.branch
                   ? el('span', { class: 'sub' }, [repoTag(t), t.repo && t.branch ? ' ' : null, t.branch || null])
@@ -3649,10 +3658,8 @@ td.what .overlap{margin-left:8px}
       draft = keep ? keep.value : '',
       hadFocus = keep && document.activeElement === keep;
     ul.textContent = '';
-    if (!loaded)
-      ul.appendChild(el('li', {}, [el('span', {}), el('span', { class: 'empty', text: failed || T('loading') })]));
-    else if (!notices.length)
-      ul.appendChild(el('li', {}, [el('span', {}), el('span', { class: 'empty', text: T('noNotices') })]));
+    if (!loaded) ul.appendChild(emptyItem(loadingText()));
+    else if (!notices.length) ul.appendChild(emptyItem(T('noNotices')));
     var unread = notices.filter(noticeNew).length,
       shown = noticesAll ? notices : notices.slice(0, Math.max(3, unread));
     shown.forEach(function (n) {
@@ -3825,7 +3832,7 @@ td.what .overlap{margin-left:8px}
       if (shut || (d.editing && $(tid))) return;
       body.textContent = '';
       if (!db) {
-        body.appendChild(el('p', { class: 'empty', text: failed || T('loading') }));
+        body.appendChild(emptyNote(loadingText()));
         return;
       }
       if (d.editing) {
@@ -3882,7 +3889,7 @@ td.what .overlap{margin-left:8px}
         return;
       }
       if (!own && !legacy) {
-        body.appendChild(el('p', { class: 'empty', text: d.loaded && d.oldLoaded ? T(k + 'Empty') : T('loading') }));
+        body.appendChild(emptyNote(d.loaded && d.oldLoaded ? T(k + 'Empty') : T('loading')));
         return;
       }
       if (legacy) body.appendChild(el('p', { class: 'rules-note', text: T('rulesLegacy') }));
@@ -4065,9 +4072,7 @@ td.what .overlap{margin-left:8px}
               return el('li', {}, [
                 button({
                   text: overlapText(overlap),
-                  onclick: function () {
-                    openSheet(overlap.task.id);
-                  }
+                  onclick: opens(overlap.task)
                 })
               ]);
             })
@@ -4148,7 +4153,7 @@ td.what .overlap{margin-left:8px}
         id: active.getAttribute('data-id')
       };
     body.textContent = '';
-    if (!maps) body.appendChild(el('p', { class: 'empty', text: failed || T('loading') }));
+    if (!maps) body.appendChild(emptyNote(loadingText()));
     else if (!maps.length) body.appendChild(noMapYet());
     else {
       body.appendChild(el('div', { class: 'cmaps' }, maps.map(mapCard)));
@@ -4185,8 +4190,8 @@ td.what .overlap{margin-left:8px}
     var rs = repoList(),
       cmd = buildCommand(rs.length === 1 ? rs[0].repo : 'owner/name');
     return el('div', { class: 'cmap-none' }, [
-      el('p', { class: 'empty', text: T('codemapNone') }),
-      cmd ? el('p', { class: 'empty', text: T('codemapHow') }) : null,
+      emptyNote(T('codemapNone')),
+      cmd ? emptyNote(T('codemapHow')) : null,
       cmd ? el('code', { class: 'cmap-cmd', text: cmd }) : null
     ]);
   }
@@ -4965,8 +4970,8 @@ td.what .overlap{margin-left:8px}
     if (!scene && !card.graph && !card.loading && !card.error && db) loadMap(map, card);
     if (!scene) {
       card.svg = null;
-      card.svgWrap.appendChild(el('p', { class: 'empty', text: card.error || T('loading') }));
-    } else if (!scene.nodes.length) card.svgWrap.appendChild(el('p', { class: 'empty', text: T('codemapEmpty') }));
+      card.svgWrap.appendChild(emptyNote(card.error || T('loading')));
+    } else if (!scene.nodes.length) card.svgWrap.appendChild(emptyNote(T('codemapEmpty')));
     else {
       markTasks(scene, card.graph);
       var key = levelKey(level) + '|' + card.builtAt + '|' + W + '|' + scene.nodes.length;
@@ -5496,9 +5501,7 @@ td.what .overlap{margin-left:8px}
     return button(
       {
         class: 'cmap-task' + personClass(holderOf(t)),
-        onclick: function () {
-          openSheet(t.id);
-        }
+        onclick: opens(t)
       },
       [el('b', { text: t.key }), el('span', { text: personName(holderOf(t)) })]
     );
@@ -5575,10 +5578,10 @@ td.what .overlap{margin-left:8px}
             })
           )
         );
-    } else if (!graph) out.appendChild(el('p', { class: 'empty', text: card.error || T('loading') }));
+    } else if (!graph) out.appendChild(emptyNote(card.error || T('loading')));
     else {
       var n = graph.node(id);
-      if (!n) out.appendChild(el('p', { class: 'empty', text: T('codemapEmpty') }));
+      if (!n) out.appendChild(emptyNote(T('codemapEmpty')));
       else {
         var lines = (n.k === 'file' || n.k === 'doc' ? graph.file(id, {}) : graph.explain(id, {})).lines;
         out.appendChild(el('p', { class: 'cmap-title', text: n.n }));
@@ -5657,9 +5660,7 @@ td.what .overlap{margin-left:8px}
         class: 'card' + (s === 'done' || s === 'archive' ? ' done' : ''),
         'data-k': t.id,
         'aria-current': String(openId === t.id),
-        onclick: function () {
-          openSheet(t.id);
-        }
+        onclick: opens(t)
       },
       [
         el('div', { class: 'top' }, [
@@ -5668,7 +5669,7 @@ td.what .overlap{margin-left:8px}
           newDot(isNew(t)),
           el('span', { class: 'right' }, [overlapFlag(t), cardFlag(t), avatar(t, true)])
         ]),
-        el('div', { class: 'title', text: t.title || T('untitled') })
+        el('div', { class: 'title', text: titleOf(t) })
       ]
     );
   }
@@ -5679,14 +5680,12 @@ td.what .overlap{margin-left:8px}
         class: 'card done line',
         'data-k': t.id,
         'aria-current': String(openId === t.id),
-        title: t.title || T('untitled'),
-        onclick: function () {
-          openSheet(t.id);
-        }
+        title: titleOf(t),
+        onclick: opens(t)
       },
       [
         el('span', { class: 'key', text: t.key }),
-        el('span', { class: 'title', text: t.title || T('untitled') }),
+        el('span', { class: 'title', text: titleOf(t) }),
         newDot(isNew(t)),
         avatar(t, true),
         t.doneAt ? el('span', { class: 'when', text: localDay(t.doneAt).slice(5) }) : null
@@ -5863,8 +5862,7 @@ td.what .overlap{margin-left:8px}
           )
         );
       var cards = el('div', { class: 'cards' });
-      if (!loaded)
-        cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: failed || T('loading') }));
+      if (!loaded) cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: loadingText() }));
       else if (!all.length)
         cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: T('empty') }));
       if (arch)
@@ -6068,7 +6066,7 @@ td.what .overlap{margin-left:8px}
     var gl = $('glegend');
     gl.textContent = '';
     if (!loaded) {
-      wrap.appendChild(el('p', { class: 'empty', style: 'padding:16px', text: failed || T('loading') }));
+      wrap.appendChild(el('p', { class: 'empty', style: 'padding:16px', text: loadingText() }));
       return;
     }
     if (!tasks.length) {
@@ -6212,9 +6210,7 @@ td.what .overlap{margin-left:8px}
               style: 'left:' + cardX(t) + 'px;top:' + cardY(t) + 'px;width:' + GRAPH.W + 'px;height:' + GRAPH.H + 'px',
               'aria-label':
                 t.key + ' ' + (t.title || '') + ', ' + statusLabel(knownStatus(t)) + ', ' + personName(t.owner),
-              onclick: function () {
-                openSheet(t.id);
-              },
+              onclick: opens(t),
               onmouseenter: function () {
                 lineage(t.id);
               },
@@ -6232,7 +6228,7 @@ td.what .overlap{margin-left:8px}
                 agentMark(t),
                 newDot(isNew(t))
               ]),
-              el('div', { class: 'tt', text: t.title || T('untitled') }),
+              el('div', { class: 'tt', text: titleOf(t) }),
               el('div', { class: 'r3' + (ready(t) ? ' ready' : ''), text: r3 })
             ]
           )
@@ -6811,7 +6807,7 @@ td.what .overlap{margin-left:8px}
         dateChip(t),
         agentMark(t)
       ]),
-      el('h2', { id: 'sheetTitle', text: t.title || T('untitled') }),
+      el('h2', { id: 'sheetTitle', text: titleOf(t) }),
       knownStatus(t) !== 'done' && waiting.length
         ? el('p', { style: 'color:var(--warn);font-size:13.5px', text: T('depsPending', { k: waiting.join(', ') }) })
         : null,
@@ -6825,9 +6821,7 @@ td.what .overlap{margin-left:8px}
       list.map(function (d) {
         return button(
           {
-            onclick: function () {
-              openSheet(d.id);
-            }
+            onclick: opens(d)
           },
           [el('span', { class: 'key', text: d.key }), statusChip(knownStatus(d))]
         );
@@ -6863,7 +6857,7 @@ td.what .overlap{margin-left:8px}
   function threadList() {
     var list = el('div', { class: 'msgs' });
     if (msgErr) list.appendChild(el('p', { class: 'err', text: T('threadFail') }));
-    else if (!msgs.length) list.appendChild(el('p', { class: 'empty', text: T('threadEmpty') }));
+    else if (!msgs.length) list.appendChild(emptyNote(T('threadEmpty')));
     msgs.forEach(function (m) {
       var ag = m.kind === 'agent',
         nw = !!m.at && m.at > openPrevSeen && !(m.author === me && !ag);
