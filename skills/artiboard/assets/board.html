@@ -430,15 +430,18 @@ td.what .overlap{margin-left:8px}
 .code .form-row input{flex:1 1 200px}
 .maplines{font-family:var(--f-mono);font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text2)}
 .maplines:empty{display:none}
-.maplines button{display:block;width:100%;text-align:left;background:none;border:0;padding:0;font:inherit;color:var(--accent);white-space:pre-wrap;overflow-wrap:anywhere}
+.maplines button{background:none;border:0;padding:0;font:inherit;color:var(--accent);text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}
 .maplines button:hover{text-decoration:underline;text-underline-offset:3px}
+.maplines .mapref{white-space:nowrap}
 /* code map: the picture */
 .cmaps{display:grid;gap:14px}
 .cmap{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .cmap-head{display:flex;flex-direction:column;gap:3px}
+.cmap-name{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;min-width:0}
 .cmap-head h3{display:flex;gap:10px;align-items:baseline;overflow-wrap:anywhere}
 .cmap-head .num{font-family:var(--f-mono);font-weight:500;color:var(--muted)}
-.cmap-head p{font-size:13px;color:var(--text2);display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.cmap-counts{font-size:12.5px;color:var(--muted)}
+.cmap-head p{font-size:12.5px;color:var(--text2);display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
 .cmap-dirty{display:inline-block;padding:0 7px;border-radius:99px;background:var(--warn-soft);color:var(--warn);font-size:11.5px;font-weight:600}
 .cmap-cmd{display:block;font-family:var(--f-mono);font-size:12px;background:var(--sunk);border-radius:6px;padding:6px 10px;overflow-wrap:anywhere;user-select:all;color:var(--text2)}
 .cmap-none{display:flex;flex-direction:column;gap:8px}
@@ -453,8 +456,13 @@ td.what .overlap{margin-left:8px}
 .crumb button{background:none;border:0;padding:2px 5px;color:var(--accent);font-size:12.5px;border-radius:4px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .crumb button:hover{background:var(--sunk)}
 .crumb b{color:var(--ink);font-weight:600;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.crumb .zoom{margin-left:auto;display:inline-flex;gap:3px}
-.crumb .zoom button{color:var(--text2);min-width:26px;min-height:24px;text-align:center;border:1px solid var(--line);padding:0 6px;font-size:13px;line-height:1}
+.crumb .back{display:inline-flex;align-items:center;gap:4px;color:var(--ink);font-weight:500;margin-right:6px;border:1px solid var(--line);padding:1px 8px 1px 6px}
+.crumb .back span{font-size:15px;line-height:1;margin-top:-2px}
+.crumb .zoom{margin-left:auto;display:inline-flex;gap:1px}
+.crumb .zoom button{color:var(--muted);min-width:24px;min-height:24px;text-align:center;border:1px solid transparent;padding:0 5px;font-size:12.5px;line-height:1}
+.crumb .zoom button:hover{border-color:var(--line);color:var(--ink)}
+/* a touch screen has no hover to show the zoom buttons are buttons, so their edges stay drawn */
+@media (hover:none){.crumb .zoom button{border-color:var(--line)}}
 .cmap-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
 .cmap-pane{display:flex;flex-direction:column;gap:8px;min-width:0}
 .cmap-svg{position:relative;border:1px solid var(--line-soft);border-radius:8px;background:var(--bg);overflow:hidden;min-height:120px}
@@ -493,6 +501,8 @@ td.what .overlap{margin-left:8px}
 .cmap-legend span{display:inline-flex;align-items:center;gap:5px}
 .cmap-legend svg .shape{fill:var(--muted)} .cmap-legend svg .shape.doc{fill:none;stroke:var(--muted);stroke-width:1.5}
 .cmap-legend svg .e{stroke:var(--muted);stroke-width:1.5} .cmap-legend svg .e.calls{stroke-dasharray:4 3} .cmap-legend svg .e.uses{stroke-dasharray:1.5 3} .cmap-legend svg .e.defines{stroke:var(--edge)}
+.cmap-legend .cmap-help{margin-left:auto;flex:none;width:18px;height:18px;padding:0;border:1px solid var(--line);border-radius:99px;background:none;color:var(--muted);font-size:11px;font-weight:600;line-height:1}
+.cmap-legend .cmap-help:hover,.cmap-legend .cmap-help[aria-expanded='true']{color:var(--ink);border-color:var(--text2)}
 .cmap-legend .cmap-hint{flex-basis:100%;color:var(--muted)}
 .cmap-legend .cmap-fail{flex-basis:100%;color:var(--danger)}
 .cmap-detail{display:flex;flex-direction:column;gap:8px;min-width:0;font-size:13px}
@@ -768,6 +778,7 @@ td.what .overlap{margin-left:8px}
       codemapRebuild: 'Rebuild',
       codemapSearchNone: 'Nothing named {q}',
       codemapGroups: 'All groups',
+      codemapBack: 'Back',
       codemapOther: 'other files',
       codemapEmpty: 'Nothing to draw here.',
       codemapZoomIn: 'Zoom in',
@@ -787,11 +798,11 @@ td.what .overlap{margin-left:8px}
       codemapEdgeDefines: 'defines',
       codemapHidden: '{n} more not shown',
       codemapPrefix: 'group names are under {p}',
+      codemapHelp: 'How to use the map',
       codemapHint:
-        'Click a node to read about it, again to open it. Esc goes up. Drag to pan; ⌘ or Ctrl + wheel zooms.',
+        'Click a node to read about it, again to open it. Esc or Backspace goes up. Drag to pan; ⌘ or Ctrl + wheel zooms.',
       codemapOverview: 'Groups of files that belong together',
-      codemapOverviewHint:
-        'Thicker links mean more imports and calls between two groups. Open a group to see its files, a file to see its symbols.',
+      codemapOverviewHint: 'Thicker links mean more imports and calls.',
       codemapOpen: 'Open',
       codemapFiles: '{n} files',
       codemapTasks: 'Open tasks touching this',
@@ -1087,6 +1098,7 @@ td.what .overlap{margin-left:8px}
       codemapRebuild: '다시 만들기',
       codemapSearchNone: '{q}라는 이름이 없어요',
       codemapGroups: '전체 묶음',
+      codemapBack: '뒤로',
       codemapOther: '그 밖의 파일',
       codemapEmpty: '그릴 것이 없어요.',
       codemapZoomIn: '확대',
@@ -1106,11 +1118,11 @@ td.what .overlap{margin-left:8px}
       codemapEdgeDefines: '정의',
       codemapHidden: '{n}개는 그리지 않음',
       codemapPrefix: '묶음 이름은 {p} 아래',
+      codemapHelp: '지도 사용법',
       codemapHint:
-        '노드를 누르면 설명이, 한 번 더 누르면 안이 열려요. Esc로 위로. 끌어서 이동, ⌘ 또는 Ctrl + 휠로 확대·축소.',
+        '노드를 누르면 설명이, 한 번 더 누르면 안이 열려요. Esc나 Backspace로 위로. 끌어서 이동, ⌘ 또는 Ctrl + 휠로 확대·축소.',
       codemapOverview: '함께 움직이는 파일 묶음',
-      codemapOverviewHint:
-        '선이 굵을수록 두 묶음 사이에 import와 호출이 많아요. 묶음을 열면 파일이, 파일을 열면 심볼이 보여요.',
+      codemapOverviewHint: '선이 굵을수록 import와 호출이 많아요.',
       codemapOpen: '열기',
       codemapFiles: '파일 {n}개',
       codemapTasks: '여기를 건드리는 열린 태스크',
@@ -1390,7 +1402,8 @@ td.what .overlap{margin-left:8px}
   const graphKind = (n) => (n.k === 'sym' || n.k === 'sec' ? n.t || n.k : n.k);
   const graphWhere = (n) => (n.l ? `${n.f}:${n.l}` : n.f);
   // list lines stay one screen wide, so a long declaration is shortened there
-  const graphSig = (n, max = 80) => (n.s ? ` · ${n.s.length > max ? `${n.s.slice(0, max - 1)}…` : n.s}` : '');
+  const graphCut = (s, max) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
+  const graphSig = (n, max = 80) => (n.s ? ` · ${graphCut(n.s, max)}` : '');
   const graphDeg = (g, id) => g.degree.get(id) || 0;
   const graphByDegree = (g) => (a, b) => graphDeg(g, b) - graphDeg(g, a) || graphCmp(a, b);
   const graphByLine = (g) => (a, b) => (g.nodes.get(a).l || 0) - (g.nodes.get(b).l || 0) || graphCmp(a, b);
@@ -1412,7 +1425,36 @@ td.what .overlap{margin-left:8px}
   // up to ten), since an agent that is not told does not ask.
   function graphList(lines, items, limit, line, more) {
     for (const it of items.slice(0, limit)) lines.push(line(it));
-    if (items.length > limit) lines.push(`  … ${items.length - limit} more${more ? ` (limit ${Math.ceil(items.length / 10) * 10})` : ''}`);
+    if (items.length > limit) lines.push(more ? graphMore(items, limit) : `  … ${items.length - limit} more`);
+  }
+
+  // Ends of edges printed by the file they are in, one line a file, so a hub's seventy callers cost a few characters
+  // each instead of a path each: `  server/flow.js: start, claim, ?post`. A leading ? marks an edge matched by name
+  // rather than read from the source (no name starts with ?, where a trailing one would blur into Ruby's valid?);
+  // `here` is the subject's own file; an end that is a file is its path; a doc section is its slug, which holds no
+  // comma. At most limit names, then how many more and the limit to pass; lines wrap so a reader never meets a
+  // thousand-character line.
+  const GRAPH_LINE = 110;
+  // the most a caller may ask for, the same bound the tool's schema enforces
+  const GRAPH_LIMIT = 200;
+  const graphMore = (items, limit) => `  … ${items.length - limit} more (limit ${Math.min(GRAPH_LIMIT, Math.ceil(items.length / 10) * 10)})`;
+  // an id without the folder a community is named for: what its overview lists, and what find resolves back
+  const graphWithin = (id, folder) => (folder && id.startsWith(`${folder}/`) ? id.slice(folder.length + 1) : id);
+  function graphGrouped(lines, g, items, limit, own) {
+    const byFile = new Map();
+    for (const [id, conf] of items.slice(0, limit)) {
+      const n = g.nodes.get(id), file = n.k === 'file' || n.k === 'doc' ? '' : n.f;
+      graphPush(byFile, file, (conf === 'i' ? '?' : '') + (file ? (n.k === 'sec' ? id.slice(id.indexOf('#') + 1) : n.n) : id));
+    }
+    for (const [file, names] of byFile) {
+      let line = file ? `  ${file === own ? 'here' : file}:` : ' ';
+      for (const name of names) {
+        if (line.length + name.length + 2 > GRAPH_LINE && line.trim().endsWith(',')) { lines.push(line.replace(/,$/, '')); line = '   '; }
+        line += ` ${name},`;
+      }
+      lines.push(line.replace(/,$/, ''));
+    }
+    if (items.length > limit) lines.push(graphMore(items, limit));
   }
 
   function graphCommunity(g, n) {
@@ -1433,6 +1475,7 @@ td.what .overlap{margin-left:8px}
       lasts.filter((id) => g.nodes.get(id).n.endsWith(`.${s}`)),
       lasts,
       s.includes('/') ? graphEnding(g, s) : [],
+      s.includes('#') ? graphEnding(g, s.slice(0, s.indexOf('#'))).map((f) => `${f}${s.slice(s.indexOf('#'))}`).filter((id) => g.nodes.has(id)) : [],
     ];
     for (const t of tiers) {
       if (!t.length) continue;
@@ -1478,7 +1521,7 @@ td.what .overlap{margin-left:8px}
       const es = (g[dir].get(n.i) || []).filter((e) => e.type === type).sort((a, b) => order(other(a), other(b)));
       if (!es.length) continue;
       lines.push(`${label}:`);
-      graphList(lines, es, limit, (e) => `  ${other(e)} [${e.conf}]`, true);
+      graphGrouped(lines, g, es.map((e) => [other(e), e.conf]), limit, n.f);
     }
     return { lines, id: n.i };
   }
@@ -1506,14 +1549,14 @@ td.what .overlap{margin-left:8px}
     const lines = [`${f.i} · ${f.k}${c ? ` · community ${c}` : ''} · ${inner.length} ${what} · imported by ${importers.length}`];
     if (inner.length) {
       lines.push(`${what}:`);
-      graphList(lines, inner, limit, (id) => { const n = g.nodes.get(id); return `  ${n.n} ${graphKind(n)} ${n.l}${graphSig(n)}`; }, true);
+      graphList(lines, inner, limit, (id) => { const n = g.nodes.get(id); return `  ${n.l} ${n.s ? graphCut(n.s, 80) : `${graphKind(n)} ${n.n}`}`; }, true);
     }
     const groups = [['imports', graphEnds(g, [f.i], 'out', 'imports')], ['imported by', importers],
       ['mentions', graphEnds(g, all, 'out', 'mentions')], ['mentioned in', graphEnds(g, all, 'in', 'mentions')]];
     for (const [label, ends] of groups) {
       if (!ends.length) continue;
       lines.push(`${label}:`);
-      graphList(lines, ends, limit, ([id, conf]) => `  ${id} [${conf}]`, true);
+      graphGrouped(lines, g, ends, limit, f.i);
     }
     return { lines, id: f.i, symbols: inner };
   }
@@ -1618,7 +1661,7 @@ td.what .overlap{margin-left:8px}
     const symbolCount = (id) => (g.files.get(id) || []).filter((s) => g.nodes.get(s).k === 'sym').length;
     const show = {
       files: (id) => { const c = graphCommunity(g, g.nodes.get(id)); return `  ${id} · ${symbolCount(id)} symbols${c ? ` · ${c}` : ''}`; },
-      symbols: (id) => { const n = g.nodes.get(id); return `  ${id} · ${graphKind(n)} · ${n.l}${graphSig(n)}`; },
+      symbols: (id) => { const n = g.nodes.get(id); return `  ${id} · ${n.l}${graphSig(n)}`; },
       docs: (id) => { const n = g.nodes.get(id); return n.k === 'doc' ? `  ${id} · doc` : `  ${id} · ${graphKind(n)} · ${n.l}`; },
     };
     const lines = [];
@@ -1656,10 +1699,10 @@ td.what .overlap{margin-left:8px}
     }
     const total = levels.reduce((s, l) => s + l.length, 0);
     if (!total) return { lines: [none(hit.id)], levels: [] };
-    const lines = [head(hit.id, total, depth)];
+    const lines = [head(hit.id, total, depth)], own = g.nodes.get(hit.id).f;
     levels.forEach((level, d) => {
       lines.push(`depth ${d + 1}:`);
-      graphList(lines, level, limit, (e) => `  ${end(e)} [${e.conf}] ${e.type}`, true);
+      graphGrouped(lines, g, level.map((e) => [end(e), e.conf]), limit, own);
     });
     return { lines, levels: levels.map((l) => l.map(end)) };
   }
@@ -1692,7 +1735,7 @@ td.what .overlap{margin-left:8px}
     const communities = ix.communities || [], god = ix.god || [];
     if (communities.length) {
       lines.push('communities:');
-      graphList(lines, communities, limit, (x) => `  ${x.name} · ${x.n} files · ${(x.top || []).slice(0, 3).join(', ')}`);
+      graphList(lines, communities, limit, (x) => `  ${x.name} · ${x.n} files · ${(x.top || []).slice(0, 3).map((id) => graphWithin(id, x.name)).join(', ')}`);
     }
     if (god.length) {
       lines.push('most connected:');
@@ -4216,18 +4259,21 @@ td.what .overlap{margin-left:8px}
         .join(' · '),
       cmd = buildCommand(mapText(index.repo) || map.key);
     return el('div', { class: 'cmap-head' }, [
-      el('h3', {}, [
-        mapText(index.label) ? el('span', { class: 'num', text: index.label }) : null,
-        mapText(index.repo) || map.key
-      ]),
-      el('p', {
-        text: T('codemapCounts', {
-          f: mapCount(counts.files),
-          s: mapCount(counts.symbols),
-          e: mapCount(counts.edges),
-          d: mapCount(counts.docs)
+      el('div', { class: 'cmap-name' }, [
+        el('h3', {}, [
+          mapText(index.label) ? el('span', { class: 'num', text: index.label }) : null,
+          mapText(index.repo) || map.key
+        ]),
+        el('span', {
+          class: 'cmap-counts',
+          text: T('codemapCounts', {
+            f: mapCount(counts.files),
+            s: mapCount(counts.symbols),
+            e: mapCount(counts.edges),
+            d: mapCount(counts.docs)
+          })
         })
-      }),
+      ]),
       el('p', { class: 'cmap-built', title: mapText(index.commit) }, [
         built,
         index.dirty === true ? el('span', { class: 'cmap-dirty', text: T('codemapDirty') }) : null,
@@ -4926,8 +4972,25 @@ td.what .overlap{margin-left:8px}
     paintDetail(map, card);
   }
   function paintCrumb(map, card) {
-    var out = card.crumb;
+    var out = card.crumb,
+      depth = card.trail.length;
     out.textContent = '';
+    // one level up, in the same place at every depth, so the way back needs no reading of the trail
+    if (depth > 1)
+      out.appendChild(
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'back',
+            title: levelLabel(map, card, card.trail[depth - 2]),
+            onclick: function () {
+              goUp(map, card, depth - 1);
+            }
+          },
+          [el('span', { 'aria-hidden': 'true', text: '‹' }), T('codemapBack')]
+        )
+      );
     card.trail.forEach(function (level, i) {
       var last = i === card.trail.length - 1,
         label = levelLabel(map, card, level);
@@ -5278,7 +5341,9 @@ td.what .overlap{margin-left:8px}
       { passive: false }
     );
     svg.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && card.trail.length > 1) {
+      if ((e.key === 'Escape' || e.key === 'Backspace') && card.trail.length > 1) {
+        // a browser that still goes back a page on Backspace would leave the board
+        e.preventDefault();
         e.stopPropagation();
         goUp(map, card, card.trail.length - 1);
         return;
@@ -5343,21 +5408,75 @@ td.what .overlap{margin-left:8px}
     });
     if (scene.hidden) out.appendChild(el('span', { text: T('codemapHidden', { n: scene.hidden }) }));
     if (scene.prefix) out.appendChild(el('span', { text: T('codemapPrefix', { p: scene.prefix }) }));
-    out.appendChild(el('span', { class: 'cmap-hint', text: T('codemapHint') }));
+    // the hint is needed once, so it waits behind a ? that says it on hover; shown in place, the ? keeps the focus
+    var hint = el('span', { class: 'cmap-hint', text: T('codemapHint') }),
+      help = el('button', {
+        type: 'button',
+        class: 'cmap-help',
+        text: '?',
+        title: T('codemapHint'),
+        'aria-label': T('codemapHelp'),
+        'aria-expanded': String(!!card.showHint),
+        onclick: function () {
+          card.showHint = !card.showHint;
+          help.setAttribute('aria-expanded', String(card.showHint));
+          if (card.showHint) out.appendChild(hint);
+          else hint.remove();
+        }
+      });
+    out.appendChild(help);
+    if (card.showHint) out.appendChild(hint);
   }
-  // one line of an answer as board_map prints it, made a button when it names something on the map
-  function mapLine(map, card, line) {
-    var m = /^ {2}(\S+)(?: \[[xi]\])?(?: ·.*)?$/.exec(line),
-      id = m && m[1];
-    return id && card.graph && card.graph.node(id)
-      ? el('button', {
-          type: 'button',
-          text: line,
-          onclick: function () {
-            goTo(map, card, id);
-          }
-        })
-      : el('div', { text: line });
+  // a name on an answer's line, a button when the map has the node it stands for; the mark after it (',' or ':') is
+  // held to it, since a line may break on either side of a button and must not start with a comma
+  function mapRef(map, card, label, id, mark) {
+    if (!(id && card.graph && card.graph.node(id))) return label + mark;
+    var button = el('button', {
+      type: 'button',
+      text: label,
+      onclick: function () {
+        goTo(map, card, id);
+      }
+    });
+    return mark ? el('span', { class: 'mapref' }, [button, mark]) : button;
+  }
+  // the comma-separated names of one line, each looked up in its file ('' for a line of files, null for no lookup);
+  // the ? of an edge matched by name stays in the label but is not part of the id
+  function mapNames(map, card, text, file) {
+    var names = text.split(', '),
+      out = [];
+    names.forEach(function (name, i) {
+      var id = file == null ? null : (file ? file + '#' : '') + name.replace(/^\?/, ''),
+        last = i === names.length - 1;
+      out.push(mapRef(map, card, name, id, last ? '' : ','));
+      if (!last) out.push(' ');
+    });
+    return out;
+  }
+  // an answer's lines as board_map prints them, every name a button: `  file: a, ?b` holds names in that file (here
+  // is own, the subject's file), `  path, path` holds files, and a deeper indent is the line above wrapped
+  function mapLines(map, card, lines, own) {
+    var file = null;
+    return lines.map(function (line) {
+      var wrapped = /^ {4}(\S.*)$/.exec(line),
+        named = !wrapped && /^ {2}(\S+): (.+)$/.exec(line),
+        paths = !wrapped && !named && /^ {2}(\S.*)$/.exec(line);
+      if (named) {
+        file = named[1] === 'here' ? own : named[1];
+        return el(
+          'div',
+          {},
+          ['  ', mapRef(map, card, named[1], file, ':'), ' '].concat(mapNames(map, card, named[2], file))
+        );
+      }
+      if (paths) {
+        file = '';
+        return el('div', {}, ['  '].concat(mapNames(map, card, paths[1], file)));
+      }
+      if (wrapped) return el('div', {}, ['    '].concat(mapNames(map, card, wrapped[1], file)));
+      file = null;
+      return el('div', { text: line });
+    });
   }
   function taskChip(t) {
     return el(
@@ -5442,7 +5561,7 @@ td.what .overlap{margin-left:8px}
             'div',
             { class: 'maplines' },
             top.map(function (tid) {
-              return mapLine(map, card, '  ' + tid);
+              return el('div', {}, ['  ', mapRef(map, card, tid, tid, '')]);
             })
           )
         );
@@ -5454,15 +5573,7 @@ td.what .overlap{margin-left:8px}
         var lines = (n.k === 'file' || n.k === 'doc' ? graph.file(id, {}) : graph.explain(id, {})).lines;
         out.appendChild(el('p', { class: 'cmap-title', text: n.n }));
         out.appendChild(el('p', { class: 'muted', text: nodeKind(n) + ' · ' + nodeWhere(n) }));
-        out.appendChild(
-          el(
-            'div',
-            { class: 'maplines' },
-            lines.slice(1).map(function (line) {
-              return mapLine(map, card, line);
-            })
-          )
-        );
+        out.appendChild(el('div', { class: 'maplines' }, mapLines(map, card, lines.slice(1), n.f)));
       }
     }
     if (node && node.tasks.length) {

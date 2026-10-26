@@ -85,6 +85,8 @@ const MAPS = { collection: 'map', limit: 50 };
 const OPEN = { collection: 'tasks', where: [{ field: 'owner', op: '>', value: '' }, { field: 'status', op: '!=', value: 'done' }], limit: 200 };
 // what a map adds to the everyday answers stays a few lines: the code a task names, and where its work meets others'
 const CODE_LINES = 7, OVERLAP_LINES = 5;
+// the most an unsized board_map answer may run to: about a screen, under a thousand tokens
+const MAP_ANSWER = 3000;
 // Maps loaded in this process, by project and key, kept while their index says the same build (builtAt); a few at
 // most, the least recently used going first.
 const loaded = new Map(), LOADED = 8;
@@ -639,7 +641,11 @@ export function makeFlow(store) {
     if (!graph) throw new BoardError('not_found', `the code map of ${name(maps[0])} was just dropped`);
     const [how, arg] = asked[0] || ['overview'], opts = limit ? { limit } : {};
     const answer = how === 'path' ? graph.path(arg[0], arg[1]) : how === 'overview' ? graph.overview(opts) : graph[how](arg, opts);
-    return answer.lines.join('\n') || 'nothing found';
+    const text = answer.lines.join('\n') || 'nothing found';
+    // an answer nobody sized is cut, so one question never costs more than a screen; limit asks for more on purpose
+    if (limit || text.length <= MAP_ANSWER) return text;
+    const cut = text.lastIndexOf('\n', MAP_ANSWER);
+    return `${text.slice(0, cut > 0 ? cut : MAP_ANSWER)}\n… cut at ${MAP_ANSWER} characters: ask a narrower name, or pass limit`;
   }
 
   // A repository's map as the build script made it: its chunks, the last build's chunks beyond the new count deleted,

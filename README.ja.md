@@ -231,7 +231,7 @@ approval_mode = "approve"
 
 あとはエージェントに「このリポジトリにボードをセットアップして」と頼んでください。
 
-**コードマップ**(任意、セルフホスト専用)。マップは、どのコミットとブランチを描いたものかを示します。CI か git フックで最新に保てて、`--if-changed` を付けると前回のマップからチェックアウトが変わったときだけ作ります(セルフホスト手順の [Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current))。リポジトリのチェックアウトからマップを作ってアップロードします:
+**コードマップ**(任意、セルフホスト専用)。マップは、どのコミットとブランチを描いたものかを示します。下のコマンドにフラグを一つ付ければ最新に保てます。`--workflow` は既定ブランチ向けの CI ワークフローを書き(リポジトリのシークレット `ARTIBOARD_TOKEN` が要ります)、`--hook` は自分だけがコミットするチェックアウトに git フックを入れます。リポジトリごとにどちらか一つだけ使います(セルフホスト手順の [Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current))。リポジトリのチェックアウトからマップを作ってアップロードします:
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api
