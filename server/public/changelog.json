@@ -2,6 +2,26 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.18.2",
+      "date": "2026-10-26",
+      "prs": [
+        48,
+        47
+      ],
+      "lines": {
+        "en": [
+          "A task that many others wait on can be finished: the dependents' waitingOn updates follow in batches, and board_start and board_claim check readiness against the deps themselves.",
+          "On Supabase, if_absent holds under two writers at once (exactly one creates the document) and a bad path answers invalid_argument instead of 'unavailable', as SQLite does.",
+          "An agent's write on the raw batch route no longer carries override: overrides go through board_batch, which records in the thread who overrode what."
+        ],
+        "ko": [
+          "많은 태스크가 기다리는 태스크도 끝낼 수 있어요. 의존 태스크들의 waitingOn 갱신은 나눠서 따라가고, board_start와 board_claim은 선행 태스크 자체를 보고 준비 여부를 판단해요.",
+          "Supabase에서 if_absent가 동시 쓰기 둘 중 하나만 문서를 만들도록 지키고, 잘못된 경로는 SQLite처럼 '사용 불가' 대신 invalid_argument로 답해요.",
+          "에이전트가 raw batch 경로로 보낸 쓰기는 override를 잃어요. override는 누가 무엇을 덮어썼는지 스레드에 남기는 board_batch로만 가능해요."
+        ]
+      }
+    },
+    {
       "version": "1.18.1",
       "date": "2026-10-26",
       "prs": [
