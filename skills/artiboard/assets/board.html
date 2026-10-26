@@ -69,6 +69,7 @@ h3{font-size:14.5px;font-weight:700;margin:0}
 p{margin:0}
 .muted{color:var(--muted)}
 .page{max-width:1180px;margin-inline:auto;display:flex;flex-direction:column;gap:28px}
+.board{display:flex;flex-direction:column;gap:28px;min-width:0}
 .view{display:flex;flex-direction:column;gap:36px;min-width:0}
 section{display:flex;flex-direction:column;gap:14px;min-width:0}
 .sec-body{display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -290,14 +291,24 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 .back{font-size:13px;color:var(--muted);text-decoration:none;align-self:flex-start}
 .back:hover{color:var(--ink)}
 
-/* kanban: a board that fills the window and scrolls both ways inside it, like Notion's. Columns keep one width,
-   fold to a strip or take two card columns; headers stay put while cards scroll. A card is two lines: what it is
-   with who has it (or that it is free) at the right, then its title. */
-.kanban{--colw:296px;overflow:auto;overscroll-behavior:contain;padding-bottom:12px}
-.cols{display:flex;gap:12px;align-items:flex-start;width:max-content;min-height:100%}
+/* kanban: the page itself scrolls both ways, so a wheel or a swipe anywhere moves it and no box traps the scroll.
+   The board grows to the columns' width, which leaves the toolbar room to stick to the window's left edge; it spans
+   the window so cards passing under it do not show beside it, and column headers stick right under it. Columns keep
+   one width, fold to a strip or take two card columns. A card is two lines: what it is with who has it (or that it
+   is free) at the right, then its title. */
+body[data-view="kanban"] .board{width:max-content;min-width:100%}
+body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);margin-left:calc(-1 * var(--page-l));padding-inline:var(--page-l) var(--page-r)}
+.kanban{--colw:296px;padding-bottom:12px}
+/* a touch browser meets a page wider than the screen by widening its layout viewport, which unpins the toolbar, so
+   there the board swipes sideways in its own box and only the vertical scroll is the page's */
+@media (pointer:coarse){
+  body[data-view="kanban"] .board{width:auto}
+  .kanban{overflow-x:auto;overscroll-behavior-x:contain}
+}
+.cols{display:flex;gap:12px;align-items:flex-start;width:max-content;padding-inline-end:max(16px,env(safe-area-inset-right,0px))}
 .col{flex:none;width:var(--colw);background:var(--sunk);border-radius:12px;display:flex;flex-direction:column}
 .col.two{width:calc(var(--colw) * 2 + 8px)}
-.col h3{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:10px 8px 8px 14px;font-size:13px;background:var(--sunk);border-radius:12px 12px 0 0}
+.col h3{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--tb-h,0px));z-index:2;display:flex;gap:8px;align-items:center;padding:10px 8px 8px 14px;font-size:13px;background:var(--sunk);border-radius:12px 12px 0 0}
 .col h3 .state{font-size:13px;color:var(--ink)}
 .col h3 .n{color:var(--muted);font-weight:500;font-size:12.5px}
 .col h3 .tools{margin-left:auto;display:flex;gap:2px}
@@ -314,7 +325,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 .cards{display:flex;flex-direction:column;gap:6px;padding:0 8px 8px}
 .col.two .cards{display:grid;grid-template-columns:1fr 1fr;align-items:start}
 .col.two .cards>p,.col.two .cards>.morebtn{grid-column:1/-1}
-.card{text-align:left;width:100%;background:var(--surface);border:1px solid var(--line-soft);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--shadow);transition:box-shadow .12s,border-color .12s}
+.card{scroll-margin-top:calc(env(safe-area-inset-top,0px) + var(--tb-h,0px) + 52px);text-align:left;width:100%;background:var(--surface);border:1px solid var(--line-soft);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--shadow);transition:box-shadow .12s,border-color .12s}
 .card:hover{border-color:var(--edge);box-shadow:var(--shadow-hi)}
 .card.cursor{outline:2px solid var(--accent);outline-offset:1px}
 .card[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
@@ -549,90 +560,92 @@ td.what .overlap{margin-left:8px}
     <div class="legend" id="legend"></div>
   </header>
 
-  <div class="toolbar" role="toolbar" id="toolbar">
-    <div class="seg" role="tablist" id="tabs">
-      <button type="button" role="tab" data-view="doc" aria-selected="false"></button>
-      <button type="button" role="tab" data-view="kanban" aria-selected="false"></button>
-      <button type="button" role="tab" data-view="graph" aria-selected="false"></button>
+  <div class="board">
+    <div class="toolbar" role="toolbar" id="toolbar">
+      <div class="seg" role="tablist" id="tabs">
+        <button type="button" role="tab" data-view="doc" aria-selected="false"></button>
+        <button type="button" role="tab" data-view="kanban" aria-selected="false"></button>
+        <button type="button" role="tab" data-view="graph" aria-selected="false"></button>
+      </div>
+      <label class="search">
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <input type="search" id="q" autocomplete="off">
+        <button type="button" class="clear" id="qClear" hidden>×</button>
+      </label>
+      <span class="result" id="qResult"></span>
+      <button type="button" class="newbtn" id="newBtn" aria-pressed="false"></button>
+      <button type="button" class="newbtn" id="mineBtn" aria-pressed="false" hidden></button>
+      <button type="button" class="linkbtn" id="readAll" hidden></button>
+      <span class="hint" aria-hidden="true" id="hint"></span>
     </div>
-    <label class="search">
-      <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <input type="search" id="q" autocomplete="off">
-      <button type="button" class="clear" id="qClear" hidden>×</button>
-    </label>
-    <span class="result" id="qResult"></span>
-    <button type="button" class="newbtn" id="newBtn" aria-pressed="false"></button>
-    <button type="button" class="newbtn" id="mineBtn" aria-pressed="false" hidden></button>
-    <button type="button" class="linkbtn" id="readAll" hidden></button>
-    <span class="hint" aria-hidden="true" id="hint"></span>
-  </div>
 
-  <div class="view" id="viewDoc" hidden>
-    <section data-fold="now">
-      <div class="sec-head"><button type="button" class="fold"><h2 id="h-now"></h2><span class="n" id="nowN"></span></button><p id="nowSub"></p></div>
-      <div class="sec-body"><div class="box" id="now"></div></div>
-    </section>
-    <section data-fold="activity">
-      <div class="sec-head"><button type="button" class="fold"><h2 id="h-activity"></h2><span class="n" id="activityN"></span></button><p id="activitySub"></p></div>
-      <div class="sec-body"><ul class="activity" id="activity"></ul></div>
-    </section>
-    <section data-fold="notices">
-      <div class="sec-head"><button type="button" class="fold"><h2 id="h-notices"></h2><span class="n" id="noticesN"></span></button><p id="noticesSub"></p>
-        <span class="tools"><button type="button" class="linkbtn" id="noticeRead" hidden></button></span></div>
-      <div class="sec-body"><ul class="feed" id="feed"></ul></div>
-    </section>
-    <section data-fold="notes">
-      <div class="sec-head"><button type="button" class="fold"><h2 id="h-notes"></h2><span class="n" id="notesN"></span></button><p id="notesSub"></p>
-        <span class="tools"><button type="button" class="linkbtn" id="notesEdit" hidden></button></span></div>
-      <div class="sec-body" id="notesBody"></div>
-    </section>
-    <section data-fold="people">
-      <div class="sec-head"><button type="button" class="fold"><h2 id="h-people"></h2><span class="n" id="peopleN"></span></button><p id="peopleSub"></p></div>
-      <div class="sec-body"><div class="lanes" id="lanes"></div></div>
-    </section>
-    <section data-fold="items">
-      <div class="sec-head"><button type="button" class="fold"><h2 id="h-items"></h2><span class="n" id="itemsN"></span></button><p id="itemsSub"></p></div>
-      <div class="sec-body">
-        <div class="filters" id="filters" role="group"></div>
-        <div class="scroll" tabindex="0">
-          <table>
-            <thead><tr id="thead"></tr></thead>
-            <tbody id="rows"></tbody>
-          </table>
+    <div class="view" id="viewDoc" hidden>
+      <section data-fold="now">
+        <div class="sec-head"><button type="button" class="fold"><h2 id="h-now"></h2><span class="n" id="nowN"></span></button><p id="nowSub"></p></div>
+        <div class="sec-body"><div class="box" id="now"></div></div>
+      </section>
+      <section data-fold="activity">
+        <div class="sec-head"><button type="button" class="fold"><h2 id="h-activity"></h2><span class="n" id="activityN"></span></button><p id="activitySub"></p></div>
+        <div class="sec-body"><ul class="activity" id="activity"></ul></div>
+      </section>
+      <section data-fold="notices">
+        <div class="sec-head"><button type="button" class="fold"><h2 id="h-notices"></h2><span class="n" id="noticesN"></span></button><p id="noticesSub"></p>
+          <span class="tools"><button type="button" class="linkbtn" id="noticeRead" hidden></button></span></div>
+        <div class="sec-body"><ul class="feed" id="feed"></ul></div>
+      </section>
+      <section data-fold="notes">
+        <div class="sec-head"><button type="button" class="fold"><h2 id="h-notes"></h2><span class="n" id="notesN"></span></button><p id="notesSub"></p>
+          <span class="tools"><button type="button" class="linkbtn" id="notesEdit" hidden></button></span></div>
+        <div class="sec-body" id="notesBody"></div>
+      </section>
+      <section data-fold="people">
+        <div class="sec-head"><button type="button" class="fold"><h2 id="h-people"></h2><span class="n" id="peopleN"></span></button><p id="peopleSub"></p></div>
+        <div class="sec-body"><div class="lanes" id="lanes"></div></div>
+      </section>
+      <section data-fold="items">
+        <div class="sec-head"><button type="button" class="fold"><h2 id="h-items"></h2><span class="n" id="itemsN"></span></button><p id="itemsSub"></p></div>
+        <div class="sec-body">
+          <div class="filters" id="filters" role="group"></div>
+          <div class="scroll" tabindex="0">
+            <table>
+              <thead><tr id="thead"></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </section>
-    <section data-fold="codemap">
-      <div class="sec-head"><button type="button" class="fold"><h2 id="h-codemap"></h2></button><p id="codemapSub"></p></div>
-      <div class="sec-body" id="codemapBody"></div>
-    </section>
-    <section data-fold="rules">
-      <div class="sec-head"><button type="button" class="fold"><h2 id="h-rules"></h2><span class="n" id="rulesN"></span></button><p id="rulesSub"></p>
-        <span class="tools"><button type="button" class="linkbtn" id="rulesEdit" hidden></button></span></div>
-      <div class="sec-body" id="rulesBody"></div>
-    </section>
-    <section data-fold="guide">
-      <div class="sec-head"><button type="button" class="fold"><h2 id="h-guide"></h2></button><p id="guideSub"></p></div>
-      <div class="sec-body"><div class="rules guide" id="guide"></div></div>
-    </section>
-  </div>
+      </section>
+      <section data-fold="codemap">
+        <div class="sec-head"><button type="button" class="fold"><h2 id="h-codemap"></h2></button><p id="codemapSub"></p></div>
+        <div class="sec-body" id="codemapBody"></div>
+      </section>
+      <section data-fold="rules">
+        <div class="sec-head"><button type="button" class="fold"><h2 id="h-rules"></h2><span class="n" id="rulesN"></span></button><p id="rulesSub"></p>
+          <span class="tools"><button type="button" class="linkbtn" id="rulesEdit" hidden></button></span></div>
+        <div class="sec-body" id="rulesBody"></div>
+      </section>
+      <section data-fold="guide">
+        <div class="sec-head"><button type="button" class="fold"><h2 id="h-guide"></h2></button><p id="guideSub"></p></div>
+        <div class="sec-body"><div class="rules guide" id="guide"></div></div>
+      </section>
+    </div>
 
-  <div class="view" id="viewKanban" hidden>
-    <section aria-labelledby="h-kanban">
-      <div class="sec-head"><h2 id="h-kanban"></h2><p id="kanbanSub"></p></div>
-      <div class="kanban" id="kanban"></div>
-    </section>
-  </div>
+    <div class="view" id="viewKanban" hidden>
+      <section aria-labelledby="h-kanban">
+        <div class="sec-head"><h2 id="h-kanban"></h2><p id="kanbanSub"></p></div>
+        <div class="kanban" id="kanban"></div>
+      </section>
+    </div>
 
-  <div class="view" id="viewGraph" hidden>
-    <section aria-labelledby="h-graph">
-      <div class="sec-head"><h2 id="h-graph"></h2><p id="graphSub"></p></div>
-      <div class="gbar">
-        <p class="crit" id="crit"></p>
-        <div class="legend" id="glegend"></div>
-      </div>
-      <div class="graph-wrap" id="graphWrap" tabindex="0"></div>
-    </section>
+    <div class="view" id="viewGraph" hidden>
+      <section aria-labelledby="h-graph">
+        <div class="sec-head"><h2 id="h-graph"></h2><p id="graphSub"></p></div>
+        <div class="gbar">
+          <p class="crit" id="crit"></p>
+          <div class="legend" id="glegend"></div>
+        </div>
+        <div class="graph-wrap" id="graphWrap" tabindex="0"></div>
+      </section>
+    </div>
   </div>
 
   <footer id="footer"></footer>
@@ -3008,9 +3021,9 @@ td.what .overlap{margin-left:8px}
     renderView();
     if (changed) showViewTop();
   }
-  // a view opens at its top. Scrolled deep into the document view, the kanban would otherwise start above the window,
-  // and its own scrolling (kept inside the board) could not bring it back. The toolbar's bottom is the line while it
-  // sticks; on a narrow window it scrolls with the page, so it comes back into view with the tabs.
+  // a view opens at its top. Scrolled deep into the document view, the kanban would otherwise start above the window.
+  // The toolbar's bottom is the line while it sticks; on a narrow window it scrolls with the page, so it comes back
+  // into view with the tabs.
   function showViewTop() {
     var shown = document.querySelector('.view:not([hidden])'),
       tb = $('toolbar');
@@ -5709,30 +5722,20 @@ td.what .overlap{margin-left:8px}
     write('ab-kcol', JSON.stringify(kanbanColumns));
     renderKanban();
   }
-  // the padding keeps the content on the page's columns while the box spans the window; off, nothing is measured
-  function fullBleed(node, on) {
-    if (!on) {
-      node.style.marginLeft = node.style.marginRight = node.style.paddingLeft = node.style.paddingRight = '';
-      return;
-    }
-    var r = document.querySelector('.page').getBoundingClientRect(),
-      cw = document.documentElement.clientWidth;
-    node.style.marginLeft = -r.left + 'px';
-    node.style.marginRight = -(cw - r.right) + 'px';
-    node.style.paddingLeft = r.left + 'px';
-    node.style.paddingRight = cw - r.right + 'px';
-  }
-  // the board runs from the window's left edge to its right and down to its bottom, so both scrollbars stay in reach;
-  // the toolbar spans the window with it, so cards scrolling under it do not show beside it. The height goes first:
-  // it can bring in the page's vertical scrollbar, which moves the edges the widths are measured from.
+  // the toolbar spans the window from its left edge while its content stays on the page's column, and column headers
+  // stick under it. Edges are measured as if the page were not scrolled sideways; the width goes first, since it can
+  // wrap the toolbar onto another line and change its height.
   function sizeBoard() {
-    var k = $('kanban'),
-      tb = $('toolbar');
-    if (!k || view !== 'kanban') return;
-    var top = getComputedStyle(tb).position === 'sticky' ? tb.offsetHeight : 0;
-    k.style.height = Math.max(360, window.innerHeight - top - 12) + 'px';
-    fullBleed(k, true);
-    fullBleed(tb, true);
+    var tb = $('toolbar'),
+      style = document.body.style;
+    if (view !== 'kanban') return;
+    var r = document.querySelector('.page').getBoundingClientRect(),
+      cw = document.documentElement.clientWidth,
+      left = r.left + window.scrollX;
+    style.setProperty('--vw', cw + 'px');
+    style.setProperty('--page-l', left + 'px');
+    style.setProperty('--page-r', cw - (r.right + window.scrollX) + 'px');
+    style.setProperty('--tb-h', (getComputedStyle(tb).position === 'sticky' ? tb.offsetHeight : 0) + 'px');
   }
   window.addEventListener('resize', sizeBoard);
   // done tasks in or out of the archive: many at once go as batches where the runtime takes them
@@ -6262,6 +6265,7 @@ td.what .overlap{margin-left:8px}
     $('viewDoc').hidden = view !== 'doc';
     $('viewKanban').hidden = view !== 'kanban';
     $('viewGraph').hidden = view !== 'graph';
+    document.body.dataset.view = view;
     applyFolds();
     if (view === 'doc') {
       if (!folded('now')) renderNow();
@@ -6277,10 +6281,7 @@ td.what .overlap{margin-left:8px}
     } else if (view === 'kanban') renderKanban();
     else renderGraph();
     // a hidden view is drawn again when shown, so its elements need not stay around meanwhile
-    if (view !== 'kanban') {
-      $('kanban').textContent = '';
-      fullBleed($('toolbar'), false);
-    }
+    if (view !== 'kanban') $('kanban').textContent = '';
     if (view !== 'graph') {
       $('graphWrap').textContent = '';
       graphRel = null;
