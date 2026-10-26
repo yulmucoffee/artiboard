@@ -2086,6 +2086,10 @@ td.what .overlap{margin-left:8px}
     });
     return n;
   }
+  // every button on the page is a plain button: none sits in a form it could submit
+  function button(a, kids) {
+    return el('button', Object.assign({ type: 'button' }, a), kids);
+  }
   var SVGNS = 'http://www.w3.org/2000/svg';
   function svgEl(tag, a, kids) {
     var n = document.createElementNS(SVGNS, tag);
@@ -2344,8 +2348,7 @@ td.what .overlap{margin-left:8px}
     });
   });
   function moreBtn(on, n, toggle) {
-    return el('button', {
-      type: 'button',
+    return button({
       class: 'morebtn',
       'aria-expanded': String(on),
       text: on ? T('showLess') : T('moreN', { n: n }),
@@ -2557,8 +2560,7 @@ td.what .overlap{margin-left:8px}
     s.setAttribute('aria-label', T('theme'));
     THEMES.forEach(function (v) {
       s.appendChild(
-        el('button', {
-          type: 'button',
+        button({
           'aria-pressed': String(v === cur),
           text: T('th_' + v),
           onclick: function () {
@@ -2592,8 +2594,7 @@ td.what .overlap{margin-left:8px}
       var on = sort.by === by;
       th.appendChild(
         el('th', { 'aria-sort': on ? (sort.dir === 'desc' ? 'descending' : 'ascending') : null }, [
-          el('button', {
-            type: 'button',
+          button({
             title: T('sortBy', { c: x }),
             text: x,
             onclick: function () {
@@ -2646,9 +2647,7 @@ td.what .overlap{margin-left:8px}
     }
     people.forEach(function (p) {
       if (uid && uidOf(p.id)) return;
-      ms.appendChild(
-        el('button', { type: 'button', 'data-me': p.id, 'aria-pressed': String(p.id === me), text: p.name || p.id })
-      );
+      ms.appendChild(button({ 'data-me': p.id, 'aria-pressed': String(p.id === me), text: p.name || p.id }));
     });
   }
 
@@ -2812,8 +2811,7 @@ td.what .overlap{margin-left:8px}
       bs = [];
     function addAction(label, patch, primary, extra) {
       bs.push(
-        el('button', {
-          type: 'button',
+        button({
           class: 'btn small' + (primary ? ' primary' : ''),
           text: label,
           onclick: function (e) {
@@ -2835,8 +2833,7 @@ td.what .overlap{margin-left:8px}
     } else if (statusOf(t) === 'todo' && !t.claimedBy && (!h || h === me)) {
       if (!unmet(t).length)
         bs.push(
-          el('button', {
-            type: 'button',
+          button({
             class: 'btn small primary',
             text: T('act_claim'),
             onclick: function (e) {
@@ -2852,7 +2849,7 @@ td.what .overlap{margin-left:8px}
       addAction(T('act_release'), { status: 'todo' });
     }
     if (h && h !== me && s !== 'done') {
-      var tk = el('button', { type: 'button', class: 'btn small', text: T('act_take', { p: personName(h) }) });
+      var tk = button({ class: 'btn small', text: T('act_take', { p: personName(h) }) });
       tk.addEventListener('click', function () {
         if (!tk.dataset.sure) {
           tk.dataset.sure = '1';
@@ -3126,8 +3123,7 @@ td.what .overlap{margin-left:8px}
     return row;
   }
   function titleButton(t) {
-    return el('button', {
-      type: 'button',
+    return button({
       class: 't',
       text: t.title || T('untitled'),
       title: t.title || '',
@@ -3184,8 +3180,7 @@ td.what .overlap{margin-left:8px}
         dateChip(t)
       ]),
       me && writable()
-        ? el('button', {
-            type: 'button',
+        ? button({
             class: 'btn small',
             text: T('claim', { p: personName(me) }),
             title: T('claimTitle', { p: personName(me) }),
@@ -3371,8 +3366,7 @@ td.what .overlap{margin-left:8px}
           el('div', {}, [
             el('div', { class: 'head' }, [
               el('span', { class: 'key', text: t.key }),
-              el('button', {
-                type: 'button',
+              button({
                 text: t.title || T('untitled'),
                 onclick: function () {
                   openSheet(t.id);
@@ -3414,8 +3408,7 @@ td.what .overlap{margin-left:8px}
             el('span', { class: 't' }, [
               statusChip(knownStatus(t)),
               el('span', { class: 'key', text: t.key }),
-              el('button', {
-                type: 'button',
+              button({
                 class: 'link',
                 text: t.title || T('untitled'),
                 onclick: function () {
@@ -3454,8 +3447,7 @@ td.what .overlap{margin-left:8px}
                 doneList.map(function (t) {
                   return el('li', {}, [
                     el('span', { class: 'key', text: t.key }),
-                    el('button', {
-                      type: 'button',
+                    button({
                       class: 'link',
                       text: t.title || T('untitled'),
                       onclick: function () {
@@ -3514,8 +3506,7 @@ td.what .overlap{margin-left:8px}
           return !hideDone || knownStatus(t) !== 'done';
         }).length;
       fr.appendChild(
-        el('button', {
-          type: 'button',
+        button({
           class: 'chip',
           'aria-pressed': String(featureFilter === f),
           text: (f === 'all' ? T('all') : f) + ' ' + n,
@@ -3533,8 +3524,7 @@ td.what .overlap{margin-left:8px}
     }).length;
     if (doneN)
       fr.appendChild(
-        el('button', {
-          type: 'button',
+        button({
           class: 'chip toggle',
           'aria-pressed': String(showDone),
           text: T('showDone', { n: doneN }),
@@ -3572,10 +3562,8 @@ td.what .overlap{margin-left:8px}
       body.appendChild(
         el('tr', { class: 'group' }, [
           el('th', { colspan: '7', scope: 'colgroup' }, [
-            el(
-              'button',
+            button(
               {
-                type: 'button',
                 class: 'fold',
                 'aria-expanded': String(!shut),
                 onclick: function () {
@@ -3628,7 +3616,7 @@ td.what .overlap{margin-left:8px}
             [
               el('td', { class: 'keycell' }, [el('span', { class: 'key', text: t.key }), newDot(isNew(t))]),
               el('td', { class: 'what' }, [
-                el('button', { type: 'button', text: t.title || T('untitled') }),
+                button({ text: t.title || T('untitled') }),
                 overlapFlag(t),
                 t.repo || t.branch
                   ? el('span', { class: 'sub' }, [repoTag(t), t.repo && t.branch ? ' ' : null, t.branch || null])
@@ -3681,8 +3669,7 @@ td.what .overlap{margin-left:8px}
       ul.appendChild(
         el('li', { class: 'more' }, [
           more
-            ? el('button', {
-                type: 'button',
+            ? button({
                 class: 'linkbtn',
                 text: noticesAll ? T('showLess') : T('showAll', { n: notices.length }),
                 onclick: function () {
@@ -3692,8 +3679,7 @@ td.what .overlap{margin-left:8px}
               })
             : null,
           canPost && !composing && !draft
-            ? el('button', {
-                type: 'button',
+            ? button({
                 class: 'btn small',
                 text: T('writeNotice'),
                 onclick: function () {
@@ -3713,7 +3699,7 @@ td.what .overlap{margin-left:8px}
         placeholder: T('noticePh', { p: personName(me) })
       });
       ta.value = draft;
-      var btn = el('button', { type: 'button', class: 'btn primary', text: T('noticeBtn') });
+      var btn = button({ class: 'btn primary', text: T('noticeBtn') });
       btn.addEventListener('click', function () {
         var v = ta.value.trim();
         if (!v) return;
@@ -3734,8 +3720,7 @@ td.what .overlap{margin-left:8px}
             btn.disabled = false;
           });
       });
-      var cancel = el('button', {
-        type: 'button',
+      var cancel = button({
         class: 'btn',
         text: T('cancel'),
         onclick: function () {
@@ -3845,7 +3830,7 @@ td.what .overlap{margin-left:8px}
           d.draft = ta.value;
         });
         var tell = el('input', { type: 'checkbox', checked: tellByDefault ? '' : null });
-        var ok = el('button', { type: 'button', class: 'btn primary small', text: T('save') });
+        var ok = button({ class: 'btn primary small', text: T('save') });
         ok.addEventListener('click', function () {
           var rev = ((d.doc && d.doc.rev) || 0) + 1,
             at = now();
@@ -3867,8 +3852,7 @@ td.what .overlap{margin-left:8px}
               refused(e);
             });
         });
-        var cancel = el('button', {
-          type: 'button',
+        var cancel = button({
           class: 'btn small',
           text: T('cancel'),
           onclick: function () {
@@ -4051,8 +4035,7 @@ td.what .overlap{margin-left:8px}
       return el('span', { class: 'touch', title: touch }, [
         el('span', { text: touch }),
         editable
-          ? el('button', {
-              type: 'button',
+          ? button({
               'aria-label': T('removeTouch', { x: touch }),
               title: T('removeTouch', { x: touch }),
               text: '×',
@@ -4079,8 +4062,7 @@ td.what .overlap{margin-left:8px}
             { class: 'overlaps' },
             overlaps.map(function (overlap) {
               return el('li', {}, [
-                el('button', {
-                  type: 'button',
+                button({
                   text: overlapText(overlap),
                   onclick: function () {
                     openSheet(overlap.task.id);
@@ -4091,10 +4073,7 @@ td.what .overlap{margin-left:8px}
           )
         : null,
       editable
-        ? el('div', { class: 'form-row' }, [
-            input,
-            el('button', { type: 'button', class: 'btn small', text: T('addTouch'), onclick: add })
-          ])
+        ? el('div', { class: 'form-row' }, [input, button({ class: 'btn small', text: T('addTouch'), onclick: add })])
         : null
     ]);
   }
@@ -4321,8 +4300,7 @@ td.what .overlap{margin-left:8px}
         built,
         index.dirty === true ? el('span', { class: 'cmap-dirty', text: T('codemapDirty') }) : null,
         cmd
-          ? el('button', {
-              type: 'button',
+          ? button({
               class: 'linkbtn',
               text: T('codemapRebuild'),
               onclick: function () {
@@ -4397,10 +4375,8 @@ td.what .overlap{margin-left:8px}
     ids.forEach(function (id) {
       var n = card.graph.node(id);
       out.appendChild(
-        el(
-          'button',
+        button(
           {
-            type: 'button',
             class: 'cmap-hit',
             onclick: function () {
               card.input.value = '';
@@ -5021,10 +4997,8 @@ td.what .overlap{margin-left:8px}
     // one level up, in the same place at every depth, so the way back needs no reading of the trail
     if (depth > 1)
       out.appendChild(
-        el(
-          'button',
+        button(
           {
-            type: 'button',
             class: 'back',
             title: levelLabel(map, card, card.trail[depth - 2]),
             onclick: function () {
@@ -5041,8 +5015,7 @@ td.what .overlap{margin-left:8px}
       out.appendChild(
         last
           ? el('b', { text: label, title: level.id || label })
-          : el('button', {
-              type: 'button',
+          : button({
               text: label,
               title: level.id || label,
               onclick: function () {
@@ -5059,8 +5032,7 @@ td.what .overlap{margin-left:8px}
     out.appendChild(zoom);
   }
   function zoomBtn(card, glyph, label, factor) {
-    return el('button', {
-      type: 'button',
+    return button({
       text: glyph,
       title: label,
       'aria-label': label,
@@ -5453,8 +5425,7 @@ td.what .overlap{margin-left:8px}
     if (scene.prefix) out.appendChild(el('span', { text: T('codemapPrefix', { p: scene.prefix }) }));
     // the hint is needed once, so it waits behind a ? that says it on hover; shown in place, the ? keeps the focus
     var hint = el('span', { class: 'cmap-hint', text: T('codemapHint') }),
-      help = el('button', {
-        type: 'button',
+      help = button({
         class: 'cmap-help',
         text: '?',
         title: T('codemapHint'),
@@ -5474,14 +5445,13 @@ td.what .overlap{margin-left:8px}
   // held to it, since a line may break on either side of a button and must not start with a comma
   function mapRef(map, card, label, id, mark) {
     if (!(id && card.graph && card.graph.node(id))) return label + mark;
-    var button = el('button', {
-      type: 'button',
+    var ref = button({
       text: label,
       onclick: function () {
         goTo(map, card, id);
       }
     });
-    return mark ? el('span', { class: 'mapref' }, [button, mark]) : button;
+    return mark ? el('span', { class: 'mapref' }, [ref, mark]) : ref;
   }
   // the comma-separated names of one line, each looked up in its file ('' for a line of files, null for no lookup);
   // the ? of an edge matched by name stays in the label but is not part of the id
@@ -5522,10 +5492,8 @@ td.what .overlap{margin-left:8px}
     });
   }
   function taskChip(t) {
-    return el(
-      'button',
+    return button(
       {
-        type: 'button',
         class: 'cmap-task' + personClass(holderOf(t)),
         onclick: function () {
           openSheet(t.id);
@@ -5555,8 +5523,7 @@ td.what .overlap{margin-left:8px}
             'div',
             { class: 'cmap-tasks' },
             god.map(function (gid) {
-              return el('button', {
-                type: 'button',
+              return button({
                 class: 'cmap-task',
                 text: gid,
                 onclick: function () {
@@ -5579,8 +5546,7 @@ td.what .overlap{margin-left:8px}
       });
     var canOpen = levelCenter(level) !== id,
       open = canOpen
-        ? el('button', {
-            type: 'button',
+        ? button({
             class: 'btn small',
             text: T('codemapOpen'),
             onclick: function () {
@@ -5685,10 +5651,8 @@ td.what .overlap{margin-left:8px}
   function kanbanCard(t, s) {
     if (s === 'done' || s === 'archive') return doneLine(t);
     var meta = [t.feature, t.repo].filter(Boolean).join(' · ');
-    return el(
-      'button',
+    return button(
       {
-        type: 'button',
         class: 'card' + (s === 'done' || s === 'archive' ? ' done' : ''),
         'data-k': t.id,
         'aria-current': String(openId === t.id),
@@ -5709,10 +5673,8 @@ td.what .overlap{margin-left:8px}
   }
   // a finished task on one line: what it is, who did it, the day it was done
   function doneLine(t) {
-    return el(
-      'button',
+    return button(
       {
-        type: 'button',
         class: 'card done line',
         'data-k': t.id,
         'aria-current': String(openId === t.id),
@@ -5831,8 +5793,7 @@ td.what .overlap{margin-left:8px}
       );
   }
   function archiveButton(list) {
-    var b = el('button', {
-      type: 'button',
+    var b = button({
       class: 'colbtn',
       text: T('archBtn'),
       title: T('archAll', { n: list.length })
@@ -5888,10 +5849,8 @@ td.what .overlap{margin-left:8px}
       if (s === 'done' && all.length && writable()) tools.appendChild(archiveButton(all));
       if (canTwo(s))
         tools.appendChild(
-          el(
-            'button',
+          button(
             {
-              type: 'button',
               class: 'colbtn',
               'aria-pressed': String(two),
               title: T(two ? 'colOne' : 'colTwo'),
@@ -6239,10 +6198,8 @@ td.what .overlap{margin-left:8px}
                   ? T('waitingDeps', { k: u.join(', ') })
                   : personName(t.owner) + ' · ' + statusLabel(knownStatus(t));
         g.appendChild(
-          el(
-            'button',
+          button(
             {
-              type: 'button',
               'data-k': t.id,
               'aria-current': String(openId === t.id),
               class:
@@ -6611,7 +6568,7 @@ td.what .overlap{margin-left:8px}
       })
       .join('\n');
     var err = el('p', { class: 'err', hidden: '' });
-    var ok = el('button', { type: 'button', class: 'btn primary', text: T('save') });
+    var ok = button({ class: 'btn primary', text: T('save') });
     ok.addEventListener('click', function () {
       var repos = [],
         bad = null;
@@ -6653,7 +6610,7 @@ td.what .overlap{margin-left:8px}
       el('div', { class: 'bar' }, [
         el('h2', { id: 'setTitle', text: T('s_head') }),
         el('span', { style: 'margin-left:auto' }),
-        el('button', { type: 'button', class: 'x', 'aria-label': T('close'), text: '×', onclick: closeSettings })
+        button({ class: 'x', 'aria-label': T('close'), text: '×', onclick: closeSettings })
       ]),
       el('div', { class: 'body' }, [
         el('div', { class: 'setform' }, [
@@ -6663,10 +6620,7 @@ td.what .overlap{margin-left:8px}
           el('label', {}, [T('s_repos'), re, el('span', { class: 'hint2', text: T('s_reposHint') })]),
           el('p', { class: 'muted', style: 'font-size:12.5px', text: T('s_people') }),
           err,
-          el('div', { class: 'form-row' }, [
-            ok,
-            el('button', { type: 'button', class: 'btn', text: T('cancel'), onclick: closeSettings })
-          ])
+          el('div', { class: 'form-row' }, [ok, button({ class: 'btn', text: T('cancel'), onclick: closeSettings })])
         ])
       ])
     ]);
@@ -6684,8 +6638,7 @@ td.what .overlap{margin-left:8px}
         ? el('span', { style: 'font-weight:400', text: stamp(detailsDoc.summaryAt) })
         : null,
       writable() && !summaryEditing
-        ? el('button', {
-            type: 'button',
+        ? button({
             class: 'linkbtn',
             text: sum ? T('edit') : T('write'),
             onclick: function () {
@@ -6706,7 +6659,7 @@ td.what .overlap{margin-left:8px}
       ]);
     var ta = el('textarea', { id: 'sumText', 'aria-label': T('summary') });
     ta.value = keep.sumText != null ? keep.sumText : sum;
-    var ok = el('button', { type: 'button', class: 'btn primary small', text: T('save') });
+    var ok = button({ class: 'btn primary small', text: T('save') });
     ok.addEventListener('click', function () {
       var patch = { summary: ta.value.trim(), summaryAt: now() },
         o = { override: !mayChange(t, me, { summary: patch.summary }, false) };
@@ -6727,8 +6680,7 @@ td.what .overlap{margin-left:8px}
       ta,
       el('div', { class: 'form-row' }, [
         ok,
-        el('button', {
-          type: 'button',
+        button({
           class: 'btn small',
           text: T('cancel'),
           onclick: function () {
@@ -6872,10 +6824,8 @@ td.what .overlap{margin-left:8px}
       'div',
       { class: 'deplist' },
       list.map(function (d) {
-        return el(
-          'button',
+        return button(
           {
-            type: 'button',
             onclick: function () {
               openSheet(d.id);
             }
@@ -6946,7 +6896,7 @@ td.what .overlap{margin-left:8px}
       ty.appendChild(el('option', { value: x, text: T('ty_' + x) }));
     });
     ty.value = values.msgType || 'note';
-    var send = el('button', { type: 'button', class: 'btn primary', text: T('post') });
+    var send = button({ class: 'btn primary', text: T('post') });
     send.addEventListener('click', function () {
       var v = ta.value.trim();
       if (!v) return;
@@ -6986,8 +6936,7 @@ td.what .overlap{margin-left:8px}
   function sheetNav(t) {
     var idx = order.indexOf(t.id);
     return el('div', { class: 'nav' }, [
-      el('button', {
-        type: 'button',
+      button({
         'aria-label': T('prev'),
         title: T('prev') + ' (k)',
         text: '↑',
@@ -6996,8 +6945,7 @@ td.what .overlap{margin-left:8px}
           moveCursor(-1);
         }
       }),
-      el('button', {
-        type: 'button',
+      button({
         'aria-label': T('next'),
         title: T('next') + ' (j)',
         text: '↓',
@@ -7055,7 +7003,7 @@ td.what .overlap{margin-left:8px}
       el('div', { class: 'bar' }, [
         el('span', { class: 'key', text: t.key }),
         sheetNav(t),
-        el('button', { type: 'button', class: 'x', 'aria-label': T('close'), text: '×', onclick: close })
+        button({ class: 'x', 'aria-label': T('close'), text: '×', onclick: close })
       ]),
       body,
       composerBlock(t, kept.values)
