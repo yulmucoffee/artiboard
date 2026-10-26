@@ -430,8 +430,9 @@ td.what .overlap{margin-left:8px}
 .code .form-row input{flex:1 1 200px}
 .maplines{font-family:var(--f-mono);font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text2)}
 .maplines:empty{display:none}
-.maplines button{display:block;width:100%;text-align:left;background:none;border:0;padding:0;font:inherit;color:var(--accent);white-space:pre-wrap;overflow-wrap:anywhere}
+.maplines button{background:none;border:0;padding:0;font:inherit;color:var(--accent);text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}
 .maplines button:hover{text-decoration:underline;text-underline-offset:3px}
+.maplines .mapref{white-space:nowrap}
 /* code map: the picture */
 .cmaps{display:grid;gap:14px}
 .cmap{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -460,6 +461,8 @@ td.what .overlap{margin-left:8px}
 .crumb .zoom{margin-left:auto;display:inline-flex;gap:1px}
 .crumb .zoom button{color:var(--muted);min-width:24px;min-height:24px;text-align:center;border:1px solid transparent;padding:0 5px;font-size:12.5px;line-height:1}
 .crumb .zoom button:hover{border-color:var(--line);color:var(--ink)}
+/* a touch screen has no hover to show the zoom buttons are buttons, so their edges stay drawn */
+@media (hover:none){.crumb .zoom button{border-color:var(--line)}}
 .cmap-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
 .cmap-pane{display:flex;flex-direction:column;gap:8px;min-width:0}
 .cmap-svg{position:relative;border:1px solid var(--line-soft);border-radius:8px;background:var(--bg);overflow:hidden;min-height:120px}
@@ -795,6 +798,7 @@ td.what .overlap{margin-left:8px}
       codemapEdgeDefines: 'defines',
       codemapHidden: '{n} more not shown',
       codemapPrefix: 'group names are under {p}',
+      codemapHelp: 'How to use the map',
       codemapHint:
         'Click a node to read about it, again to open it. Esc or Backspace goes up. Drag to pan; ⌘ or Ctrl + wheel zooms.',
       codemapOverview: 'Groups of files that belong together',
@@ -1114,6 +1118,7 @@ td.what .overlap{margin-left:8px}
       codemapEdgeDefines: '정의',
       codemapHidden: '{n}개는 그리지 않음',
       codemapPrefix: '묶음 이름은 {p} 아래',
+      codemapHelp: '지도 사용법',
       codemapHint:
         '노드를 누르면 설명이, 한 번 더 누르면 안이 열려요. Esc나 Backspace로 위로. 끌어서 이동, ⌘ 또는 Ctrl + 휠로 확대·축소.',
       codemapOverview: '함께 움직이는 파일 묶음',
@@ -1420,20 +1425,26 @@ td.what .overlap{margin-left:8px}
   // up to ten), since an agent that is not told does not ask.
   function graphList(lines, items, limit, line, more) {
     for (const it of items.slice(0, limit)) lines.push(line(it));
-    if (items.length > limit) lines.push(`  … ${items.length - limit} more${more ? ` (limit ${Math.ceil(items.length / 10) * 10})` : ''}`);
+    if (items.length > limit) lines.push(more ? graphMore(items, limit) : `  … ${items.length - limit} more`);
   }
 
   // Ends of edges printed by the file they are in, one line a file, so a hub's seventy callers cost a few characters
-  // each instead of a path each: `  server/flow.js: start, claim, post?`. A ? marks an edge matched by name rather
-  // than read from the source; `here` is the subject's own file; an end that is a file is its path. At most limit
-  // names, then how many more and the limit to pass. A line is wrapped at GRAPH_LINE characters.
+  // each instead of a path each: `  server/flow.js: start, claim, ?post`. A leading ? marks an edge matched by name
+  // rather than read from the source (no name starts with ?, where a trailing one would blur into Ruby's valid?);
+  // `here` is the subject's own file; an end that is a file is its path; a doc section is its slug, which holds no
+  // comma. At most limit names, then how many more and the limit to pass; lines wrap so a reader never meets a
+  // thousand-character line.
   const GRAPH_LINE = 110;
-  const graphTail = (id) => id.slice(id.lastIndexOf('/') + 1);
+  // the most a caller may ask for, the same bound the tool's schema enforces
+  const GRAPH_LIMIT = 200;
+  const graphMore = (items, limit) => `  … ${items.length - limit} more (limit ${Math.min(GRAPH_LIMIT, Math.ceil(items.length / 10) * 10)})`;
+  // an id without the folder a community is named for: what its overview lists, and what find resolves back
+  const graphWithin = (id, folder) => (folder && id.startsWith(`${folder}/`) ? id.slice(folder.length + 1) : id);
   function graphGrouped(lines, g, items, limit, own) {
     const byFile = new Map();
     for (const [id, conf] of items.slice(0, limit)) {
       const n = g.nodes.get(id), file = n.k === 'file' || n.k === 'doc' ? '' : n.f;
-      graphPush(byFile, file, (file ? n.n : id) + (conf === 'i' ? '?' : ''));
+      graphPush(byFile, file, (conf === 'i' ? '?' : '') + (file ? (n.k === 'sec' ? id.slice(id.indexOf('#') + 1) : n.n) : id));
     }
     for (const [file, names] of byFile) {
       let line = file ? `  ${file === own ? 'here' : file}:` : ' ';
@@ -1443,7 +1454,7 @@ td.what .overlap{margin-left:8px}
       }
       lines.push(line.replace(/,$/, ''));
     }
-    if (items.length > limit) lines.push(`  … ${items.length - limit} more (limit ${Math.ceil(items.length / 10) * 10})`);
+    if (items.length > limit) lines.push(graphMore(items, limit));
   }
 
   function graphCommunity(g, n) {
@@ -1464,6 +1475,7 @@ td.what .overlap{margin-left:8px}
       lasts.filter((id) => g.nodes.get(id).n.endsWith(`.${s}`)),
       lasts,
       s.includes('/') ? graphEnding(g, s) : [],
+      s.includes('#') ? graphEnding(g, s.slice(0, s.indexOf('#'))).map((f) => `${f}${s.slice(s.indexOf('#'))}`).filter((id) => g.nodes.has(id)) : [],
     ];
     for (const t of tiers) {
       if (!t.length) continue;
@@ -1649,7 +1661,7 @@ td.what .overlap{margin-left:8px}
     const symbolCount = (id) => (g.files.get(id) || []).filter((s) => g.nodes.get(s).k === 'sym').length;
     const show = {
       files: (id) => { const c = graphCommunity(g, g.nodes.get(id)); return `  ${id} · ${symbolCount(id)} symbols${c ? ` · ${c}` : ''}`; },
-      symbols: (id) => { const n = g.nodes.get(id); return `  ${id}:${n.l}${graphSig(n)}`; },
+      symbols: (id) => { const n = g.nodes.get(id); return `  ${id} · ${n.l}${graphSig(n)}`; },
       docs: (id) => { const n = g.nodes.get(id); return n.k === 'doc' ? `  ${id} · doc` : `  ${id} · ${graphKind(n)} · ${n.l}`; },
     };
     const lines = [];
@@ -1723,7 +1735,7 @@ td.what .overlap{margin-left:8px}
     const communities = ix.communities || [], god = ix.god || [];
     if (communities.length) {
       lines.push('communities:');
-      graphList(lines, communities, limit, (x) => `  ${x.name} · ${x.n} files · ${(x.top || []).slice(0, 3).map(graphTail).join(', ')}`);
+      graphList(lines, communities, limit, (x) => `  ${x.name} · ${x.n} files · ${(x.top || []).slice(0, 3).map((id) => graphWithin(id, x.name)).join(', ')}`);
     }
     if (god.length) {
       lines.push('most connected:');
@@ -5403,6 +5415,7 @@ td.what .overlap{margin-left:8px}
         class: 'cmap-help',
         text: '?',
         title: T('codemapHint'),
+        'aria-label': T('codemapHelp'),
         'aria-expanded': String(!!card.showHint),
         onclick: function () {
           card.showHint = !card.showHint;
@@ -5414,19 +5427,56 @@ td.what .overlap{margin-left:8px}
     out.appendChild(help);
     if (card.showHint) out.appendChild(hint);
   }
-  // one line of an answer as board_map prints it, made a button when it names something on the map
-  function mapLine(map, card, line) {
-    var m = /^ {2}([^\s:,]+)[:,]?(?:\s|$)/.exec(line),
-      id = m && m[1];
-    return id && card.graph && card.graph.node(id)
-      ? el('button', {
-          type: 'button',
-          text: line,
-          onclick: function () {
-            goTo(map, card, id);
-          }
-        })
-      : el('div', { text: line });
+  // a name on an answer's line, a button when the map has the node it stands for; the mark after it (',' or ':') is
+  // held to it, since a line may break on either side of a button and must not start with a comma
+  function mapRef(map, card, label, id, mark) {
+    if (!(id && card.graph && card.graph.node(id))) return label + mark;
+    var button = el('button', {
+      type: 'button',
+      text: label,
+      onclick: function () {
+        goTo(map, card, id);
+      }
+    });
+    return mark ? el('span', { class: 'mapref' }, [button, mark]) : button;
+  }
+  // the comma-separated names of one line, each looked up in its file ('' for a line of files, null for no lookup);
+  // the ? of an edge matched by name stays in the label but is not part of the id
+  function mapNames(map, card, text, file) {
+    var names = text.split(', '),
+      out = [];
+    names.forEach(function (name, i) {
+      var id = file == null ? null : (file ? file + '#' : '') + name.replace(/^\?/, ''),
+        last = i === names.length - 1;
+      out.push(mapRef(map, card, name, id, last ? '' : ','));
+      if (!last) out.push(' ');
+    });
+    return out;
+  }
+  // an answer's lines as board_map prints them, every name a button: `  file: a, ?b` holds names in that file (here
+  // is own, the subject's file), `  path, path` holds files, and a deeper indent is the line above wrapped
+  function mapLines(map, card, lines, own) {
+    var file = null;
+    return lines.map(function (line) {
+      var wrapped = /^ {4}(\S.*)$/.exec(line),
+        named = !wrapped && /^ {2}(\S+): (.+)$/.exec(line),
+        paths = !wrapped && !named && /^ {2}(\S.*)$/.exec(line);
+      if (named) {
+        file = named[1] === 'here' ? own : named[1];
+        return el(
+          'div',
+          {},
+          ['  ', mapRef(map, card, named[1], file, ':'), ' '].concat(mapNames(map, card, named[2], file))
+        );
+      }
+      if (paths) {
+        file = '';
+        return el('div', {}, ['  '].concat(mapNames(map, card, paths[1], file)));
+      }
+      if (wrapped) return el('div', {}, ['    '].concat(mapNames(map, card, wrapped[1], file)));
+      file = null;
+      return el('div', { text: line });
+    });
   }
   function taskChip(t) {
     return el(
@@ -5511,7 +5561,7 @@ td.what .overlap{margin-left:8px}
             'div',
             { class: 'maplines' },
             top.map(function (tid) {
-              return mapLine(map, card, '  ' + tid);
+              return el('div', {}, ['  ', mapRef(map, card, tid, tid, '')]);
             })
           )
         );
@@ -5523,15 +5573,7 @@ td.what .overlap{margin-left:8px}
         var lines = (n.k === 'file' || n.k === 'doc' ? graph.file(id, {}) : graph.explain(id, {})).lines;
         out.appendChild(el('p', { class: 'cmap-title', text: n.n }));
         out.appendChild(el('p', { class: 'muted', text: nodeKind(n) + ' · ' + nodeWhere(n) }));
-        out.appendChild(
-          el(
-            'div',
-            { class: 'maplines' },
-            lines.slice(1).map(function (line) {
-              return mapLine(map, card, line);
-            })
-          )
-        );
+        out.appendChild(el('div', { class: 'maplines' }, mapLines(map, card, lines.slice(1), n.f)));
       }
     }
     if (node && node.tasks.length) {

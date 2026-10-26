@@ -17,8 +17,9 @@ const langs = readdirSync(new URL('server/codemap/lang/', root)).filter((f) => f
 const order = [...langs, 'server/codemap/lang/index.js', 'server/codemap/graph.js', 'server/codemap/scan.js', 'server/codemap/build.js'];
 
 // the uploader's own imports, beside the ones the modules bring
-const hoisted = new Set(["import { gzipSync } from 'node:zlib';", "import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';",
-  "import { tmpdir } from 'node:os';", "import { resolve, sep } from 'node:path';"]), names = new Map(), parts = [];
+const hoisted = new Set(["import { gzipSync } from 'node:zlib';",
+  "import { accessSync, chmodSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';",
+  "import { tmpdir } from 'node:os';", "import { delimiter, isAbsolute, resolve, sep } from 'node:path';"]), names = new Map(), parts = [];
 for (const file of order) {
   const src = read(file);
   const kept = [];
@@ -53,16 +54,31 @@ const shellWord = (s) => (/^[\\w@%+=:,./-]+$/.test(s) ? s : \`'\${String(s).repl
 const codemapGit = async (cwd, ...args) => (await scanGit(cwd, args)).trim();
 const CODEMAP_MARK = '# artiboard code map';
 
+// The default branch: origin/HEAD when the clone recorded it, else what origin says (a remote added by hand records
+// nothing), else main. git may not stop to ask for a password while the timeout runs.
+async function codemapBranch(top) {
+  const origin = await codemapGit(top, 'symbolic-ref', 'refs/remotes/origin/HEAD').catch(() => '');
+  if (origin) return origin.replace(/^refs\\/remotes\\/origin\\//, '');
+  const said = await scanExec('git', ['ls-remote', '--symref', 'origin', 'HEAD'], { cwd: top, timeout: 5000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
+    .then((r) => r.stdout, () => '');
+  return /^ref: refs\\/heads\\/(\\S+)\\tHEAD$/m.exec(said)?.[1] || 'main';
+}
+
 // A CI job that rebuilds the map on each push to the default branch, with the uploader of the site's own version
 async function codemapWorkflow({ site, project, repo, label, root }) {
   const top = await codemapGit(root, 'rev-parse', '--show-toplevel'), dir = join(top, '.github', 'workflows');
   const file = join(dir, 'artiboard-codemap.yml');
   if (existsSync(file)) { console.error(\`\${file} exists; not overwritten\`); process.exit(1); }
-  const origin = await codemapGit(top, 'symbolic-ref', 'refs/remotes/origin/HEAD').catch(() => '');
-  const branch = origin.replace(/^refs\\/remotes\\/origin\\//, '') || 'main';
+  // a job written by hand from an older recipe is a second writer
+  const other = (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : []).find((e) => e.isFile() && readFileSync(join(dir, e.name), 'utf8').includes('codemap.mjs'));
+  if (other) {
+    console.error(\`.github/workflows/\${other.name} already runs codemap.mjs, and two jobs would flip the map between them: add --if-changed to that one, or delete it and run --workflow again\`);
+    process.exit(1);
+  }
+  const branch = await codemapBranch(top);
   // CI checks out at the repository's root, so a map of one folder names that folder
   const folder = (await codemapGit(root, 'rev-parse', '--show-prefix')).replace(/\\/$/, '');
-  const run = ['--site', site, '--project', project, '--repo', repo, ...(label ? ['--label', label] : []), ...(folder ? ['--root', folder] : [])];
+  const run = ['--site', site, '--project', project, '--repo', repo, ...(label ? ['--label', label] : []), ...(folder ? ['--root', folder] : []), '--if-changed'];
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, [
     \`# Written by codemap.mjs --workflow: rebuilds the board's code map of \${repo} on each push to \${branch}.\`,
@@ -92,10 +108,24 @@ async function codemapWorkflow({ site, project, repo, label, root }) {
   console.log(\`next: gh secret set ARTIBOARD_TOKEN --repo \${repo} with a member's token (a viewer's cannot write maps), then commit the workflow\`);
 }
 
-// Hooks that rebuild the map after each commit and merge, in the background so git never waits on it. Every path in
-// them is absolute and git's own variables are cleared before the build: a hook runs from whichever worktree committed,
-// with that worktree's GIT_DIR, and core.hooksPath can share one hooks folder between checkouts, yet the map must
-// describe the checkout that installed it.
+// The node this shell finds, named in the hooks: GUI git clients, and shells that set up a version manager in a
+// profile, run hooks with another PATH. The PATH entry, not process.execPath, which a package manager may resolve to
+// one version's folder that an upgrade removes.
+const codemapNode = () => (process.env.PATH || '').split(delimiter).map((d) => join(d, 'node')).find((at) => {
+  try { accessSync(at, constants.X_OK); return isAbsolute(at) && statSync(at).isFile(); } catch { return false; }
+}) || process.execPath;
+// whether a hook's #! line names a shell, directly or through env, so that the sh line can go in it
+const codemapShell = (first) => {
+  const words = first.slice(2).trim().split(/\\s+/).map((w) => w.split('/').pop());
+  return ['sh', 'bash', 'dash', 'zsh'].includes(words[0] === 'env' ? words.find((w, i) => i && !w.startsWith('-')) : words[0]);
+};
+
+// Hooks that rebuild the map after each commit, merge and rebase, in the background so git never waits on it. Every
+// path in them is absolute and git's own variables are cleared before the build: a hook runs with the GIT_DIR of
+// whatever ran it, yet the map must describe the checkout that installed it. So they go only where that checkout
+// alone runs them: not from a linked worktree, whose repository's hooks folder every worktree shares and which goes
+// away, and not into a hooks folder outside the git dir (core.hooksPath), which other repositories may share or the
+// repository may track.
 async function codemapHook({ site, project, repo, label, root, token }) {
   const self = realpathSync(process.argv[1]);
   if ([tmpdir(), '/tmp'].some((d) => existsSync(d) && self.startsWith(realpathSync(d) + sep))) {
@@ -103,30 +133,52 @@ async function codemapHook({ site, project, repo, label, root, token }) {
     process.exit(2);
   }
   const gitDir = await codemapGit(root, 'rev-parse', '--absolute-git-dir');
+  const common = resolve(root, await codemapGit(root, 'rev-parse', '--git-common-dir'));
+  if (realpathSync(gitDir) !== realpathSync(common)) {
+    console.error(\`\${resolve(root)} is a linked worktree: every worktree of a repository runs one hooks folder, and these hooks would keep this one's paths after it is removed. Nothing installed; run --hook from the main checkout\`);
+    process.exit(2);
+  }
   const hooks = resolve(root, await codemapGit(root, 'rev-parse', '--git-path', 'hooks'));
   const env = join(gitDir, 'artiboard-codemap.env'), log = join(gitDir, 'codemap.log');
+  const run = [codemapNode(), self, '--site', site, '--project', project, '--repo', repo, ...(label ? ['--label', label] : []), '--root', resolve(root), '--if-changed'];
+  // a subshell, so sitting out a rebase leaves the hook's other lines running; set -a exports what the env file sets
+  const build = \`unset $(git rev-parse --local-env-vars); env=\${shellWord(env)}; set -a; [ -f "$env" ] && . "$env"; \${run.map(shellWord).join(' ')} >> \${shellWord(log)} 2>&1 &\`;
+  const sitOut = '[ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] && exit 0; ';
+  // a rebase commits once for each commit it moves, then runs post-rewrite once, while its own state may still be there
+  const each = \`( \${sitOut}\${build} ) \${CODEMAP_MARK}\`, lines = { 'post-commit': each, 'post-merge': each, 'post-rewrite': \`( \${build} ) \${CODEMAP_MARK}\` };
+  if (!hooks.startsWith(common + sep)) {
+    console.error([\`git runs this repository's hooks from \${hooks}, outside \${common} (core.hooksPath): a folder other repositories share would run them there too, and a tracked one would carry this checkout's paths into every clone. Nothing installed; add these lines by hand where they belong:\`,
+      ...Object.entries(lines).map(([name, line]) => \`\${name}: \${line}\`)].join('\\n'));
+    process.exit(2);
+  }
+  const before = {};
+  for (const name of Object.keys(lines)) {
+    const file = join(hooks, name), text = existsSync(file) ? readFileSync(file, 'utf8') : '', first = text.split('\\n')[0];
+    if (first.startsWith('#!') && !codemapShell(first)) {
+      console.error(\`\${file} is not a shell script (\${first}), and the line --hook adds is sh. Nothing installed; have that hook run this line with sh:\\n\${lines[name]}\`);
+      process.exit(2);
+    }
+    before[name] = text;
+  }
   if (token) {
     writeFileSync(env, \`ARTIBOARD_TOKEN=\${shellWord(token)}\\n\`, { mode: 0o600 });
     chmodSync(env, 0o600);
-  }
-  const run = ['node', self, '--site', site, '--project', project, '--repo', repo, ...(label ? ['--label', label] : []), '--root', resolve(root), '--if-changed'];
-  // a subshell, so sitting out a rebase leaves the hook's other lines running; set -a exports what the env file sets
-  const line = \`( [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] && exit 0; \` +
-    \`unset $(git rev-parse --local-env-vars); env=\${shellWord(env)}; set -a; [ -f "$env" ] && . "$env"; \` +
-    \`\${run.map(shellWord).join(' ')} >> \${shellWord(log)} 2>&1 & ) \${CODEMAP_MARK}\`;
+  } else if (existsSync(env)) token = /^ARTIBOARD_TOKEN=(.*)$/m.exec(readFileSync(env, 'utf8'))?.[1];
   mkdirSync(hooks, { recursive: true });
-  const files = ['post-commit', 'post-merge'].map((name) => join(hooks, name));
-  for (const file of files) {
-    const old = existsSync(file) ? readFileSync(file, 'utf8') : '#!/bin/sh\\n';
-    const lines = old.replace(/\\n$/, '').split('\\n'), at = lines.findIndex((l) => l.endsWith(CODEMAP_MARK));
-    if (at < 0) lines.push(line);
-    else lines[at] = line;
-    if (lines.join('\\n') + '\\n' !== old) writeFileSync(file, lines.join('\\n') + '\\n');
+  for (const [name, text] of Object.entries(before)) {
+    const file = join(hooks, name), own = text ? text.replace(/\\n$/, '').split('\\n') : [];
+    const [first, ...rest] = own[0]?.startsWith('#!') ? own : ['#!/bin/sh', ...own];
+    // right after the #! line, which a hook that ends in exit or exec never reaches past; a line that already runs the
+    // uploader, marked or written by hand from 1.17's recipe, goes, so the map keeps one writer
+    const kept = rest.filter((l) => !l.endsWith(CODEMAP_MARK) && (l.trimStart().startsWith('#') || !l.includes('codemap.mjs')));
+    const next = [first, lines[name], ...kept].join('\\n') + '\\n';
+    if (next !== text) writeFileSync(file, next);
     chmodSync(file, 0o755);
   }
-  console.log(\`hooks: \${files.join(', ')} rebuild the map in the background after each commit and merge; log: \${log}\`);
+  console.log(\`hooks: \${Object.keys(before).map((name) => join(hooks, name)).join(', ')} rebuild the map in the background after each commit, merge and rebase; log: \${log}\`);
   console.log(existsSync(env) ? \`token: \${env}\` : 'token from the environment: set ARTIBOARD_TOKEN wherever git runs');
   console.log("a team board's map describes the shared default branch, so CI is its one writer (--workflow): keep hooks to checkouts only you commit to");
+  return token;
 }
 async function codemapMain(argv) {
   const args = {};
@@ -136,9 +188,9 @@ async function codemapMain(argv) {
   const root = args.root && args.root !== true ? args.root : process.cwd();
   const label = args.label && args.label !== true ? args.label : undefined;
   if (args.workflow) return codemapWorkflow({ site, project, repo, label, root });
-  const token = args.token && args.token !== true ? args.token : process.env.ARTIBOARD_TOKEN;
+  let token = args.token && args.token !== true ? args.token : process.env.ARTIBOARD_TOKEN;
   // installed hooks build once now, so the map exists before the next commit
-  if (args.hook) await codemapHook({ site, project, repo, label, root, token });
+  if (args.hook) token = await codemapHook({ site, project, repo, label, root, token });
   if (!token) { console.error('pass --token or set ARTIBOARD_TOKEN'); process.exit(2); }
   const url = \`\${site}/api/p/\${encodeURIComponent(project)}/map\`, auth = { Authorization: \`Bearer \${token}\` };
   // a clean checkout at the commit the site's map describes, with no changes of its own, has nothing new to send; a
@@ -155,8 +207,8 @@ async function codemapMain(argv) {
   }
   const started = Date.now();
   const { index, chunks } = await mapRepo(root, { repo, label, ...head });
-  // a rebase or a cherry-pick runs a hook once per commit: a map whose files were read while HEAD moved on would say
-  // one commit and hold another's files, so it is not sent; the hook for the last commit sends the right one
+  // a map whose files were read while HEAD moved on would say one commit and hold another's files, so it is not sent:
+  // the hook of the newer commit sends the right one (a cherry-pick's last pick; post-rewrite, once a rebase ends)
   if (head.commit && (await headState(root)).commit !== head.commit) { console.log(\`skipped: HEAD moved while \${repo} was read\`); return; }
   // gzipped bytes as an octet stream: a map's JSON is large and hosts cap request bodies, and a host that parses
   // JSON bodies itself would choke on compressed JSON; the server inflates what starts with the gzip magic bytes

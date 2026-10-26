@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createServer, request } from 'node:http';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
@@ -988,53 +988,149 @@ for (const backend of backends) {
       }
     });
 
-    test('--hook installs git hooks that rebuild the map after each commit, beside a hook\'s own lines', async () => {
-      const id = `hook-${R}`, root = mkdtempSync(join(tmpdir(), 'artiboard-repo-')), downloads = mkdtempSync(join(tmpdir(), 'artiboard-dl-'));
-      const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-      // not execFileSync: a commit runs the hook, and this process's own server must answer its upload
-      const commit = (...args) => runCli('git', ['-c', 'user.email=a@b', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', ...args], { cwd: root });
-      const hook = async (script = UPLOADER) => (await runCli(process.execPath, [script, '--hook',
-        '--site', BASE, '--project', id, '--repo', SHOP_REPO, '--root', root, '--token', tokens.member])).stdout;
-      const mapped = async () => (await (await api(`/api/p/${id}/map`, { headers: { Authorization: `Bearer ${tokens.viewer}` } })).json()).maps[0]?.commit;
-      await store.createProject(null, { id, title: 'Hook', lang: 'en', repos: [{ repo: SHOP_REPO, label: 'shop' }] });
-      try {
-        writeFileSync(join(root, 'units.js'), 'export function toCents(amount) {\n  return Math.round(amount * 100);\n}\n');
-        git('init', '-q');
-        git('add', '.');
-        await commit('-m', 'x');
-        const gitDir = git('rev-parse', '--absolute-git-dir'), hooks = ['post-commit', 'post-merge'].map((h) => join(gitDir, 'hooks', h));
-        const own = '#!/bin/sh\necho own >> "$(git rev-parse --git-dir)/own.log"\n';
-        writeFileSync(hooks[0], own, { mode: 0o755 });
-
-        copyFileSync(UPLOADER, join(downloads, 'codemap.mjs'));
-        await assert.rejects(hook(join(downloads, 'codemap.mjs')), (e) => e.code === 2 && /temp folder/.test(e.stderr), 'a copy that will vanish is refused');
-        assert.equal(readFileSync(hooks[0], 'utf8'), own, 'and installs nothing');
-
-        assert.match(await hook(), new RegExp(`^${literal(`${SHOP_REPO} → ${BASE}/p/${id}`)}: 1 files`, 'm'), 'it builds once now');
-        assert.equal(await mapped(), git('rev-parse', 'HEAD'), 'so the map exists before the next commit');
-        const installed = hooks.map((f) => readFileSync(f, 'utf8'));
-        for (const [i, text] of installed.entries()) {
-          assert.ok(statSync(hooks[i]).mode & 0o100, `${hooks[i]} is executable`);
-          assert.match(text, /^\( .* --if-changed >> .* 2>&1 & \) # artiboard code map$/m, 'one marked line runs the uploader in the background');
-        }
-        assert.ok(installed[0].startsWith(own), 'a hook\'s own lines stay, and the marked line follows them');
-        const env = join(gitDir, 'artiboard-codemap.env');
-        assert.equal(statSync(env).mode & 0o777, 0o600, 'the token file is its owner\'s alone');
-        assert.equal(readFileSync(env, 'utf8'), `ARTIBOARD_TOKEN=${tokens.member}\n`);
-        assert.match(await hook(), /^up to date: /m, 'installing again builds nothing new');
-        assert.deepEqual(hooks.map((f) => readFileSync(f, 'utf8')), installed, 'and changes no hook');
-
-        writeFileSync(join(root, 'units.js'), 'export function toCents(amount) {\n  return Math.round(amount * 1000) / 10;\n}\n');
-        await commit('-am', 'x');
-        const want = git('rev-parse', 'HEAD');
-        for (const until = Date.now() + 15000; (await mapped()) !== want && Date.now() < until;) await new Promise((r) => setTimeout(r, 200));
-        assert.equal(await mapped(), want, 'the hook rebuilt the map for the new commit');
-        assert.equal(readFileSync(join(gitDir, 'own.log'), 'utf8'), 'own\n', 'and the hook\'s own line ran too');
-      } finally {
+    // what the hooks run first after a commit or a merge, so they sit out the commits a rebase makes one by one
+    const SIT_OUT = '[ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] && exit 0';
+    // A checkout with one commit, on a project of its own, and --hook run as a person runs it: with a node first on PATH
+    // that is not process.execPath, and without the caller's ARTIBOARD_TOKEN
+    async function hookCheckout(t, name) {
+      const id = `${name}-${R}`, root = mkdtempSync(join(tmpdir(), 'artiboard-repo-')), bin = mkdtempSync(join(tmpdir(), 'artiboard-bin-'));
+      t.after(async () => {
         await store.dropProject(id).catch(() => {});
-        rmSync(root, { recursive: true, force: true });
-        rmSync(downloads, { recursive: true, force: true });
-      }
+        for (const d of [root, bin]) rmSync(d, { recursive: true, force: true });
+      });
+      symlinkSync(process.execPath, join(bin, 'node'));
+      const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+      delete env.ARTIBOARD_TOKEN;
+      const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+      // not execFileSync: a commit runs the hooks, and this process's own server must answer their upload
+      const run = (...args) => runCli('git', ['-c', 'user.email=a@b', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], { cwd: root, env });
+      const hook = async ({ at = root, token = tokens.member, script = UPLOADER } = {}) => (await runCli(process.execPath,
+        [script, '--hook', '--site', BASE, '--project', id, '--repo', SHOP_REPO, '--root', at, ...(token ? ['--token', token] : [])], { env })).stdout;
+      const mapped = async () => (await (await api(`/api/p/${id}/map`, { headers: { Authorization: `Bearer ${tokens.viewer}` } })).json()).maps[0]?.commit;
+      // the hooks build in the background
+      const settled = async (want) => {
+        for (const until = Date.now() + 15000; (await mapped()) !== want && Date.now() < until;) await new Promise((r) => setTimeout(r, 200));
+        return mapped();
+      };
+      await store.createProject(null, { id, title: 'Hook', lang: 'en', repos: [{ repo: SHOP_REPO, label: 'shop' }] });
+      writeFileSync(join(root, 'units.js'), 'export function toCents(amount) {\n  return Math.round(amount * 100);\n}\n');
+      git('init', '-q');
+      git('add', '.');
+      await run('commit', '-q', '-m', 'x');
+      const gitDir = git('rev-parse', '--absolute-git-dir');
+      const hooks = Object.fromEntries(['post-commit', 'post-merge', 'post-rewrite'].map((h) => [h, join(gitDir, 'hooks', h)]));
+      return { id, root, bin, env, git, run, hook, mapped, settled, gitDir, hooks, envFile: join(gitDir, 'artiboard-codemap.env') };
+    }
+    const markedLine = (file) => readFileSync(file, 'utf8').split('\n').find((l) => l.endsWith('# artiboard code map'));
+
+    test('--hook installs git hooks that rebuild the map after each commit and merge, first in a hook\'s own lines', async (t) => {
+      const repo = await hookCheckout(t, 'hook'), downloads = mkdtempSync(join(tmpdir(), 'artiboard-dl-'));
+      t.after(() => rmSync(downloads, { recursive: true, force: true }));
+      // a hook that ends in exit, as generated hooks do, and one with no #! line, which git runs with sh
+      const own = 'echo own >> "$(git rev-parse --git-dir)/own.log"\nexit 0\n';
+      writeFileSync(repo.hooks['post-commit'], `#!/bin/sh\n${own}`, { mode: 0o755 });
+      writeFileSync(repo.hooks['post-merge'], 'echo merged\n', { mode: 0o755 });
+
+      copyFileSync(UPLOADER, join(downloads, 'codemap.mjs'));
+      await assert.rejects(repo.hook({ script: join(downloads, 'codemap.mjs') }), (e) => e.code === 2 && /temp folder/.test(e.stderr), 'a copy that will vanish is refused');
+      assert.equal(readFileSync(repo.hooks['post-commit'], 'utf8'), `#!/bin/sh\n${own}`, 'and installs nothing');
+
+      assert.match(await repo.hook(), new RegExp(`^${literal(`${SHOP_REPO} → ${BASE}/p/${repo.id}`)}: 1 files`, 'm'), 'it builds once now');
+      assert.equal(await repo.mapped(), repo.git('rev-parse', 'HEAD'), 'so the map exists before the next commit');
+      const line = markedLine(repo.hooks['post-commit']), files = [repo.hooks['post-commit'], repo.hooks['post-merge']];
+      const installed = files.map((f) => readFileSync(f, 'utf8'));
+      assert.equal(installed[0], `#!/bin/sh\n${line}\n${own}`, 'the marked line follows the #! line, so a hook that exits early runs it too');
+      assert.equal(installed[1], `#!/bin/sh\n${line}\necho merged\n`, 'a hook with no #! line gets one');
+      assert.match(line, /^\( .* --if-changed >> .* 2>&1 & \) # artiboard code map$/, 'one marked line runs the uploader in the background');
+      for (const f of files) assert.ok(statSync(f).mode & 0o100, `${f} is executable`);
+      assert.equal(statSync(repo.envFile).mode & 0o777, 0o600, 'the token file is its owner\'s alone');
+      assert.equal(readFileSync(repo.envFile, 'utf8'), `ARTIBOARD_TOKEN=${tokens.member}\n`);
+      assert.match(await repo.hook(), /^up to date: /m, 'installing again builds nothing new');
+      assert.deepEqual(files.map((f) => readFileSync(f, 'utf8')), installed, 'and changes no hook');
+
+      writeFileSync(join(repo.root, 'units.js'), 'export function toCents(amount) {\n  return Math.round(amount * 1000) / 10;\n}\n');
+      await repo.run('commit', '-q', '-am', 'x');
+      const want = repo.git('rev-parse', 'HEAD');
+      assert.equal(await repo.settled(want), want, 'the hook rebuilt the map for the new commit');
+      assert.equal(readFileSync(join(repo.gitDir, 'own.log'), 'utf8'), 'own\n', 'and the hook\'s own line ran too');
+    });
+
+    test('--hook again with no token builds with the one it saved', async (t) => {
+      const repo = await hookCheckout(t, 'hook-again');
+      await repo.hook();
+      assert.match(await repo.hook({ token: null }), /^up to date: /m);
+    });
+
+    test('--hook replaces a line that already runs codemap.mjs, so an upgrade keeps one writer', async (t) => {
+      const repo = await hookCheckout(t, 'hook-up');
+      // the post-commit hook 1.17 asked people to write by hand
+      const recipe = `node ${UPLOADER} --site ${BASE} --project ${repo.id} --repo ${SHOP_REPO} --if-changed >> "$(git rev-parse --git-dir)/codemap.log" 2>&1 &`;
+      writeFileSync(repo.hooks['post-commit'], `#!/bin/sh\n${SIT_OUT}\n${recipe}\n`, { mode: 0o755 });
+      await repo.hook();
+      const text = readFileSync(repo.hooks['post-commit'], 'utf8');
+      assert.equal(text.split('\n').filter((l) => l.includes('codemap.mjs')).length, 1, 'one line runs codemap.mjs');
+      assert.equal(text, `#!/bin/sh\n${markedLine(repo.hooks['post-commit'])}\n${SIT_OUT}\n`, 'the marked one, after the #! line');
+    });
+
+    test('--hook rebuilds the map once a rebase ends', async (t) => {
+      const repo = await hookCheckout(t, 'hook-rebase');
+      await repo.hook();
+      const base = repo.git('rev-parse', 'HEAD');
+      writeFileSync(join(repo.root, 'units.js'), 'export function toCents(amount) {\n  return Math.round(amount * 1000) / 10;\n}\n');
+      await repo.run('commit', '-q', '-am', 'x');
+      const onto = repo.git('rev-parse', 'HEAD');
+      repo.git('checkout', '-q', '-b', 'side', base);
+      writeFileSync(join(repo.root, 'cart.js'), "import { toCents } from './units.js';\n\nexport const total = (x) => toCents(x);\n");
+      repo.git('add', '.');
+      await repo.run('commit', '-q', '-m', 'side');
+      const side = repo.git('rev-parse', 'HEAD');
+      assert.equal(await repo.settled(side), side);
+      // a rebase commits once per commit it moves: post-commit sits those out, and post-rewrite runs once it ends
+      await repo.run('rebase', '-q', onto);
+      const rebased = repo.git('rev-parse', 'HEAD');
+      assert.equal(await repo.settled(rebased), rebased, 'the map describes the rebased commit');
+      assert.equal(markedLine(repo.hooks['post-rewrite']), markedLine(repo.hooks['post-commit']).replace(`${SIT_OUT}; `, ''),
+        'post-rewrite runs the same line, without sitting out the rebase whose state it may still see');
+    });
+
+    test('--hook names the node it found on PATH, so a hook that git runs with another PATH still builds', async (t) => {
+      const repo = await hookCheckout(t, 'hook-node');
+      await repo.hook();
+      assert.ok(markedLine(repo.hooks['post-commit']).includes(`; ${join(repo.bin, 'node')} ${UPLOADER} --site `),
+        'the PATH entry, not process.execPath, which a package manager may point at one version\'s folder');
+      // a GUI git client or a shell without the version manager: the first node on PATH is not one that works
+      const broken = join(repo.bin, 'broken');
+      mkdirSync(broken);
+      writeFileSync(join(broken, 'node'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+      repo.env.PATH = `${broken}:${process.env.PATH}`;
+      writeFileSync(join(repo.root, 'units.js'), 'export function toCents(amount) {\n  return Math.round(amount * 1000) / 10;\n}\n');
+      await repo.run('commit', '-q', '-am', 'x');
+      const want = repo.git('rev-parse', 'HEAD');
+      assert.equal(await repo.settled(want), want);
+    });
+
+    test('--hook refuses a hook that is not a shell script, and prints the line to add by hand', async (t) => {
+      const repo = await hookCheckout(t, 'hook-py'), python = '#!/usr/bin/env python3\nprint("own")\n';
+      writeFileSync(repo.hooks['post-commit'], python, { mode: 0o755 });
+      await assert.rejects(repo.hook(), (e) => e.code === 2 && /post-commit is not a shell script/.test(e.stderr) && /^\( .* # artiboard code map$/m.test(e.stderr));
+      assert.equal(readFileSync(repo.hooks['post-commit'], 'utf8'), python, 'and installs nothing');
+      assert.deepEqual([existsSync(repo.hooks['post-merge']), existsSync(repo.envFile)], [false, false]);
+    });
+
+    test('--hook refuses a hooks folder outside the repository\'s git dir, and prints the lines to add by hand', async (t) => {
+      const repo = await hookCheckout(t, 'hook-path');
+      // a tracked folder, as hook managers set: hooks there would carry this machine's paths into every clone
+      repo.git('config', 'core.hooksPath', '.husky');
+      await assert.rejects(repo.hook(), (e) => e.code === 2 && /core\.hooksPath/.test(e.stderr) && /^post-rewrite: \( .* # artiboard code map$/m.test(e.stderr));
+      assert.deepEqual([existsSync(join(repo.root, '.husky')), existsSync(repo.envFile)], [false, false], 'and installs nothing');
+    });
+
+    test('--hook refuses a linked worktree, whose paths the shared hooks would keep after it is gone', async (t) => {
+      const repo = await hookCheckout(t, 'hook-wt'), away = mkdtempSync(join(tmpdir(), 'artiboard-wt-'));
+      t.after(() => rmSync(away, { recursive: true, force: true }));
+      repo.git('worktree', 'add', '-q', join(away, 'wt'));
+      await assert.rejects(repo.hook({ at: join(away, 'wt') }), (e) => e.code === 2 && /run --hook from the main checkout/.test(e.stderr));
+      assert.equal(existsSync(repo.hooks['post-commit']), false, 'and installs nothing');
     });
 
     test('--workflow writes the CI job that keeps a team board\'s map current, and never replaces one', async () => {
@@ -1047,7 +1143,8 @@ for (const backend of backends) {
         const file = join(root, '.github/workflows/artiboard-codemap.yml'), yaml = readFileSync(file, 'utf8');
         assert.match(yaml, /^ {4}branches: \[main\]$/m, 'with no origin HEAD, the default branch is main');
         assert.match(yaml, new RegExp(`^ {10}curl -fsSL ${literal(BASE)}/codemap\\.mjs -o "\\$RUNNER_TEMP/codemap\\.mjs"$`, 'm'), 'the uploader of the site\'s own version');
-        assert.match(yaml, new RegExp(`^ {10}node "\\$RUNNER_TEMP/codemap\\.mjs" --site ${literal(BASE)} --project ${M} --repo ${literal(SHOP_REPO)} --label shop$`, 'm'));
+        assert.match(yaml, new RegExp(`^ {10}node "\\$RUNNER_TEMP/codemap\\.mjs" --site ${literal(BASE)} --project ${M} --repo ${literal(SHOP_REPO)} --label shop --if-changed$`, 'm'),
+          'a re-run of the job sends nothing');
         assert.match(yaml, /^ {6}- env:\n {10}ARTIBOARD_TOKEN: \$\{\{ secrets\.ARTIBOARD_TOKEN \}\}\n {8}run: \|$/m, 'with the token from a secret');
         assert.match(stdout, new RegExp(`gh secret set ARTIBOARD_TOKEN --repo ${literal(SHOP_REPO)}`), 'and says how to store it');
         writeFileSync(file, 'ours\n');
@@ -1056,6 +1153,34 @@ for (const backend of backends) {
       } finally {
         rmSync(root, { recursive: true, force: true });
       }
+    });
+
+    test('--workflow asks origin for its default branch when the clone did not record it', async (t) => {
+      const root = mkdtempSync(join(tmpdir(), 'artiboard-repo-')), remote = mkdtempSync(join(tmpdir(), 'artiboard-origin-'));
+      t.after(() => { for (const d of [root, remote]) rmSync(d, { recursive: true, force: true }); });
+      const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' });
+      git(remote, 'init', '-q', '--bare');
+      git(remote, 'symbolic-ref', 'HEAD', 'refs/heads/trunk');
+      git(root, 'init', '-q');
+      writeFileSync(join(root, 'units.js'), 'export const one = 1;\n');
+      git(root, 'add', '.');
+      git(root, '-c', 'user.email=a@b', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'x');
+      git(root, 'push', '-q', remote, 'HEAD:refs/heads/trunk');
+      // a remote added by hand leaves refs/remotes/origin/HEAD unset
+      git(root, 'remote', 'add', 'origin', remote);
+      await runCli(process.execPath, [UPLOADER, '--workflow', '--site', BASE, '--project', M, '--repo', SHOP_REPO, '--root', root]);
+      assert.match(readFileSync(join(root, '.github/workflows/artiboard-codemap.yml'), 'utf8'), /^ {4}branches: \[trunk\]$/m);
+    });
+
+    test('--workflow refuses a repository whose other workflow already runs codemap.mjs', async (t) => {
+      const root = mkdtempSync(join(tmpdir(), 'artiboard-repo-'));
+      t.after(() => rmSync(root, { recursive: true, force: true }));
+      execFileSync('git', ['init', '-q'], { cwd: root });
+      mkdirSync(join(root, '.github/workflows'), { recursive: true });
+      writeFileSync(join(root, '.github/workflows/map.yml'), `jobs:\n  map:\n    steps:\n      - run: node codemap.mjs --site ${BASE} --project ${M} --repo ${SHOP_REPO}\n`);
+      await assert.rejects(runCli(process.execPath, [UPLOADER, '--workflow', '--site', BASE, '--project', M, '--repo', SHOP_REPO, '--root', root]),
+        (e) => e.code === 1 && e.stderr.includes('.github/workflows/map.yml'));
+      assert.equal(existsSync(join(root, '.github/workflows/artiboard-codemap.yml')), false, 'two writers would flip the map between them');
     });
 
     test('a host that reads the body before the site does hands it over as bytes, text or JSON, and a map still arrives', async () => {
@@ -1176,7 +1301,7 @@ for (const backend of backends) {
         const unsized = await ask({ explain: 'el', limit: undefined });
         assert.ok(unsized.length < 1000, `thirty callers by file: ${unsized.length} chars`);
         const file = await ask({ file: 'big.js' });
-        assert.ok(file.length < 2200 && /… 370 more \(limit 400\)$/m.test(file), `thirty symbols: ${file.length} chars`);
+        assert.ok(file.length < 2200 && /… 370 more \(limit 200\)$/m.test(file), `thirty symbols: ${file.length} chars`);
         const all = await ask({ file: 'big.js', limit: 200 });
         assert.ok(all.length > 6000 && !/cut at/.test(all), 'limit asks for more on purpose, uncut');
         const wide = await ask({ impact: 'el', limit: 200 });

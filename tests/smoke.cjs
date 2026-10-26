@@ -1096,12 +1096,16 @@ const meLane = (d) => {
           { i: 'server/flow.js', k: 'file', n: 'flow.js', f: 'server/flow.js', l: 0, c: 1 },
           { i: 'shared/units.ts', k: 'file', n: 'units.ts', f: 'shared/units.ts', l: 0, c: 0 },
           { i: 'shared/units.ts#toMeters', k: 'sym', n: 'toMeters', f: 'shared/units.ts', l: 3, t: 'fn', c: 0, e: 1 },
+          { i: 'shared/units.ts#round', k: 'sym', n: 'round', f: 'shared/units.ts', l: 9, t: 'fn', c: 0 },
           { i: 'web/chart.tsx', k: 'file', n: 'chart.tsx', f: 'web/chart.tsx', l: 0, c: 0 },
           { i: 'web/total.tsx', k: 'file', n: 'total.tsx', f: 'web/total.tsx', l: 0, c: 0 }
         ],
         edges: [
           ['web/chart.tsx', 'shared/units.ts', 'imports', 'x'],
           ['shared/units.ts', 'shared/units.ts#toMeters', 'defines', 'x'],
+          ['shared/units.ts', 'shared/units.ts#round', 'defines', 'x'],
+          // matched by name, so board_map prints it as ?round
+          ['shared/units.ts#toMeters', 'shared/units.ts#round', 'calls', 'i'],
           ['web/total.tsx', 'shared/units.ts', 'imports', 'x'],
           ['web/total.tsx', 'shared/units.ts#toMeters', 'calls', 'x'],
           ['server/flow.js', 'shared/units.ts', 'imports', 'x']
@@ -1196,7 +1200,7 @@ const meLane = (d) => {
   ok(
     hits === 'toMetersfn · shared/units.ts:3' &&
       crumb() === 'All groups›shared›units.ts›toMeters' &&
-      nodeIds() === 'shared/units.ts#toMeters,shared/units.ts,web/total.tsx' &&
+      nodeIds() === 'shared/units.ts#toMeters,shared/units.ts,web/total.tsx,shared/units.ts#round' &&
       /called by:\s+web\/total\.tsx/.test(b.d.querySelector('#codemapBody .maplines')?.textContent) &&
       b.reads.filter((p) => p === 'map/api/chunks').length === 1,
     'a search offers the names it matches; picking one draws that symbol with its neighbors and explains it as board_map would'
@@ -1259,6 +1263,73 @@ const meLane = (d) => {
       !hint() &&
       help().getAttribute('aria-expanded') === 'false',
     'the hint waits behind a ? at the end of the legend: its tooltip, and a click shows it under the legend, another hides it'
+  );
+  const touchRules = [...b.d.styleSheets]
+    .flatMap((s) => [...s.cssRules])
+    .filter((r) => r.media && /\(hover: ?none\)/.test(r.media.mediaText))
+    .flatMap((r) => [...r.cssRules]);
+  ok(
+    help().getAttribute('aria-label') === 'How to use the map' &&
+      touchRules.some(
+        (r) => r.selectorText === '.crumb .zoom button' && r.style.getPropertyValue('border-color') === 'var(--line)'
+      ),
+    'the ? says what it is to a screen reader, and where nothing hovers the zoom buttons show their edges'
+  );
+  // a line of the detail after its label, as board_map prints it, and the names on it that are buttons
+  const lineAfter = (label) => {
+    const lines = [...(b.d.querySelector('#codemapBody .maplines')?.children || [])],
+      at = lines.findIndex((x) => x.textContent === label);
+    return at < 0 ? null : lines[at + 1];
+  };
+  const buttons = (line) => [...(line?.querySelectorAll('button') || [])];
+  const labels = (line) =>
+    buttons(line)
+      .map((x) => x.textContent)
+      .join();
+  const named = (line, name) => buttons(line).find((x) => x.textContent === name);
+  // a line may break beside a button, so no piece of it may start with the comma or colon of the name before
+  const held = (line) => !!line && [...line.childNodes].every((x) => !/^[,:]/.test(x.textContent));
+  search(b.d, 'toMeters');
+  b.d.querySelector('#codemapBody .cmap-hit')?.click();
+  await tick();
+  const calledBy = lineAfter('called by:'),
+    callers = labels(calledBy);
+  named(calledBy, 'web/total.tsx')?.click();
+  await tick();
+  ok(
+    calledBy?.textContent === '  web/total.tsx' &&
+      callers === 'web/total.tsx' &&
+      crumb() === 'All groups›shared›total.tsx',
+    'in the detail, each file a symbol is called from is a button to that file'
+  );
+  search(b.d, 'toMeters');
+  b.d.querySelector('#codemapBody .cmap-hit')?.click();
+  await tick();
+  const calls = lineAfter('calls:'),
+    callees = labels(calls);
+  named(calls, '?round')?.click();
+  await tick();
+  ok(
+    calls?.textContent === '  here: ?round' &&
+      held(calls) &&
+      callees === 'here,?round' &&
+      crumb() === 'All groups›shared›units.ts›round',
+    "a name in the subject's own file (here:) is a button to that symbol, kept as ?name when it was matched by name"
+  );
+  named(lineAfter('called by:'), 'here')?.click();
+  await tick();
+  const importers = lineAfter('imported by:');
+  const inUnits = crumb(),
+    importerNames = labels(importers);
+  named(importers, 'web/chart.tsx')?.click();
+  await tick();
+  ok(
+    inUnits === 'All groups›shared›units.ts' &&
+      importers?.textContent === '  server/flow.js, web/chart.tsx, web/total.tsx' &&
+      held(importers) &&
+      importerNames === 'server/flow.js,web/chart.tsx,web/total.tsx' &&
+      crumb() === 'All groups›shared›chart.tsx',
+    "here goes to the subject's file, and in a line of files each one is its own button"
   );
   b.d.querySelector('tr.item[data-k="M1-5"]').click();
   await tick();

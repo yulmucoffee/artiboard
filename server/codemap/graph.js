@@ -50,20 +50,26 @@ export function mapDegrees(edges) {
 // up to ten), since an agent that is not told does not ask.
 function graphList(lines, items, limit, line, more) {
   for (const it of items.slice(0, limit)) lines.push(line(it));
-  if (items.length > limit) lines.push(`  … ${items.length - limit} more${more ? ` (limit ${Math.ceil(items.length / 10) * 10})` : ''}`);
+  if (items.length > limit) lines.push(more ? graphMore(items, limit) : `  … ${items.length - limit} more`);
 }
 
 // Ends of edges printed by the file they are in, one line a file, so a hub's seventy callers cost a few characters
-// each instead of a path each: `  server/flow.js: start, claim, post?`. A ? marks an edge matched by name rather
-// than read from the source; `here` is the subject's own file; an end that is a file is its path. At most limit
-// names, then how many more and the limit to pass. A line is wrapped at GRAPH_LINE characters.
+// each instead of a path each: `  server/flow.js: start, claim, ?post`. A leading ? marks an edge matched by name
+// rather than read from the source (no name starts with ?, where a trailing one would blur into Ruby's valid?);
+// `here` is the subject's own file; an end that is a file is its path; a doc section is its slug, which holds no
+// comma. At most limit names, then how many more and the limit to pass; lines wrap so a reader never meets a
+// thousand-character line.
 const GRAPH_LINE = 110;
-const graphTail = (id) => id.slice(id.lastIndexOf('/') + 1);
+// the most a caller may ask for, the same bound the tool's schema enforces
+const GRAPH_LIMIT = 200;
+const graphMore = (items, limit) => `  … ${items.length - limit} more (limit ${Math.min(GRAPH_LIMIT, Math.ceil(items.length / 10) * 10)})`;
+// an id without the folder a community is named for: what its overview lists, and what find resolves back
+const graphWithin = (id, folder) => (folder && id.startsWith(`${folder}/`) ? id.slice(folder.length + 1) : id);
 function graphGrouped(lines, g, items, limit, own) {
   const byFile = new Map();
   for (const [id, conf] of items.slice(0, limit)) {
     const n = g.nodes.get(id), file = n.k === 'file' || n.k === 'doc' ? '' : n.f;
-    graphPush(byFile, file, (file ? n.n : id) + (conf === 'i' ? '?' : ''));
+    graphPush(byFile, file, (conf === 'i' ? '?' : '') + (file ? (n.k === 'sec' ? id.slice(id.indexOf('#') + 1) : n.n) : id));
   }
   for (const [file, names] of byFile) {
     let line = file ? `  ${file === own ? 'here' : file}:` : ' ';
@@ -73,7 +79,7 @@ function graphGrouped(lines, g, items, limit, own) {
     }
     lines.push(line.replace(/,$/, ''));
   }
-  if (items.length > limit) lines.push(`  … ${items.length - limit} more (limit ${Math.ceil(items.length / 10) * 10})`);
+  if (items.length > limit) lines.push(graphMore(items, limit));
 }
 
 function graphCommunity(g, n) {
@@ -94,6 +100,7 @@ function graphFind(g, q) {
     lasts.filter((id) => g.nodes.get(id).n.endsWith(`.${s}`)),
     lasts,
     s.includes('/') ? graphEnding(g, s) : [],
+    s.includes('#') ? graphEnding(g, s.slice(0, s.indexOf('#'))).map((f) => `${f}${s.slice(s.indexOf('#'))}`).filter((id) => g.nodes.has(id)) : [],
   ];
   for (const t of tiers) {
     if (!t.length) continue;
@@ -279,7 +286,7 @@ function graphQuery(g, text, { limit = 20 } = {}) {
   const symbolCount = (id) => (g.files.get(id) || []).filter((s) => g.nodes.get(s).k === 'sym').length;
   const show = {
     files: (id) => { const c = graphCommunity(g, g.nodes.get(id)); return `  ${id} · ${symbolCount(id)} symbols${c ? ` · ${c}` : ''}`; },
-    symbols: (id) => { const n = g.nodes.get(id); return `  ${id}:${n.l}${graphSig(n)}`; },
+    symbols: (id) => { const n = g.nodes.get(id); return `  ${id} · ${n.l}${graphSig(n)}`; },
     docs: (id) => { const n = g.nodes.get(id); return n.k === 'doc' ? `  ${id} · doc` : `  ${id} · ${graphKind(n)} · ${n.l}`; },
   };
   const lines = [];
@@ -353,7 +360,7 @@ function graphOverview(g, { limit = 10 } = {}) {
   const communities = ix.communities || [], god = ix.god || [];
   if (communities.length) {
     lines.push('communities:');
-    graphList(lines, communities, limit, (x) => `  ${x.name} · ${x.n} files · ${(x.top || []).slice(0, 3).map(graphTail).join(', ')}`);
+    graphList(lines, communities, limit, (x) => `  ${x.name} · ${x.n} files · ${(x.top || []).slice(0, 3).map((id) => graphWithin(id, x.name)).join(', ')}`);
   }
   if (god.length) {
     lines.push('most connected:');

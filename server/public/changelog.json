@@ -10,12 +10,12 @@
       "lines": {
         "en": [
           "board_map answers cost a third less: names are listed by file (src/api/users.ts: createUser, deleteUser), a ? marks a name matched rather than read, and an unsized answer stops near 3,000 characters.",
-          "Keeping a map current is one command: codemap.mjs --workflow writes a CI job that rebuilds on each push to the default branch; --hook installs post-commit and post-merge hooks that rebuild on change.",
+          "Keeping a map current is one command: codemap.mjs --workflow writes the CI job for the default branch; --hook installs git hooks (commit, merge, rewrite) that rebuild in the background on change.",
           "On the page, a Back button and Backspace go up one level from a file or a symbol, and the Code map section shows less around the picture."
         ],
         "ko": [
           "board_map 답이 3분의 1 짧아졌어요. 이름을 파일별로 묶어 보여 주고(src/api/users.ts: createUser, deleteUser), 이름으로만 맞춘 것은 ?를 붙이고, 크기를 정하지 않은 답은 약 3,000자에서 멈춰요.",
-          "맵을 최신으로 두는 일이 명령 하나예요. codemap.mjs --workflow는 기본 브랜치에 push할 때마다 다시 만드는 CI 작업을 써 주고, --hook은 코드가 바뀐 때만 다시 만드는 post-commit·post-merge 훅을 깔아요.",
+          "맵을 최신으로 두는 일이 명령 하나예요. codemap.mjs --workflow는 기본 브랜치용 CI 작업을 써 주고, --hook은 커밋·머지·리베이스 뒤에 코드가 바뀐 때만 뒤에서 다시 만드는 git 훅을 깔아요.",
           "페이지에서 뒤로 버튼과 Backspace로 파일이나 심볼에서 한 단계 올라갈 수 있고, 코드 맵 섹션이 그림 주변을 더 간결하게 보여 줘요."
         ]
       }
