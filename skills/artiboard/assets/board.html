@@ -2099,6 +2099,35 @@ td.what .overlap{margin-left:8px}
     });
     return n;
   }
+  // the page's line icons, 14 px in the text's color: one or two card columns, and the sideways arrows
+  var ICONS = {
+    one: [['rect', { x: 3.5, y: 2.5, width: 7, height: 9, rx: 1.5 }]],
+    two: [
+      ['rect', { x: 1.5, y: 2.5, width: 4.5, height: 9, rx: 1.2 }],
+      ['rect', { x: 8, y: 2.5, width: 4.5, height: 9, rx: 1.2 }]
+    ],
+    left: [['path', { d: 'M8.5 3.5 5 7l3.5 3.5' }]],
+    right: [['path', { d: 'M5.5 3.5 9 7l-3.5 3.5' }]]
+  };
+  function icon(name, weight) {
+    return svgEl(
+      'svg',
+      {
+        width: 14,
+        height: 14,
+        viewBox: '0 0 14 14',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': weight || 1.5,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        'aria-hidden': 'true'
+      },
+      ICONS[name].map(function (shape) {
+        return svgEl(shape[0], shape[1]);
+      })
+    );
+  }
   function $(id) {
     return document.getElementById(id);
   }
@@ -5694,33 +5723,6 @@ td.what .overlap{margin-left:8px}
   }
   // each column remembers, in this browser, whether it shows two card columns
   var kanbanColumns = readJSON('ab-kcol') || {};
-  // column header icons: one or two card columns
-  function columnIcon(kind) {
-    var g = {
-      one: [['rect', { x: 3.5, y: 2.5, width: 7, height: 9, rx: 1.5 }]],
-      two: [
-        ['rect', { x: 1.5, y: 2.5, width: 4.5, height: 9, rx: 1.2 }],
-        ['rect', { x: 8, y: 2.5, width: 4.5, height: 9, rx: 1.2 }]
-      ]
-    }[kind];
-    return svgEl(
-      'svg',
-      {
-        width: 14,
-        height: 14,
-        viewBox: '0 0 14 14',
-        fill: 'none',
-        stroke: 'currentColor',
-        'stroke-width': 1.5,
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
-        'aria-hidden': 'true'
-      },
-      g.map(function (x) {
-        return svgEl(x[0], x[1]);
-      })
-    );
-  }
   // done and archived work is one line per card, which two card columns would cut to a few characters of title
   function canTwo(k) {
     return k !== 'done' && k !== 'archive';
@@ -5858,7 +5860,7 @@ td.what .overlap{margin-left:8px}
                 setTwo(s, !two);
               }
             },
-            [columnIcon(two ? 'one' : 'two')]
+            [icon(two ? 'one' : 'two')]
           )
         );
       var cards = el('div', { class: 'cards' });
@@ -6298,23 +6300,7 @@ td.what .overlap{margin-left:8px}
   SIDES.forEach(function (key) {
     [-1, 1].forEach(function (dir) {
       var b = $(key + (dir < 0 ? 'Prev' : 'Next'));
-      b.appendChild(
-        svgEl(
-          'svg',
-          {
-            width: 14,
-            height: 14,
-            viewBox: '0 0 14 14',
-            fill: 'none',
-            stroke: 'currentColor',
-            'stroke-width': 1.75,
-            'stroke-linecap': 'round',
-            'stroke-linejoin': 'round',
-            'aria-hidden': 'true'
-          },
-          [svgEl('path', { d: dir < 0 ? 'M8.5 3.5 5 7l3.5 3.5' : 'M5.5 3.5 9 7l-3.5 3.5' })]
-        )
-      );
+      b.appendChild(icon(dir < 0 ? 'left' : 'right', 1.75));
       b.addEventListener('click', function () {
         var box = key === 'kanban' ? window : $('graphWrap'),
           width = key === 'kanban' ? document.documentElement.clientWidth : box.clientWidth;
