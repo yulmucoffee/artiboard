@@ -78,7 +78,8 @@ function boot({
   race = null,
   bump = null,
   versions = false,
-  failRead = []
+  failRead = [],
+  hash = ''
 } = {}) {
   const store = { ...seed(), ...docs },
     subs = [],
@@ -163,7 +164,7 @@ function boot({
   }
   const dom = new JSDOM('<!doctype html><body>' + html + '</body>', {
     runScripts: 'dangerously',
-    url: 'https://board.test/',
+    url: 'https://board.test/' + hash,
     pretendToBeVisual: true,
     beforeParse(w) {
       w.Math.random = () => 0;
@@ -831,6 +832,28 @@ const meLane = (d) => {
     arrows('kanban').every((a) => a && a.hidden && /^Scroll (left|right)$/.test(a.getAttribute('aria-label'))) &&
       arrows('graph').every((a) => a && a.hidden),
     'the kanban and the graph have sideways arrows, hidden while nothing is off screen'
+  );
+
+  console.log('# links');
+  b = boot({ hash: '#M1-2' });
+  all.push(b);
+  await tick();
+  await tick();
+  const sheetKey = () => b.d.querySelector('.sheet .bar .key')?.textContent;
+  ok(sheetKey() === 'M1-2', "a link to a task's key opens its sheet");
+  b.w.location.hash = '';
+  await tick();
+  ok(!b.d.querySelector('.sheet'), 'an address without a key closes it');
+  b.w.location.hash = '#graph';
+  await tick();
+  ok(b.d.body.dataset.view === 'graph' && b.w.location.hash === '#graph', 'a view named later opens and stays named');
+  b = boot({ hash: '#kanban' });
+  all.push(b);
+  await tick();
+  await tick();
+  ok(
+    b.d.body.dataset.view === 'kanban' && b.w.location.hash === '',
+    'a link that opens the board on a view lets go of it in the address'
   );
 
   console.log('# a long done column');

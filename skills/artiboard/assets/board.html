@@ -2990,6 +2990,17 @@ td.what .overlap{margin-left:8px}
     bk.hidden = !window.AB_PROJECT;
     bk.textContent = T('back');
     $('setBtn').hidden = !loaded || !writable();
+    renderRepos();
+    var unread = notices.filter(noticeNew).length;
+    $('noticesN').textContent = unread ? T('newN', { n: unread }) : '';
+    $('itemsN').textContent = loaded ? T('total', { n: tasks.length }) : '';
+    var lv = $('mLive');
+    lv.hidden = live == null || !loaded;
+    lv.textContent = live ? T('live') : T('offline');
+    lv.className = 'live' + (live ? '' : ' off');
+    renderProgress(c);
+  }
+  function renderRepos() {
     var rb = $('repos'),
       rs = repoList();
     rb.textContent = '';
@@ -3003,13 +3014,9 @@ td.what .overlap{margin-left:8px}
         )
       );
     });
-    var unread = notices.filter(noticeNew).length;
-    $('noticesN').textContent = unread ? T('newN', { n: unread }) : '';
-    $('itemsN').textContent = loaded ? T('total', { n: tasks.length }) : '';
-    var lv = $('mLive');
-    lv.hidden = live == null || !loaded;
-    lv.textContent = live ? T('live') : T('offline');
-    lv.className = 'live' + (live ? '' : ' off');
+  }
+  // the bar of the board's tasks by status, and its legend with the counts (c: tasks per status)
+  function renderProgress(c) {
     var p = $('progress');
     p.textContent = '';
     var lg = $('legend');
@@ -6553,6 +6560,23 @@ td.what .overlap{margin-left:8px}
     $('sheetRoot').textContent = '';
     focusBack(lastFocus);
   }
+  // the settings' repository lines, "owner/name label" each: the repositories, or the first line that names none
+  function parseRepos(text) {
+    var repos = [],
+      bad = null;
+    text.split('\n').forEach(function (line) {
+      var parts = line.trim().split(/\s+/);
+      if (!parts[0]) return;
+      var name = repoOf(parts[0]);
+      if (!name) {
+        bad = bad || parts[0];
+        return;
+      }
+      var lb = parts.slice(1).join(' ').slice(0, 40);
+      repos.push(lb ? { repo: name, label: lb } : { repo: name });
+    });
+    return { repos: repos, bad: bad };
+  }
   function renderSettings() {
     $('sheetRoot').textContent = '';
     function input(id, v, max) {
@@ -6572,19 +6596,9 @@ td.what .overlap{margin-left:8px}
     var err = el('p', { class: 'err', hidden: '' });
     var ok = button({ class: 'btn primary', text: T('save') });
     ok.addEventListener('click', function () {
-      var repos = [],
-        bad = null;
-      re.value.split('\n').forEach(function (line) {
-        var parts = line.trim().split(/\s+/);
-        if (!parts[0]) return;
-        var name = repoOf(parts[0]);
-        if (!name) {
-          bad = bad || parts[0];
-          return;
-        }
-        var lb = parts.slice(1).join(' ').slice(0, 40);
-        repos.push(lb ? { repo: name, label: lb } : { repo: name });
-      });
+      var parsed = parseRepos(re.value),
+        repos = parsed.repos,
+        bad = parsed.bad;
       if (bad) {
         err.textContent = T('s_bad', { r: bad });
         err.hidden = false;
@@ -7160,18 +7174,7 @@ td.what .overlap{margin-left:8px}
         }
         renderAll();
         healWaiting();
-        if (!openId && location.hash.length > 1) {
-          var h = decodeURIComponent(location.hash.slice(1));
-          if (VIEWS.indexOf(h) >= 0) {
-            setView(h);
-            try {
-              history.replaceState(null, '', location.pathname + location.search);
-            } catch (e) {}
-          } else {
-            var t = taskByKey(h);
-            if (t) openSheet(t.id);
-          }
-        }
+        if (!openId && location.hash.length > 1) followHash(true);
       }
       db.collection('notices')
         .orderBy('at', 'desc')
@@ -7215,7 +7218,9 @@ td.what .overlap{margin-left:8px}
       renderRules();
     });
   }
-  window.addEventListener('hashchange', function () {
+  // #kanban or #graph opens a view, #KEY a task's sheet, and no hash closes the sheet. A link that opens the board on
+  // a view only says where to start, so the address lets go of it.
+  function followHash(atStart) {
     var h = decodeURIComponent(location.hash.slice(1));
     if (!h) {
       if (openId) close();
@@ -7223,10 +7228,17 @@ td.what .overlap{margin-left:8px}
     }
     if (VIEWS.indexOf(h) >= 0) {
       setView(h);
+      if (atStart)
+        try {
+          history.replaceState(null, '', location.pathname + location.search);
+        } catch (e) {}
       return;
     }
     var t = taskByKey(h);
     if (t && openId !== t.id) openSheet(t.id);
+  }
+  window.addEventListener('hashchange', function () {
+    followHash(false);
   });
   applyConfig({});
   if (window.claude && window.claude.use) start();
