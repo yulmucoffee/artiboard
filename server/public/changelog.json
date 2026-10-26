@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.20.2",
+      "date": "2026-10-26",
+      "prs": [
+        53
+      ],
+      "lines": {
+        "en": [
+          "A kanban column with two card columns stays inside its own width, so it no longer slides under the next column; a long title wraps inside its card.",
+          "Widening or narrowing a column slides the columns after it over.",
+          "Columns no longer fold."
+        ],
+        "ko": [
+          "칸반 칸을 2열로 펼쳐도 제 폭 안에 머물러 옆 칸에 가려지지 않아요. 긴 제목은 카드 안에서 줄을 바꿔요.",
+          "칸을 넓히거나 좁히면 옆 칸들이 자연스럽게 밀려나요.",
+          "칸 접기 기능은 없앴어요."
+        ]
+      }
+    },
+    {
       "version": "1.20.1",
       "date": "2026-10-26",
       "prs": [

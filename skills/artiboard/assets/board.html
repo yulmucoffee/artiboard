@@ -299,8 +299,8 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 /* kanban: the page itself scrolls both ways, so a wheel or a swipe anywhere moves it and no box traps the scroll.
    The board grows to the columns' width, which leaves the toolbar room to stick to the window's left edge; it spans
    the window so cards passing under it do not show beside it, and column headers stick right under it. Columns keep
-   one width, fold to a strip or take two card columns. A card is two lines: what it is with who has it (or that it
-   is free) at the right, then its title. */
+   one width or take two card columns. A card is two lines: what it is with who has it (or that it is free) at the
+   right, then its title. */
 body[data-view="kanban"] .board{width:max-content;min-width:100%}
 body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);max-width:none;margin-left:calc(-1 * var(--page-l));padding-inline:var(--col-l) var(--col-r)}
 .kanban{--colw:296px;padding-bottom:12px}
@@ -321,14 +321,12 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .colbtn:hover{background:var(--line-soft);color:var(--ink)}
 .colbtn[aria-pressed="true"]{color:var(--accent)}
 .colbtn.sure{color:var(--danger);background:var(--danger-soft)}
-.col.folded{width:44px;cursor:pointer}
-.col.folded h3{writing-mode:vertical-rl;padding:12px 0;align-items:center;justify-content:flex-start;gap:10px;border-radius:12px;min-height:180px}
-.col.folded h3 .tools{margin:0}
-.col.folded .cards{display:none}
 .col.arch{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
 .col.arch h3{background:var(--bg)}
 .cards{display:flex;flex-direction:column;gap:6px;padding:0 8px 8px}
-.col.two .cards{display:grid;grid-template-columns:1fr 1fr;align-items:start}
+/* two equal tracks that never grow past the column: a title with a long path or link in it wraps inside its card
+   instead of widening its track under the next column */
+.col.two .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
 .col.two .cards>p,.col.two .cards>.morebtn{grid-column:1/-1}
 .card{scroll-margin-top:calc(env(safe-area-inset-top,0px) + var(--tb-h,0px) + 52px);text-align:left;width:100%;background:var(--surface);border:1px solid var(--line-soft);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--shadow);transition:box-shadow .12s,border-color .12s}
 .card:hover{border-color:var(--edge);box-shadow:var(--shadow-hi)}
@@ -342,7 +340,7 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .card .flag.ready{color:var(--accent);font-weight:600}
 .card .flag.wait,.card .flag.soon{color:var(--warn)}
 .card .flag.late{color:var(--danger);font-weight:600}
-.card .title{font-weight:600;line-height:1.38;font-size:13.5px;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .title{font-weight:600;line-height:1.38;font-size:13.5px;color:var(--ink);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .card.done .title{color:var(--text2);font-weight:500}
 .card.done{box-shadow:none;background:transparent;border-color:var(--line)}
 /* finished work is looked up, not worked on: one line each, so a column holds about three times as many */
@@ -858,9 +856,7 @@ td.what .overlap{margin-left:8px}
       startLate: 'start {d} passed',
       h_kanban: 'Kanban',
       kanbanSub:
-        'Grouped by status. Top right: the owner (ringed while an agent has it) or what to know now. Fold a column or give it two card columns; scroll sideways with Shift and the wheel.',
-      colFold: 'Fold',
-      colOpen: 'Open {s}',
+        'Grouped by status. Top right: the owner (ringed while an agent has it) or what to know now. Give a column two card columns; scroll sideways with Shift and the wheel.',
       colTwo: 'Two card columns',
       colOne: 'One card column',
       archN: 'Archived',
@@ -1178,9 +1174,7 @@ td.what .overlap{margin-left:8px}
       startLate: '{d} 착수 · 늦음',
       h_kanban: '칸반',
       kanbanSub:
-        '상태별로 모았어요. 카드 오른쪽 위는 담당(테두리면 에이전트) 또는 지금 알아야 할 것이에요. 칸은 접거나 2열로 볼 수 있고, Shift+휠로 옆으로 넘겨요.',
-      colFold: '접기',
-      colOpen: '{s} 펼치기',
+        '상태별로 모았어요. 카드 오른쪽 위는 담당(테두리면 에이전트) 또는 지금 알아야 할 것이에요. 칸은 2열로 볼 수 있고, Shift+휠로 옆으로 넘겨요.',
       colTwo: '2열로 보기',
       colOne: '1열로 보기',
       archN: '보관함',
@@ -5710,23 +5704,15 @@ td.what .overlap{margin-left:8px}
       ]
     );
   }
-  // each column remembers, in this browser, whether it is folded or shows two card columns; the archive starts folded
+  // each column remembers, in this browser, whether it shows two card columns
   var kanbanColumns = readJSON('ab-kcol') || {};
-  // column header icons: one or two card columns, fold or open
+  // column header icons: one or two card columns
   function columnIcon(kind) {
     var g = {
       one: [['rect', { x: 3.5, y: 2.5, width: 7, height: 9, rx: 1.5 }]],
       two: [
         ['rect', { x: 1.5, y: 2.5, width: 4.5, height: 9, rx: 1.2 }],
         ['rect', { x: 8, y: 2.5, width: 4.5, height: 9, rx: 1.2 }]
-      ],
-      fold: [
-        ['path', { d: 'M8.5 3.5 5 7l3.5 3.5' }],
-        ['path', { d: 'M11.5 3v8' }]
-      ],
-      open: [
-        ['path', { d: 'M5.5 3.5 9 7l-3.5 3.5' }],
-        ['path', { d: 'M2.5 3v8' }]
       ]
     }[kind];
     return svgEl(
@@ -5751,14 +5737,18 @@ td.what .overlap{margin-left:8px}
   function canTwo(k) {
     return k !== 'done' && k !== 'archive';
   }
-  function colState(k) {
-    var c = kanbanColumns[k] || {};
-    return { fold: 'fold' in c ? !!c.fold : k === 'archive', two: !!c.two && canTwo(k) };
+  function showsTwo(k) {
+    return !!(kanbanColumns[k] || {}).two && canTwo(k);
   }
-  function setColumn(k, patch) {
-    kanbanColumns[k] = Object.assign(colState(k), patch);
+  // the column grows from where it was, so the columns after it slide over instead of jumping
+  function setTwo(k, on) {
+    var from = document.querySelector('.col[data-status="' + k + '"]').offsetWidth;
+    kanbanColumns[k] = { two: on };
     write('ab-kcol', JSON.stringify(kanbanColumns));
     renderKanban();
+    var col = document.querySelector('.col[data-status="' + k + '"]');
+    if (col.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches)
+      col.animate([{ width: from + 'px' }, { width: col.offsetWidth + 'px' }], { duration: 180, easing: 'ease-out' });
   }
   // the toolbar spans the window from its left edge while its content stays on the heading's centered column, and
   // column headers stick under it. Edges are measured as if the page were not scrolled sideways; the width goes first,
@@ -5864,83 +5854,58 @@ td.what .overlap{margin-left:8px}
           return (arch || knownStatus(t) === s) && match(t);
         })
         .sort(arch ? byArchived : s === 'done' ? byDone : byKey);
-      var cs = colState(s),
+      var two = showsTwo(s),
         capped = (s === 'done' || arch) && !filtering(),
         shown = capped ? Math.min(kanbanShown[s] || DONE_FIRST, all.length) : all.length,
         list = all.slice(0, shown);
       var name = arch ? T('archN') : statusLabel(s),
         tools = el('span', { class: 'tools' });
-      if (s === 'done' && !cs.fold && all.length && writable()) tools.appendChild(archiveButton(all));
-      if (!cs.fold && canTwo(s))
+      if (s === 'done' && all.length && writable()) tools.appendChild(archiveButton(all));
+      if (canTwo(s))
         tools.appendChild(
           el(
             'button',
             {
               type: 'button',
               class: 'colbtn',
-              'aria-pressed': String(cs.two),
-              title: T(cs.two ? 'colOne' : 'colTwo'),
-              'aria-label': T(cs.two ? 'colOne' : 'colTwo'),
-              onclick: function (e) {
-                e.stopPropagation();
-                setColumn(s, { two: !cs.two });
+              'aria-pressed': String(two),
+              title: T(two ? 'colOne' : 'colTwo'),
+              'aria-label': T(two ? 'colOne' : 'colTwo'),
+              onclick: function () {
+                setTwo(s, !two);
               }
             },
-            [columnIcon(cs.two ? 'one' : 'two')]
+            [columnIcon(two ? 'one' : 'two')]
           )
         );
-      tools.appendChild(
-        el(
-          'button',
-          {
-            type: 'button',
-            class: 'colbtn',
-            'aria-expanded': String(!cs.fold),
-            title: cs.fold ? T('colOpen', { s: name }) : T('colFold'),
-            'aria-label': cs.fold ? T('colOpen', { s: name }) : T('colFold'),
-            onclick: function (e) {
-              e.stopPropagation();
-              setColumn(s, { fold: !cs.fold });
-            }
-          },
-          [columnIcon(cs.fold ? 'open' : 'fold')]
-        )
-      );
       var cards = el('div', { class: 'cards' });
-      if (!cs.fold) {
-        if (!loaded)
-          cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: failed || T('loading') }));
-        else if (!all.length)
-          cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: T('empty') }));
-        if (arch)
-          cards.appendChild(
-            el('p', { class: 'muted', style: 'padding:0 4px 4px;font-size:12px;line-height:1.5', text: T('archHint') })
-          );
-        list.forEach(function (t) {
-          order.push(t.id);
-          cards.appendChild(kanbanCard(t, s));
-        });
-        if (capped && all.length > DONE_FIRST) {
-          var rest = all.length - shown;
-          cards.appendChild(
-            moreBtn(!rest, Math.min(DONE_STEP, rest), function () {
-              kanbanShown[s] = rest ? shown + DONE_STEP : DONE_FIRST;
-              renderKanban();
-            })
-          );
-        }
+      if (!loaded)
+        cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: failed || T('loading') }));
+      else if (!all.length)
+        cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: T('empty') }));
+      if (arch)
+        cards.appendChild(
+          el('p', { class: 'muted', style: 'padding:0 4px 4px;font-size:12px;line-height:1.5', text: T('archHint') })
+        );
+      list.forEach(function (t) {
+        order.push(t.id);
+        cards.appendChild(kanbanCard(t, s));
+      });
+      if (capped && all.length > DONE_FIRST) {
+        var rest = all.length - shown;
+        cards.appendChild(
+          moreBtn(!rest, Math.min(DONE_STEP, rest), function () {
+            kanbanShown[s] = rest ? shown + DONE_STEP : DONE_FIRST;
+            renderKanban();
+          })
+        );
       }
       cols.appendChild(
         el(
           'div',
           {
-            class: 'col' + (cs.fold ? ' folded' : '') + (cs.two && !cs.fold ? ' two' : '') + (arch ? ' arch' : ''),
-            title: cs.fold ? T('colOpen', { s: name }) : null,
-            onclick: cs.fold
-              ? function () {
-                  setColumn(s, { fold: false });
-                }
-              : null
+            class: 'col' + (two ? ' two' : '') + (arch ? ' arch' : ''),
+            'data-status': s
           },
           [
             el('h3', {}, [

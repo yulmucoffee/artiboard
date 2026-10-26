@@ -802,11 +802,9 @@ const meLane = (d) => {
     'then archives the done tasks, which stay done'
   );
   ok(
-    !col('Done').querySelector('.card') && col('Archived').classList.contains('folded'),
-    'they leave the done column for an archive that starts folded'
+    !col('Done').querySelector('.card') && col('Archived').querySelector('.card.line'),
+    'they leave the done column for the archive'
   );
-  col('Archived').click();
-  await tick();
   col('Archived').querySelector('.card').click();
   await tick();
   [...b.d.querySelectorAll('.sheet .acts button')].find((x) => /Back from the archive/.test(x.textContent)).click();
@@ -823,6 +821,7 @@ const meLane = (d) => {
     !col('Done').querySelector('.colbtn[aria-pressed]') && !col('Done').classList.contains('two'),
     'the done column has no two-column switch'
   );
+  ok(!b.d.querySelector('.col.folded, .colbtn[aria-expanded]'), 'columns do not fold');
 
   console.log('# a long done column');
   const doneDocs = {};
