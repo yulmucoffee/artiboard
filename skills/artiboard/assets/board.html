@@ -786,6 +786,7 @@ td.what .overlap{margin-left:8px}
       codemapEdgeUses: 'uses or mentions',
       codemapEdgeDefines: 'defines',
       codemapHidden: '{n} more not shown',
+      codemapPrefix: 'group names are under {p}',
       codemapHint:
         'Click a node to read about it, again to open it. Esc goes up. Drag to pan; ⌘ or Ctrl + wheel zooms.',
       codemapOverview: 'Groups of files that belong together',
@@ -1104,6 +1105,7 @@ td.what .overlap{margin-left:8px}
       codemapEdgeUses: '사용·언급',
       codemapEdgeDefines: '정의',
       codemapHidden: '{n}개는 그리지 않음',
+      codemapPrefix: '묶음 이름은 {p} 아래',
       codemapHint:
         '노드를 누르면 설명이, 한 번 더 누르면 안이 열려요. Esc로 위로. 끌어서 이동, ⌘ 또는 Ctrl + 휠로 확대·축소.',
       codemapOverview: '함께 움직이는 파일 묶음',
@@ -4408,7 +4410,25 @@ td.what .overlap{margin-left:8px}
 
   // ---- scenes: the nodes and edges one level shows ----
   function sceneNode(id, label, kind, c, size) {
-    return { id: id, label: label, kind: kind, c: c, size: size, tasks: [], center: false, faded: false };
+    return { id: id, label: label, full: label, kind: kind, c: c, size: size, tasks: [], center: false, faded: false };
+  }
+  // Groups named by folder share a long start on a deep tree (src/main/java/…/service, src/main/java/…/web): the
+  // part every group shares is said once, under the picture, and each name keeps what sets it apart.
+  function dropSharedPrefix(scene) {
+    var groups = scene.nodes.filter(function (n) {
+      return n.kind === 'group';
+    });
+    if (groups.length < 3) return;
+    var prefix = groups[0].label;
+    groups.forEach(function (n) {
+      while (prefix && n.label.indexOf(prefix) !== 0) prefix = prefix.slice(0, -1);
+    });
+    prefix = prefix.slice(0, prefix.lastIndexOf('/') + 1);
+    if (prefix.length < 8) return;
+    groups.forEach(function (n) {
+      n.label = n.label.slice(prefix.length);
+    });
+    scene.prefix = prefix;
   }
   // edges joined by their ends and kind, the strongest kind kept, with how many they stand for
   function edgeBag() {
@@ -4458,7 +4478,9 @@ td.what .overlap{margin-left:8px}
       .map(function (l) {
         return { a: 'c:' + l[0], b: 'c:' + l[1], type: 'links', w: l[2] };
       });
-    return { nodes: nodes, edges: edges, hidden: 0 };
+    var scene = { nodes: nodes, edges: edges, hidden: 0 };
+    dropSharedPrefix(scene);
+    return scene;
   }
   // a file's weight on the picture: how connected it and its symbols are
   function groupKey(n) {
@@ -4843,15 +4865,16 @@ td.what .overlap{margin-left:8px}
     });
     // names keep their size while the picture shrinks, so the fit is tried twice more with them in it
     for (var pass = 0; pass < 2; pass++) {
-      var all = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      var all = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
+        drawn = labelRoom(scene, out, null);
       ns.forEach(function (node) {
-        var b = labelBox(node, out),
+        var b = drawn[node.id] ? labelBox(node, out) : null,
           p = out.pos[node.id],
           rr = out.r[node.id];
-        all.minX = Math.min(all.minX, p[0] - rr, b[0]);
-        all.maxX = Math.max(all.maxX, p[0] + rr, b[2]);
-        all.minY = Math.min(all.minY, p[1] - rr, b[1]);
-        all.maxY = Math.max(all.maxY, p[1] + rr, b[3]);
+        all.minX = Math.min(all.minX, p[0] - rr, b ? b[0] : Infinity);
+        all.maxX = Math.max(all.maxX, p[0] + rr, b ? b[2] : -Infinity);
+        all.minY = Math.min(all.minY, p[1] - rr, b ? b[1] : Infinity);
+        all.maxY = Math.max(all.maxY, p[1] + rr, b ? b[3] : -Infinity);
       });
       var again = Math.min(1, (W - 2 * CMAP.PAD) / (all.maxX - all.minX), (H - 2 * CMAP.PAD) / (all.maxY - all.minY)),
         cx2 = (all.minX + all.maxX) / 2,
@@ -4978,7 +5001,7 @@ td.what .overlap{margin-left:8px}
     return svgEl('circle', { class: 'shape', r: r });
   }
   function labelText(n) {
-    return n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label;
+    return n.label.length > 28 ? '…' + n.label.slice(-27) : n.label;
   }
   // where a node's name is drawn: under a group's circle, beside anything else; about 6 px a character
   function labelBox(n, lay) {
@@ -5121,7 +5144,7 @@ td.what .overlap{margin-left:8px}
       });
       g.appendChild(
         svgEl('title', {}, [
-          document.createTextNode(n.id === n.label ? n.label + ' · ' + kind : n.label + ' · ' + kind + ' · ' + n.id)
+          document.createTextNode(n.id === n.full ? n.full + ' · ' + kind : n.full + ' · ' + kind + ' · ' + n.id)
         ])
       );
       if (n.tasks.length) {
@@ -5319,6 +5342,7 @@ td.what .overlap{margin-left:8px}
       out.appendChild(el('span', {}, [legendGlyph(it[0]), T(it[1])]));
     });
     if (scene.hidden) out.appendChild(el('span', { text: T('codemapHidden', { n: scene.hidden }) }));
+    if (scene.prefix) out.appendChild(el('span', { text: T('codemapPrefix', { p: scene.prefix }) }));
     out.appendChild(el('span', { class: 'cmap-hint', text: T('codemapHint') }));
   }
   // one line of an answer as board_map prints it, made a button when it names something on the map

@@ -1325,6 +1325,43 @@ const meLane = (d) => {
     'a most connected name read before the chunks loads them once and then goes there, with the keyboard on the picture'
   );
 
+  // groups named by folders under one deep tree: the shared start is said once under the picture
+  b = boot({
+    docs: {
+      'map/deep': {
+        repo: 'acme/deep',
+        builtAt: T0,
+        by: 'cy',
+        counts: { files: 9, symbols: 0, edges: 0, docs: 0 },
+        chunks: 1,
+        communities: [
+          { c: 0, name: 'src/main/java/kr/acme/service', n: 3, top: [] },
+          { c: 1, name: 'src/main/java/kr/acme/web', n: 3, top: [] },
+          { c: 2, name: 'src/main/java/kr/acme/web/admin (Users.java)', n: 3, top: [] }
+        ],
+        god: [],
+        links: [],
+        langs: { java: 9 },
+        version: 1
+      }
+    }
+  });
+  all.push(b);
+  await tick();
+  await heal();
+  codemap(b.d)?.querySelector('.fold').click();
+  await tick();
+  ok(
+    [...b.d.querySelectorAll('#codemapBody .cnode .lbl')].map((x) => x.textContent).join() ===
+      'service,web,web/admin (Users.java)' &&
+      b.d.querySelector('#codemapBody .cnode[data-id="c:0"] title').textContent ===
+        'src/main/java/kr/acme/service · group · c:0' &&
+      /group names are under src\/main\/java\/kr\/acme\//.test(
+        b.d.querySelector('#codemapBody .cmap-legend').textContent
+      ),
+    'group names drop the folder they all share, a long name keeps its end, and the full name stays in the title'
+  );
+
   // a read that fails: the section says so once and does not read again on its own
   b = boot({
     failRead: ['map/web/chunks'],
