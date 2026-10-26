@@ -2195,6 +2195,11 @@ td.what .overlap{margin-left:8px}
   function knownStatus(t) {
     return STATUS.indexOf(t.status) >= 0 ? t.status : 'todo';
   }
+  function countStatus(list, s) {
+    return list.filter(function (t) {
+      return knownStatus(t) === s;
+    }).length;
+  }
   function statusLabel(s) {
     var l = T('st_' + s);
     return l === 'st_' + s ? s : l;
@@ -2606,22 +2611,14 @@ td.what .overlap{margin-left:8px}
     $('readAll').textContent = T('readAll');
     $('noticeRead').textContent = T('noticeRead');
     kbdText($('hint'), T('hint'));
+    // each section's heading and the line under it; the now section's line counts, so renderNow writes it
     ['now', 'activity', 'people', 'items', 'codemap', 'notices', 'notes', 'rules', 'guide', 'kanban', 'graph'].forEach(
       function (k) {
         $('h-' + k).textContent = T('h_' + k);
+        if (k !== 'now') $(k + 'Sub').textContent = T(k + 'Sub');
       }
     );
-    $('activitySub').textContent = T('activitySub');
     renderTheme();
-    $('peopleSub').textContent = T('peopleSub');
-    $('itemsSub').textContent = T('itemsSub');
-    $('noticesSub').textContent = T('noticesSub');
-    $('rulesSub').textContent = T('rulesSub');
-    $('notesSub').textContent = T('notesSub');
-    $('guideSub').textContent = T('guideSub');
-    $('codemapSub').textContent = T('codemapSub');
-    $('kanbanSub').textContent = T('kanbanSub');
-    $('graphSub').textContent = T('graphSub');
     SIDES.forEach(function (key) {
       [$(key + 'Prev'), $(key + 'Next')].forEach(function (b, i) {
         b.title = T(i ? 'sideNext' : 'sidePrev');
@@ -3162,9 +3159,7 @@ td.what .overlap{margin-left:8px}
         return t.owner === p.id;
       });
       var n = function (s) {
-        return held.filter(function (t) {
-          return knownStatus(t) === s;
-        }).length;
+        return countStatus(held, s);
       };
       var bits = [];
       ['doing', 'review', 'blocked'].forEach(function (s) {
@@ -3268,18 +3263,16 @@ td.what .overlap{margin-left:8px}
   function renderNow() {
     var box = $('now');
     box.textContent = '';
-    var count = function (s) {
-      return tasks.filter(function (t) {
-        return knownStatus(t) === s;
-      }).length;
-    };
     var late = tasks.filter(function (t) {
       var a = attention(t);
       return a && a.o === 1;
     }).length;
     $('nowSub').textContent = loaded
-      ? T('nowSub', { a: count('doing'), b: count('review'), c: count('blocked') }) +
-        (late ? ' · ' + T('lateN', { n: late }) : '')
+      ? T('nowSub', {
+          a: countStatus(tasks, 'doing'),
+          b: countStatus(tasks, 'review'),
+          c: countStatus(tasks, 'blocked')
+        }) + (late ? ' · ' + T('lateN', { n: late }) : '')
       : '';
     if (!loaded) {
       box.appendChild(emptyNote(loadingText()));
@@ -3586,9 +3579,7 @@ td.what .overlap{margin-left:8px}
         })
       );
     });
-    var doneN = tasks.filter(function (t) {
-      return knownStatus(t) === 'done';
-    }).length;
+    var doneN = countStatus(tasks, 'done');
     if (doneN)
       fr.appendChild(
         button({
@@ -3622,9 +3613,7 @@ td.what .overlap{margin-left:8px}
             })
           : hits,
         hidden = hits.length - list.length;
-      var dn = all.filter(function (t) {
-          return knownStatus(t) === 'done';
-        }).length,
+      var dn = countStatus(all, 'done'),
         shut = !!groupFold[f] && !filtering();
       body.appendChild(
         el('tr', { class: 'group' }, [
@@ -6185,9 +6174,7 @@ td.what .overlap{margin-left:8px}
     });
     g.appendChild(svg);
     m.cols.forEach(function (c, ci) {
-      var dn = c.filter(function (t) {
-        return knownStatus(t) === 'done';
-      }).length;
+      var dn = countStatus(c, 'done');
       g.appendChild(
         el('div', { class: 'gcol', style: 'left:' + (GRAPH.PAD + ci * (GRAPH.W + GRAPH.GX)) + 'px;top:12px' }, [
           T('step', { n: ci + 1 }) + (ci === 0 ? T('stepRoot') : ''),
