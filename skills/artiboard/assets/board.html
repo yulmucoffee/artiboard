@@ -4088,8 +4088,7 @@ td.what .overlap{margin-left:8px}
           : null
       ]);
     }
-    return el('div', { class: 'block code' }, [
-      el('h3', { text: T('touches') }),
+    return sheetBlock(T('touches'), 'code', [
       mine.length
         ? el('div', { class: 'touches' }, mine.map(chip))
         : el('p', { class: 'muted', style: 'font-size:13.5px', text: T('touchesNone') }),
@@ -6437,19 +6436,9 @@ td.what .overlap{margin-left:8px}
     if (!t) return;
     if (settingsOpen) settingsOpen = false;
     if (openId !== id) {
-      if (unsub) {
-        unsub();
-        unsub = null;
-      }
-      msgs = [];
+      dropSheetData();
       msgErr = false;
       openPrevSeen = seen[id] || '';
-      if (unsubDetails) {
-        unsubDetails();
-        unsubDetails = null;
-      }
-      detailsDoc = null;
-      summaryEditing = false;
       if (db) {
         unsub = db
           .collection('tasks/' + id + '/messages')
@@ -6492,8 +6481,8 @@ td.what .overlap{margin-left:8px}
     renderView();
     renderSheet(true);
   }
-  function close() {
-    openId = null;
+  // the open task's thread and details stop listening, and what the sheet held goes with them
+  function dropSheetData() {
     if (unsub) {
       unsub();
       unsub = null;
@@ -6505,16 +6494,44 @@ td.what .overlap{margin-left:8px}
     }
     detailsDoc = null;
     summaryEditing = false;
+  }
+  function close() {
+    openId = null;
+    dropSheetData();
     try {
       history.replaceState(null, '', location.pathname + location.search);
     } catch (e) {}
     $('sheetRoot').textContent = '';
     renderView();
-    var back = document.querySelector('.view:not([hidden]) [data-k="' + cursor + '"]') || lastFocus;
-    if (back && back.focus && document.body.contains(back))
+    focusBack(document.querySelector('.view:not([hidden]) [data-k="' + cursor + '"]') || lastFocus);
+  }
+  function focusBack(n) {
+    if (n && n.focus && document.body.contains(n))
       try {
-        back.focus();
+        n.focus();
       } catch (e) {}
+  }
+  // the task sheet and the settings are one kind of dialog: a bar that ends in ×, what follows, and a scrim behind
+  // that closes it
+  function showDialog(labelId, onClose, bar, rest) {
+    var sheet = el(
+      'div',
+      { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': labelId },
+      [
+        el(
+          'div',
+          { class: 'bar' },
+          bar.concat([button({ class: 'x', 'aria-label': T('close'), text: '×', onclick: onClose })])
+        )
+      ].concat(rest)
+    );
+    $('sheetRoot').appendChild(el('div', { class: 'scrim', onclick: onClose }));
+    $('sheetRoot').appendChild(sheet);
+    return sheet;
+  }
+  // a titled part of the sheet
+  function sheetBlock(title, cls, kids) {
+    return el('div', { class: 'block' + (cls ? ' ' + cls : '') }, [el('h3', { text: title })].concat(kids));
   }
   // ---------- board settings: name, one line, milestone, repositories (people stay with site admins) ----------
   function openSettings() {
@@ -6527,14 +6544,10 @@ td.what .overlap{margin-left:8px}
   function closeSettings() {
     settingsOpen = false;
     $('sheetRoot').textContent = '';
-    if (lastFocus && lastFocus.focus && document.body.contains(lastFocus))
-      try {
-        lastFocus.focus();
-      } catch (e) {}
+    focusBack(lastFocus);
   }
   function renderSettings() {
-    var root = $('sheetRoot');
-    root.textContent = '';
+    $('sheetRoot').textContent = '';
     function input(id, v, max) {
       var n = el('input', { type: 'text', id: id, maxlength: String(max) });
       n.value = v || '';
@@ -6588,26 +6601,24 @@ td.what .overlap{margin-left:8px}
           refused(e);
         });
     });
-    var sheet = el('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'setTitle' }, [
-      el('div', { class: 'bar' }, [
-        el('h2', { id: 'setTitle', text: T('s_head') }),
-        el('span', { style: 'margin-left:auto' }),
-        button({ class: 'x', 'aria-label': T('close'), text: '×', onclick: closeSettings })
-      ]),
-      el('div', { class: 'body' }, [
-        el('div', { class: 'setform' }, [
-          el('label', {}, [T('s_title'), ti]),
-          el('label', {}, [T('s_subtitle'), su]),
-          el('label', {}, [T('s_milestone'), mi]),
-          el('label', {}, [T('s_repos'), re, el('span', { class: 'hint2', text: T('s_reposHint') })]),
-          el('p', { class: 'muted', style: 'font-size:12.5px', text: T('s_people') }),
-          err,
-          el('div', { class: 'form-row' }, [ok, button({ class: 'btn', text: T('cancel'), onclick: closeSettings })])
+    showDialog(
+      'setTitle',
+      closeSettings,
+      [el('h2', { id: 'setTitle', text: T('s_head') }), el('span', { style: 'margin-left:auto' })],
+      [
+        el('div', { class: 'body' }, [
+          el('div', { class: 'setform' }, [
+            el('label', {}, [T('s_title'), ti]),
+            el('label', {}, [T('s_subtitle'), su]),
+            el('label', {}, [T('s_milestone'), mi]),
+            el('label', {}, [T('s_repos'), re, el('span', { class: 'hint2', text: T('s_reposHint') })]),
+            el('p', { class: 'muted', style: 'font-size:12.5px', text: T('s_people') }),
+            err,
+            el('div', { class: 'form-row' }, [ok, button({ class: 'btn', text: T('cancel'), onclick: closeSettings })])
+          ])
         ])
-      ])
-    ]);
-    root.appendChild(el('div', { class: 'scrim', onclick: closeSettings }));
-    root.appendChild(sheet);
+      ]
+    );
     ti.focus();
   }
   $('setBtn').addEventListener('click', openSettings);
@@ -6822,11 +6833,10 @@ td.what .overlap{margin-left:8px}
       })
       .sort(byKey);
     return [
-      el('div', { class: 'block' }, [
-        el('h3', { text: T('depsBlock') }),
+      sheetBlock(T('depsBlock'), '', [
         deps.length ? depButtons(deps.map(taskByKey).filter(Boolean)) : el('p', { class: 'muted', text: T('depsNone') })
       ]),
-      unlocks.length ? el('div', { class: 'block' }, [el('h3', { text: T('unlockBlock') }), depButtons(unlocks)]) : null
+      unlocks.length ? sheetBlock(T('unlockBlock'), '', [depButtons(unlocks)]) : null
     ];
   }
   function claimLine(t) {
@@ -6966,28 +6976,17 @@ td.what .overlap{margin-left:8px}
         claimLine(t),
         prLinks(t).length ? el('div', { class: 'form-row' }, prEls(t)) : null,
         summaryBlock(t, kept.values),
-        acc
-          ? el('div', { class: 'block' }, [el('h3', { text: T('acceptance') }), el('div', { class: 'pre', text: acc })])
-          : null,
-        spec
-          ? el('div', { class: 'block' }, [el('h3', { text: T('spec') }), el('div', { class: 'pre', text: spec })])
-          : null,
+        acc ? sheetBlock(T('acceptance'), '', [el('div', { class: 'pre', text: acc })]) : null,
+        spec ? sheetBlock(T('spec'), '', [el('div', { class: 'pre', text: spec })]) : null,
         codeBlock(t, kept.values)
-      ].concat(depBlocks(t), [
-        el('div', { class: 'block' }, [el('h3', { text: T('thread', { n: msgs.length }) }), threadList()])
-      ])
+      ].concat(depBlocks(t), [sheetBlock(T('thread', { n: msgs.length }), '', [threadList()])])
     );
-    var sheet = el('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheetTitle' }, [
-      el('div', { class: 'bar' }, [
-        el('span', { class: 'key', text: t.key }),
-        sheetNav(t),
-        button({ class: 'x', 'aria-label': T('close'), text: '×', onclick: close })
-      ]),
-      body,
-      composerBlock(t, kept.values)
-    ]);
-    root.appendChild(el('div', { class: 'scrim', onclick: close }));
-    root.appendChild(sheet);
+    var sheet = showDialog(
+      'sheetTitle',
+      close,
+      [el('span', { class: 'key', text: t.key }), sheetNav(t)],
+      [body, composerBlock(t, kept.values)]
+    );
     // a fresh sheet starts at the top; a re-render stays where the reader was, or at the bottom if they were following the thread
     body.scrollTop = fresh ? 0 : kept.atBottom ? body.scrollHeight : kept.scroll;
     if (fresh) sheet.querySelector('.x').focus();
