@@ -5844,25 +5844,53 @@ td.what .overlap{margin-left:8px}
     var root = $('kanban');
     root.textContent = '';
     order = [];
-    var cols = el('div', { class: 'cols' });
-    STATUS.concat(['archive']).forEach(function (s) {
-      var arch = s === 'archive';
-      if (arch && !archived.length) return;
-      var all = (arch ? archived : tasks)
-        .filter(function (t) {
-          return (arch || knownStatus(t) === s) && match(t);
+    root.appendChild(el('div', { class: 'cols' }, STATUS.concat(['archive']).map(kanbanColumn)));
+    sizeBoard();
+  }
+  // a status's column (or the archive's, when it holds anything): its header with its tools, then its cards
+  function kanbanColumn(s) {
+    var arch = s === 'archive';
+    if (arch && !archived.length) return null;
+    var all = (arch ? archived : tasks)
+      .filter(function (t) {
+        return (arch || knownStatus(t) === s) && match(t);
+      })
+      .sort(arch ? byArchived : s === 'done' ? byDone : byKey);
+    var two = showsTwo(s),
+      capped = (s === 'done' || arch) && !filtering(),
+      shown = capped ? Math.min(kanbanShown[s] || DONE_FIRST, all.length) : all.length;
+    var cards = el('div', { class: 'cards' });
+    if (!loaded) cards.appendChild(emptyNote(loadingText()));
+    else if (!all.length) cards.appendChild(emptyNote(T('empty')));
+    if (arch) cards.appendChild(el('p', { class: 'muted arch-hint', text: T('archHint') }));
+    all.slice(0, shown).forEach(function (t) {
+      order.push(t.id);
+      cards.appendChild(kanbanCard(t, s));
+    });
+    if (capped && all.length > DONE_FIRST) {
+      var rest = all.length - shown;
+      cards.appendChild(
+        moreBtn(!rest, Math.min(DONE_STEP, rest), function () {
+          kanbanShown[s] = rest ? shown + DONE_STEP : DONE_FIRST;
+          renderKanban();
         })
-        .sort(arch ? byArchived : s === 'done' ? byDone : byKey);
-      var two = showsTwo(s),
-        capped = (s === 'done' || arch) && !filtering(),
-        shown = capped ? Math.min(kanbanShown[s] || DONE_FIRST, all.length) : all.length,
-        list = all.slice(0, shown);
-      var name = arch ? T('archN') : statusLabel(s),
-        tools = el('span', { class: 'tools' });
-      if (s === 'done' && all.length && writable()) tools.appendChild(archiveButton(all));
-      if (canTwo(s))
-        tools.appendChild(
-          button(
+      );
+    }
+    return el('div', { class: 'col' + (two ? ' two' : '') + (arch ? ' arch' : ''), 'data-status': s }, [
+      el('h3', {}, [
+        arch ? el('span', { class: 'state', text: T('archN') }) : statusChip(s),
+        el('span', { class: 'n', text: String(all.length) }),
+        columnTools(s, all, two)
+      ]),
+      cards
+    ]);
+  }
+  // the done column archives its tasks; the open columns switch between one and two card columns
+  function columnTools(s, all, two) {
+    return el('span', { class: 'tools' }, [
+      s === 'done' && all.length && writable() ? archiveButton(all) : null,
+      canTwo(s)
+        ? button(
             {
               class: 'colbtn',
               'aria-pressed': String(two),
@@ -5874,44 +5902,8 @@ td.what .overlap{margin-left:8px}
             },
             [icon(two ? 'one' : 'two')]
           )
-        );
-      var cards = el('div', { class: 'cards' });
-      if (!loaded) cards.appendChild(emptyNote(loadingText()));
-      else if (!all.length) cards.appendChild(emptyNote(T('empty')));
-      if (arch) cards.appendChild(el('p', { class: 'muted arch-hint', text: T('archHint') }));
-      list.forEach(function (t) {
-        order.push(t.id);
-        cards.appendChild(kanbanCard(t, s));
-      });
-      if (capped && all.length > DONE_FIRST) {
-        var rest = all.length - shown;
-        cards.appendChild(
-          moreBtn(!rest, Math.min(DONE_STEP, rest), function () {
-            kanbanShown[s] = rest ? shown + DONE_STEP : DONE_FIRST;
-            renderKanban();
-          })
-        );
-      }
-      cols.appendChild(
-        el(
-          'div',
-          {
-            class: 'col' + (two ? ' two' : '') + (arch ? ' arch' : ''),
-            'data-status': s
-          },
-          [
-            el('h3', {}, [
-              arch ? el('span', { class: 'state', text: name }) : statusChip(s),
-              el('span', { class: 'n', text: String(all.length) }),
-              tools
-            ]),
-            cards
-          ]
-        )
-      );
-    });
-    root.appendChild(cols);
-    sizeBoard();
+        : null
+    ]);
   }
 
   // ---------- dependency graph ----------
@@ -6717,69 +6709,108 @@ td.what .overlap{margin-left:8px}
         : false
     };
   }
+  function option(value, text) {
+    return el('option', { value: value, text: text });
+  }
+  // a sheet field that writes its own task field when it changes; a viewer who cannot write sees it disabled
+  function taskField(t, k, node, value, clean) {
+    node.value = value;
+    node.disabled = !writable();
+    node.addEventListener('change', function () {
+      var patch = {};
+      patch[k] = clean(node.value);
+      change(t, patch);
+    });
+    return node;
+  }
+  function orNull(v) {
+    return v || null;
+  }
+  function trimmedOrNull(v) {
+    return v.trim() || null;
+  }
   // a field being typed in keeps its draft across a re-render
   function sheetFields(t, kept) {
-    var f = {};
-    f.status = el('select', { id: 'fStatus', 'aria-label': T('f_status') });
-    STATUS.forEach(function (x) {
-      f.status.appendChild(el('option', { value: x, text: statusLabel(x) }));
-    });
-    f.status.value = knownStatus(t);
-    f.status.addEventListener('change', function () {
-      change(t, { status: f.status.value });
-    });
-    f.owner = el('select', { id: 'fOwner', 'aria-label': T('f_owner') });
-    f.owner.appendChild(el('option', { value: '', text: T('unassigned') }));
-    people.forEach(function (p) {
-      f.owner.appendChild(el('option', { value: p.id, text: p.name || p.id }));
-    });
-    if (t.owner && !person(t.owner)) f.owner.appendChild(el('option', { value: t.owner, text: t.owner }));
-    f.owner.value = t.owner || '';
-    f.owner.addEventListener('change', function () {
-      change(t, { owner: f.owner.value || null });
-    });
-    f.branch = el('input', { type: 'text', id: 'fBranch', placeholder: 'feature/…', 'aria-label': T('f_branch') });
-    f.branch.value = kept.activeId === 'fBranch' ? kept.values.fBranch : t.branch || '';
-    f.branch.addEventListener('change', function () {
-      change(t, { branch: f.branch.value.trim() || null });
-    });
-    f.pr = el('input', { type: 'url', id: 'fPr', placeholder: 'https://github.com/…/pull/N', 'aria-label': T('f_pr') });
-    f.pr.value = kept.activeId === 'fPr' ? kept.values.fPr : t.pr || '';
-    f.pr.addEventListener('change', function () {
-      change(t, { pr: f.pr.value.trim() || null });
-    });
-    f.start = el('input', { type: 'date', id: 'fStart', 'aria-label': T('f_start') });
-    f.start.value = startOf(t);
-    f.start.addEventListener('change', function () {
-      change(t, { start: f.start.value || null });
-    });
-    f.due = el('input', { type: 'date', id: 'fDue', 'aria-label': T('f_due') });
-    f.due.value = dueOf(t);
-    f.due.addEventListener('change', function () {
-      change(t, { due: f.due.value || null });
-    });
+    function typed(id, v) {
+      return kept.activeId === id ? kept.values[id] : v || '';
+    }
+    var f = {
+      status: taskField(
+        t,
+        'status',
+        el(
+          'select',
+          { id: 'fStatus', 'aria-label': T('f_status') },
+          STATUS.map(function (x) {
+            return option(x, statusLabel(x));
+          })
+        ),
+        knownStatus(t),
+        String
+      ),
+      owner: taskField(
+        t,
+        'owner',
+        el(
+          'select',
+          { id: 'fOwner', 'aria-label': T('f_owner') },
+          [option('', T('unassigned'))].concat(
+            people.map(function (p) {
+              return option(p.id, p.name || p.id);
+            }),
+            t.owner && !person(t.owner) ? [option(t.owner, t.owner)] : []
+          )
+        ),
+        t.owner || '',
+        orNull
+      ),
+      branch: taskField(
+        t,
+        'branch',
+        el('input', { type: 'text', id: 'fBranch', placeholder: 'feature/…', 'aria-label': T('f_branch') }),
+        typed('fBranch', t.branch),
+        trimmedOrNull
+      ),
+      pr: taskField(
+        t,
+        'pr',
+        el('input', { type: 'url', id: 'fPr', placeholder: 'https://github.com/…/pull/N', 'aria-label': T('f_pr') }),
+        typed('fPr', t.pr),
+        trimmedOrNull
+      ),
+      start: taskField(
+        t,
+        'start',
+        el('input', { type: 'date', id: 'fStart', 'aria-label': T('f_start') }),
+        startOf(t),
+        orNull
+      ),
+      due: taskField(t, 'due', el('input', { type: 'date', id: 'fDue', 'aria-label': T('f_due') }), dueOf(t), orNull),
+      repo: null
+    };
     // the repo a task belongs to: a label (or owner/name) from meta/config.repos
     var rs = repoList();
-    f.repo = null;
     if (rs.length || t.repo) {
-      f.repo = el('select', { id: 'fRepo', 'aria-label': T('f_repo') });
-      f.repo.appendChild(el('option', { value: '', text: T('repoNone') }));
-      rs.forEach(function (r) {
-        var v = r.label || r.repo;
-        f.repo.appendChild(el('option', { value: v, text: r.label ? r.label + ' · ' + r.repo : r.repo }));
-      });
       var listed = rs.some(function (r) {
         return (r.label || r.repo) === t.repo;
       });
-      if (t.repo && !listed) f.repo.appendChild(el('option', { value: t.repo, text: t.repo }));
-      f.repo.value = t.repo || '';
-      f.repo.addEventListener('change', function () {
-        change(t, { repo: f.repo.value || null });
-      });
+      f.repo = taskField(
+        t,
+        'repo',
+        el(
+          'select',
+          { id: 'fRepo', 'aria-label': T('f_repo') },
+          [option('', T('repoNone'))].concat(
+            rs.map(function (r) {
+              return option(r.label || r.repo, r.label ? r.label + ' · ' + r.repo : r.repo);
+            }),
+            t.repo && !listed ? [option(t.repo, t.repo)] : []
+          )
+        ),
+        t.repo || '',
+        orNull
+      );
     }
-    ['status', 'owner', 'branch', 'pr', 'start', 'due', 'repo'].forEach(function (k) {
-      if (f[k]) f[k].disabled = !writable();
-    });
     return f;
   }
   function fieldGrid(t, f) {
