@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.21.2",
+      "date": "2026-10-26",
+      "prs": [
+        56
+      ],
+      "lines": {
+        "en": [
+          "The public demo says how long ago things happened again (40m ago, 1h ago) instead of 1-01 00:00.",
+          "The README screenshots show the board as it is now."
+        ],
+        "ko": [
+          "공개 데모가 다시 '40분 전', '1시간 전'처럼 시간을 보여 줘요. 그동안은 1-01 00:00으로 보였어요.",
+          "README 스크린샷이 지금 보드 모습으로 바뀌었어요."
+        ]
+      }
+    },
+    {
       "version": "1.21.1",
       "date": "2026-10-26",
       "prs": [
