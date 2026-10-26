@@ -18,26 +18,48 @@
 
 ### Di "crea un tablero de tareas". Obtén un tablero desde el que trabajan todo tu equipo y cada agente.
 
-**Una sola página se convierte en el tablero: tareas, hilos, avisos y un grafo de dependencias.** Mantenlo como artifact de claude.ai o alójalo tú mismo para Claude Code y Codex.<br/>
-La página dibuja todo desde la base de datos del tablero con código, así que se mantiene al día sin gastar un solo token.<br/>
-Los agentes siguen unas pocas reglas ligeras que viven en tu repositorio: consultar en vez de listar, un lote por acción, resúmenes en vez de hilos largos.
+**Una sola página es el tablero: tareas, hilos, avisos, un grafo de dependencias y un mapa de código.** Mantenlo como artifact de claude.ai o alójalo tú mismo para Claude Code y Codex.<br/>
+La página dibuja todo desde la base de datos del tablero con código, así que se mantiene al día sin gastar un solo token, y los agentes la leen y la escriben siguiendo unas pocas reglas ligeras.
 
-[Demo](#demo) · [Inicio rápido](#inicio-rápido) · [Uso](#uso) · [Autoalojamiento](#autoalojamiento) · [Cómo funciona](#cómo-funciona) · [Diseño de tokens](#diseño-de-tokens) · [Para agentes](FOR_AGENTS.md)
+[Instalación](#instalación) · [Demo](#demo) · [Qué obtienes](#qué-obtienes) · [Uso](#uso) · [Autoalojamiento](#autoalojamiento) · [Cómo funciona](#cómo-funciona) · [Para agentes](FOR_AGENTS.md)
 
 </div>
 
-> [!TIP]
-> **Deja que Claude lo instale.** Pega esto en Claude Code:
->
-> ```text
-> Instala artiboard siguiendo https://github.com/yulmucoffee/artiboard/blob/main/FOR_AGENTS.md
-> ```
->
-> Claude instala la skill y luego pregunta cuántas personas (1, 2, 3 o cualquier número), cómo repartís el trabajo, el idioma del tablero y de dónde salen las primeras tareas.
+## Instalación
+
+**Pídeselo a Claude.** Pega esto en Claude Code; instala la skill y pregunta cuántas personas sois, cómo repartís el trabajo, el idioma del tablero y de dónde salen las primeras tareas:
+
+```text
+Set up artiboard for me by following https://github.com/yulmucoffee/artiboard/blob/main/FOR_AGENTS.md
+```
+
+**O copia la skill tú mismo.** Dos comandos y luego, en una sesión nueva, di "crea un tablero de tareas para este proyecto":
+
+```bash
+git clone --depth 1 https://github.com/yulmucoffee/artiboard.git "$HOME/.artiboard/src"
+```
+
+```bash
+mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
+```
+
+Para Codex, cópiala a `$HOME/.codex/skills/artiboard`; para un solo repositorio, a `.claude/skills/artiboard` (o `.agents/skills/artiboard`) y haz commit. Para actualizar, ejecuta `git -C "$HOME/.artiboard/src" pull --ff-only` y vuelve a copiarla. Los comandos para Windows PowerShell están en [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill).
+
+<details>
+<summary><b>¿Prefieres el plugin de Claude Code?</b></summary>
+
+```text
+/plugin marketplace add yulmucoffee/artiboard
+/plugin install artiboard@artiboard
+```
+
+La skill pasa a ser `/artiboard:artiboard`.
+
+</details>
 
 ## Demo
 
-**[Abrir la demo en vivo →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** Un equipo ficticio de tres personas que construye una app de recetas, con 14 tareas. Ejecuta la página real del tablero con datos de ejemplo dentro de la página, así que pruébalo sin miedo: toma una tarea, escribe en un hilo, busca, pulsa `j`/`k`. A los pocos segundos llegan solas dos actualizaciones de agentes. El botón English / 한국어 de arriba cambia toda la demo, datos de ejemplo incluidos, a coreano. En el kanban puedes plegar una columna, verla en dos columnas de tarjetas o archivar el trabajo terminado.
+**[Abrir la demo en vivo →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** Un equipo de tres personas que construye una app de recetas: la página real del tablero con datos de ejemplo, así que toma una tarea, escribe en un hilo, abre el mapa de código o cambia a 한국어. Dos actualizaciones de agentes llegan solas.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">
@@ -69,95 +91,24 @@ Los agentes siguen unas pocas reglas ligeras que viven en tu repositorio: consul
 </tr>
 </table>
 
-## Por qué artiboard
+## Qué obtienes
 
-Cuando dos personas ejecutan varias sesiones de Claude cada una sobre el mismo código, lo difícil no es el código. Es saber quién tomó qué, qué está bloqueado y qué cambió mientras no estabas. El historial del chat no viaja entre sesiones, y pegar todo el estado en cada prompt sale caro muy rápido.
+Cuando varias personas ejecutan cada una varias sesiones de agentes sobre el mismo código, lo difícil es saber quién tomó qué, qué está bloqueado y qué cambió mientras no estabas. artiboard es un único lugar en vivo para todo eso, y a los agentes les sale barato usarlo.
 
-artiboard da al equipo un único lugar compartido y en vivo para ese estado, y da a los agentes una forma barata y estricta de usarlo.
+- **Un tablero, tres vistas.** Un documento que se lee de arriba abajo, un kanban y un grafo de dependencias que resalta la cadena restante más larga. "Ahora" destaca lo bloqueado, atrasado o que vence hoy; búsqueda, un filtro "mías", teclas `j`/`k`, marcas de "nuevo desde tu última visita", tema claro u oscuro.
+- **Personas y agentes juntos.** Los agentes toman tareas con escrituras que comprueban la versión, así que dos nunca toman la misma. Los hilos guardan decisiones y traspasos; los avisos, lo que todos deben saber. Una persona mueve una tarea con un clic, y cada cambio queda en su hilo.
+- **Un mapa de código** (autoalojado). Los archivos, símbolos y enlaces de cada repositorio, generados a partir de un checkout sin ningún modelo. Los agentes consultan `board_map` en vez de usar grep, dos tareas abiertas sobre el mismo código se avisan entre sí, y la página lo dibuja como nodos que se abren grupo a grupo.
+- **Hecho para seguir siendo barato.** Las vistas las dibuja el código, nunca un modelo. Los agentes leen solo la parte que necesitan y escriben en un solo lote, así que tomar una tarea es una sola llamada de menos de cien tokens.
 
-<table>
-<tr>
-<td width="33%" valign="top">
-
-### 🗂️ Un tablero, tres vistas
-
-Una vista de documento que se lee de arriba abajo, un kanban y un grafo de dependencias que resalta la cadena restante más larga. La actividad reciente muestra el último mensaje de cada tarea que se movió, y "Ahora" destaca lo bloqueado, atrasado o que vence hoy. Búsqueda, columnas ordenables, un filtro "mías", teclas `j`/`k` y marcas de "nuevo desde tu última visita". Tema claro, oscuro o automático. El kanban ocupa toda la ventana como en Notion: las columnas se pliegan o muestran dos columnas de tarjetas, y lo terminado se archiva de una vez.
-
-</td>
-<td width="33%" valign="top">
-
-### 🤝 Personas y agentes juntos
-
-Cada persona tiene un color. Los agentes toman tareas con escrituras que comprueban la versión, así que dos agentes nunca toman la misma. Los hilos guardan decisiones, preguntas y traspasos. Los avisos llevan lo que todos deben saber. Quien revisa cierra la tarea en revisión, y un agente toma la tarea de otra persona solo cuando su persona se lo pide. Las personas también mueven tareas con un clic, y cada cambio queda en el hilo.
-
-</td>
-<td width="33%" valign="top">
-
-### 🪶 Hecho para seguir siendo barato
-
-Las vistas las dibuja el código, nunca un modelo. Los agentes leen solo la parte que necesitan y escriben en un solo lote. Cuanto más dura el proyecto, más se nota.
-
-</td>
-</tr>
-</table>
-
-**Mapa de código.** Un tablero autoalojado puede guardar un mapa de los archivos, funciones e imports de cada repositorio. Los agentes consultan `board_map` antes de usar grep, y el tablero avisa cuando dos tareas abiertas tocan el mismo código. La página lo dibuja como nodos y enlaces que se abren grupo a grupo y archivo a archivo, con las tareas abiertas del equipo colocadas sobre el código. Se crea con un solo comando ([Autoalojamiento](#autoalojamiento)). Los tableros artifact de claude.ai todavía no lo tienen.
-
-## Inicio rápido
-
-Un tablero vive en uno de dos sitios. Los dos usan la misma página, los mismos documentos y las mismas reglas, y la skill prepara cualquiera de ellos.
+Un tablero vive en uno de dos sitios. Los dos usan la misma página, los mismos documentos y las mismas reglas; la skill prepara cualquiera de ellos.
 
 | | Artifact de claude.ai | Sitio autoalojado |
 | --- | --- | --- |
-| Agentes | Claude Code con sesión iniciada en claude.ai (`Artifact`, `ArtifactData`) | Claude Code, Codex, cualquier cliente MCP (servidor MCP `artiboard`) |
+| Agentes | Claude Code con sesión iniciada en claude.ai | Claude Code, Codex, cualquier cliente MCP |
 | Datos | La base de datos del artifact | SQLite (un archivo) o Supabase |
 | Dónde corre | claude.ai, nada que ejecutar | Este ordenador, tu dominio (Docker) o Vercel |
-| Cómo entra el equipo | El menú Share del artifact | Un token que un admin emite en la página de proyectos o con `artiboard member add` |
+| Cómo entra el equipo | El menú Share del artifact | Un token que emite un admin |
 | Tableros | Un artifact por tablero | Un sitio, un tablero por proyecto en `/p/<project>` |
-
-Para un tablero autoalojado, levanta primero el sitio: [Autoalojamiento](#autoalojamiento).
-
-**Opción A: que lo haga Claude.** Usa el texto del recuadro de arriba. Claude sigue [FOR_AGENTS.md](FOR_AGENTS.md).
-
-**Opción B: solo para mí, en todos los proyectos**
-
-```bash
-git clone --depth 1 https://github.com/yulmucoffee/artiboard.git "$HOME/.artiboard/src"
-```
-
-```bash
-mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
-```
-
-Abre una sesión nueva en tu proyecto y di "crea un tablero de tareas para este proyecto".
-
-**Opción C: para el repositorio de mi equipo** (ejecútalo en la raíz del repositorio y haz commit)
-
-```bash
-mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
-```
-
-**Opción D: Codex.** La misma skill funciona en Codex. Cópiala a `~/.codex/skills/artiboard` para todos los proyectos, o a `.agents/skills/artiboard` dentro de un repositorio:
-
-```bash
-mkdir -p "$HOME/.codex/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.codex/skills/artiboard/"
-```
-
-Codex trabaja con tableros autoalojados (no tiene artifacts de claude.ai).
-
-Para actualizar, ejecuta `git -C "$HOME/.artiboard/src" pull --ff-only` y luego el mismo comando de copia otra vez. En Windows PowerShell, usa los comandos de [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill).
-
-<details>
-<summary><b>¿Prefieres el plugin de Claude Code?</b></summary>
-
-```text
-/plugin marketplace add yulmucoffee/artiboard
-/plugin install artiboard@artiboard
-```
-
-La skill pasa a ser `/artiboard:artiboard`.
-
-</details>
 
 ## Uso
 
@@ -165,18 +116,17 @@ Pídelo con tus palabras y en cualquier idioma.
 
 | Dices | Qué pasa |
 | --- | --- |
-| "Crea un tablero de tareas para este proyecto" | **setup**: pregunta dónde vive el tablero, el tamaño del equipo, el reparto, el idioma y el origen de las tareas. Redacta las tareas y las reglas del proyecto a partir de tu documentación y te las muestra para que digas sí. Publica o crea el tablero, enlaza tus repositorios de GitHub, lo llena y añade una indicación corta en `CLAUDE.md` (y en `AGENTS.md` para Codex). |
-| "Añade a Cy al tablero", "Pon el tablero en inglés" | **adapt**: actualiza la configuración del tablero. Sin volver a publicar. |
-| "Añade un estado QA", "Muestra estimaciones en las tarjetas" | **adapt**: modifica la página y las reglas a la vez. En un tablero autoalojado, mediante ediciones con `board_page`. |
+| "Crea un tablero de tareas para este proyecto", "Set up a task board for this project" | **setup**: pregunta dónde vive el tablero, el tamaño del equipo, el reparto, el idioma y el origen de las tareas; redacta las tareas y las reglas del proyecto a partir de tu documentación para que des el visto bueno; publica o crea el tablero, enlaza tus repositorios y añade una indicación corta en `CLAUDE.md` (y en `AGENTS.md`). |
+| "Añade a Cy al tablero", "Añade un estado QA", "Pon el tablero en japonés" | **adapt**: cambia la configuración del tablero, o la página y las reglas a la vez. Sin volver a publicar. |
 | "Mueve nuestro tablero a nuestro propio servidor" | **move**: copia los documentos de un tablero en artifact a un proyecto autoalojado. |
-| "Dame un enlace para entrar al tablero" | Un enlace de un solo uso para iniciar sesión en el navegador en un tablero autoalojado. |
-| "Toma la siguiente tarea", "Continúa M1-4" | Trabajo diario. El agente empieza con `board_start` (en un tablero artifact, `docs/artiboard.md`), que le da las reglas del tablero, las del proyecto y su trabajo: tomar, hilo, resumen, revisión, hecho. |
+| "Dame un enlace para entrar al tablero", "Give me a board sign-in link" | Un enlace de un solo uso para iniciar sesión en el navegador en un tablero autoalojado. |
+| "Toma la siguiente tarea", "Continúa M1-4" | Trabajo diario: `board_start` trae las reglas del tablero, las del proyecto y tu trabajo; luego tomar, hilo, resumen, revisión, hecho. |
 
-Después, comparte el tablero con tu equipo desde el menú **Share** del artifact con permiso de edición. Sus agentes encuentran el tablero por la indicación al hacer pull del repositorio. La página sabe quién la está viendo: la primera vez que alguien elige su nombre en "I am", el tablero lo vincula a su cuenta de claude.ai y lo elige por ella desde entonces. Avisa cuando alguien publica con un nombre vinculado a otra cuenta, y quien solo puede ver no recibe los botones de tomar, publicar ni editar.
+Comparte un tablero en artifact desde su menú **Share** con permiso de edición; los agentes de tu equipo lo encuentran por la indicación del repositorio. La primera vez que alguien elige su nombre en "I am", el tablero lo vincula a su cuenta de claude.ai.
 
 ## Autoalojamiento
 
-Un sitio autoalojado sirve una lista de proyectos en `/`, un tablero por proyecto en `/p/<project>` y un servidor MCP en `/mcp`. La página del tablero es el mismo `board.html` que publica el artifact, con un pequeño runtime (`server/public/shim.js`) que hace las veces de claude.ai: inicia la sesión de las personas, lee y escribe los datos del sitio y envía cada cambio a las páginas abiertas. Necesita Node 22.13 o posterior. La lista de proyectos empieza con quién trabaja en qué, tablero por tablero.
+Un sitio sirve una lista de proyectos en `/`, un tablero por proyecto en `/p/<project>` y un servidor MCP en `/mcp`. Es la misma página que publica el artifact, con un pequeño runtime que hace las veces de claude.ai. Necesita Node 22.13 o posterior.
 
 **En este ordenador** (SQLite, datos en `~/.artiboard/board.db`):
 
@@ -204,15 +154,15 @@ docker compose up -d
 docker compose exec board node server/cli.js init --person ana --name Ana
 ```
 
-**En Vercel con Supabase:** crea un proyecto de Supabase y luego sube el esquema y configura el entorno del sitio:
+**En Vercel con Supabase:** crea un proyecto de Supabase y luego sube el esquema:
 
 ```bash
 supabase link --project-ref <ref> && supabase db push
 ```
 
-Define `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` y `BOARD_URL` en el proyecto de Vercel, añade tu dominio, ejecuta `vercel link` y luego `npm run deploy:vercel` (`VERCEL_REGION=icn1` mantiene las funciones cerca de una base de datos en Seúl). En Supabase Auth, añade `<BOARD_URL>/` a las URL de redirección. Los comandos de administración se ejecutan desde cualquier lugar con esas variables en un archivo: `node server/cli.js --env site.env member list`. El mismo servidor también funciona con Supabase desde cualquier host: define las tres variables `SUPABASE_*` y ejecuta `serve`. Para actualizar un sitio, trae el código, ejecuta `supabase db push` si hay migraciones nuevas y vuelve a desplegar.
+Define `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` y `BOARD_URL` en el proyecto de Vercel, añade tu dominio, ejecuta `vercel link` y luego `npm run deploy:vercel` (`VERCEL_REGION=icn1` mantiene las funciones cerca de una base de datos en Seúl). En Supabase Auth, añade `<BOARD_URL>/` a las URL de redirección. Para actualizar un sitio, trae el código, ejecuta `supabase db push` si hay migraciones nuevas y vuelve a desplegar.
 
-**Conecta los agentes.** Cada persona recibe un token (un admin lo emite en **Miembros** en la página de proyectos, o con `member add` o `member token`) y ejecuta:
+**Conecta los agentes.** Cada persona recibe un token (un admin lo emite en **Members** en la página de proyectos, o con `member add`) y ejecuta uno de estos:
 
 ```bash
 claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
@@ -222,22 +172,20 @@ claude mcp add --scope user --transport http artiboard https://board.example.com
 codex mcp add artiboard --url https://board.example.com/mcp --bearer-token-env-var ARTIBOARD_TOKEN
 ```
 
-Para Codex, deja `export ARTIBOARD_TOKEN=abt_…` en el perfil de tu shell. Codex pregunta antes de cada llamada a una herramienta que puede sobrescribir documentos (`board_batch`, `board_page`); para que `board_batch` se ejecute sin preguntar, añade esto a `~/.codex/config.toml`:
+Para Codex, deja `export ARTIBOARD_TOKEN=abt_…` en el perfil de tu shell. Codex pregunta antes de cada llamada a una herramienta que puede sobrescribir documentos; para que `board_batch` se ejecute sin preguntar, añade esto a `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.artiboard.tools.board_batch]
 approval_mode = "approve"
 ```
 
-Luego pide al agente "prepara el tablero para este repositorio".
-
-**Mapa de código** (opcional, solo autoalojado). Un mapa dice qué commit y qué rama describe. Para mantenerlo al día basta una opción en el comando de abajo: `--workflow` escribe un workflow de CI para la rama por defecto (necesita el secreto `ARTIBOARD_TOKEN` en el repositorio) y `--hook` instala hooks de git en un checkout donde solo tú haces commits; usa uno por repositorio, nunca los dos ([Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current), en la guía de autoalojamiento). Desde el checkout del repositorio, crea su mapa y súbelo:
+**Mapa de código.** Desde el checkout de un repositorio, crea su mapa y súbelo; añade `--workflow` para escribir un job de CI para la rama por defecto (con el secreto `ARTIBOARD_TOKEN` en el repositorio), o `--hook` para instalar hooks de git en un checkout donde solo tú haces commits, uno por repositorio ([Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current), en la guía de autoalojamiento):
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api
 ```
 
-**Personaliza** exactamente como en claude.ai. El título, el idioma y cualquier texto de la interfaz viven en `meta/config` y cambian en vivo; quién está en un tablero lo deciden los administradores (`member join`, `member remove`). La página en sí es por proyecto: un administrador ejecuta `artiboard page set --project acme --file page.html` (estados, campos, vistas), y `page reset` vuelve a la página incluida, que se actualiza con el sitio. El código de la página se ejecuta para cada miembro, así que los agentes solo leen las páginas (`board_page` con `find`) salvo que el sitio defina `ARTIBOARD_AGENT_PAGE_EDITS=1`; entonces el agente de un administrador puede cambiar una página con ediciones pequeñas y exactas.
+**Personaliza.** El título, el idioma y cualquier texto de la interfaz viven en `meta/config` y cambian en vivo. La página es por proyecto: `artiboard page set --project acme --file page.html` para estados, campos o vistas, y `page reset` para volver a la página incluida, que se actualiza con el sitio.
 
 | Ajuste | Por defecto | Significado |
 | --- | --- | --- |
@@ -262,7 +210,7 @@ artiboard import --project ID --file FILE [--map old=new]
 artiboard map build|drop --project ID --repo R
 ```
 
-Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins hacen lo mismo desde el sitio: la página de proyectos tiene un panel **Miembros** (añadir, nuevo token, enlace de acceso, nivel, revocar, quitar), y cada persona fija su propio nombre y rol en **Perfil**, que se muestra en todos los tableros donde está. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y valen para todo el sitio: cada miembro ve todos los proyectos. Los miembros nunca reciben contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador. `member revoke` también cierra esas sesiones. Solo los administradores cambian quién es quién (`meta/config.people`, `people/`), y los mensajes y avisos siempre llevan el nombre de quien los escribe.
+Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins hacen lo mismo desde la página de proyectos (**Members**: añadir, token, enlace de inicio de sesión, nivel de acceso, revocar, quitar), y cada persona fija su propio nombre y rol en **Profile**. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y un sitio es un solo equipo: cada miembro ve todos los proyectos. Nadie recibe contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador.
 
 </details>
 
@@ -271,16 +219,16 @@ Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins
 
 | Herramienta | Qué hace |
 | --- | --- |
-| `board_start {project o repo}` | Las reglas del tablero y del proyecto, avisos nuevos desde tu cursor (y lo avanza), tus tareas abiertas (marcadas donde otra persona escribió lo último; las que están en revisión, en una línea), tareas disponibles, tareas ajenas esperando revisión. Con `repo` (un git remote) encuentra el proyecto y muestra el trabajo de ese repositorio |
-| `board_claim {id, text, override?}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación y resumen. `override` toma la tarea de otra persona cuando tu persona lo pide |
+| `board_start {project o repo}` | Las reglas del tablero y las del proyecto, avisos nuevos desde tu cursor, tus tareas abiertas, tareas disponibles, tareas ajenas esperando revisión. Con `repo` (un git remote) encuentra el proyecto |
+| `board_claim {id, text, override?}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación, resumen y el código que nombra la tarea |
 | `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen |
-| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | Un mensaje en el hilo más cambios en tu tarea; cualquiera puede mover el `due` de una tarea. `done` registra `doneAt` y desbloquea las que dependen de ella; `todo` libera la tarea para cualquiera. Sin `task`: un aviso. `tasks` da a varias tareas un mismo estado y mensaje en una sola escritura, todo o nada (un despliegue que cierra sus revisiones). Una tarea en revisión queda abierta a quien la revisa (`done` o de vuelta a `doing`); `override` cambia la tarea de otra persona cuando tu persona lo pide, y el hilo nombra a quien la tenía. `touches` añade los archivos o símbolos que tocas (`""` lo borra); un tablero autoalojado avisa cuando las tareas abiertas se solapan |
-| `board_map {explain, file, path, query, impact}` | El mapa de código de un tablero autoalojado. Pregúntalo antes de usar grep: explicar un nombre, mostrar un archivo, `path [a, b]`, palabras de consulta, impacto (lo que depende de X). Sin pregunta: resumen |
-| `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData`. Las escrituras en lote sobre tareas siguen la misma regla de responsable que `board_post` |
+| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | Un mensaje en el hilo más cambios en tu tarea. `done` desbloquea las que dependen de ella y `todo` libera la tarea; sin `task`, un aviso; `tasks` mueve varias en una sola escritura. `touches` registra los archivos que tocas, para que las tareas que se solapan se avisen entre sí |
+| `board_map {explain, file, path, query, impact, inside}` | El mapa de código: explicar un nombre, un archivo, el camino entre dos, palabras, qué depende de X, qué usa X. Sin pregunta: resumen |
+| `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData` |
 | `board_page` | La página del proyecto: tamaño, `find`, `read` y, para administradores, `edits`, `html`, `reset` |
-| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio; cada proyecto muestra sus repositorios de GitHub |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio y sus proyectos |
 
-Las herramientas de uso diario responden en líneas cortas, comprueban versiones y ponen la hora en el servidor, así que tomar o actualizar una tarea es una sola llamada de menos de cien tokens.
+Las herramientas de uso diario responden en líneas cortas y comprueban versiones en el servidor, así que tomar o actualizar una tarea es una sola llamada de menos de cien tokens.
 
 </details>
 
@@ -295,36 +243,34 @@ flowchart LR
   end
   People(["Personas"]) --> Page
   AgentA(["Sesiones de agentes"]) -- ArtifactData<br/>consultas + lotes --> DB
-  Repo["Tu repositorio<br/>indicación en CLAUDE.md<br/>reglas en docs/artiboard.md"] -. solo al trabajar con el tablero .-> AgentA
+  Repo["Tu repositorio<br/>indicación en CLAUDE.md<br/>reglas en docs/artiboard.md"] -. se lee al trabajar con el tablero .-> AgentA
 ```
-
-| Pieza | Qué guarda | Quién la lee |
-| --- | --- | --- |
-| `tasks/<id>` | Solo el estado: responsable, dependencias, `waitingOn`, quién la tomó, rama, PR, `archivedAt` | La página; los agentes mediante consultas |
-| `details/<id>` | Dónde está la especificación, criterio de aceptación, resumen de cinco líneas | Los agentes, solo para la tarea en curso |
-| `tasks/<id>/messages` | El hilo: avances, preguntas, traspasos, bloqueos | Los agentes leen los últimos ocho; las personas, todo |
-| `notices` | Lo que todos deben saber | Los agentes solo leen lo posterior a su cursor |
-| `cursors/<persona>` | Cuándo leyeron los avisos por última vez los agentes de esa persona | Agentes |
-| `meta/config` | Título, personas, idioma, repositorios de GitHub, textos de la interfaz | La página |
-| `meta/rules` | Las reglas propias del proyecto: quién lleva qué, dónde están las especificaciones, ramas, qué anunciar | Las personas en la página; los agentes al empezar a trabajar con el tablero |
-| `meta/notes` | Estado compartido: calendario, dónde está cada cosa, preguntas abiertas | Las personas en la página; los agentes solo cuando lo necesitan |
-| `people/<person>` | Qué cuenta de claude.ai eligió primero a esa persona | La página |
-| `docs/artiboard.md` (repo, tableros artifact) | Las reglas del tablero, copiadas tal cual (un sitio autoalojado las da en `board_start`) | Los agentes, solo en sesiones que usan el tablero |
-
-## Diseño de tokens
 
 | Regla | Efecto |
 | --- | --- |
-| El código dibuja el tablero | Vistas, gráficos, recuentos, disponibilidad y marcas de "nuevo" no gastan tokens del modelo, sea cual sea el tamaño del equipo. |
-| Las reglas llegan con el trabajo del tablero | Cada sesión paga una indicación de tres líneas. Las reglas del tablero, iguales en todos, y las reglas cortas del proyecto llegan solo al empezar a trabajar con el tablero; las notas de estado se leen solo cuando hacen falta. Las reglas del tablero vienen con artiboard, así que ningún proyecto guarda ni edita una copia. |
-| Consultar, nunca listar | Encontrar trabajo es una consulta (`status == todo`, `waitingOn == []`). Los avisos llegan como diferencia desde tu cursor. |
-| Documentos pequeños | Las tareas guardan el estado. El texto largo se abre para una tarea cada vez. |
-| Resúmenes en vez de hilos | Cada traspaso reescribe un resumen de cinco líneas, así que quien sigue se salta los mensajes viejos. |
+| El código dibuja el tablero | Vistas, recuentos, disponibilidad y marcas de "nuevo" no gastan tokens del modelo, sea cual sea el tamaño del equipo. |
+| Las reglas llegan con el trabajo del tablero | Cada sesión paga una indicación de tres líneas. Las reglas del tablero y las reglas cortas del proyecto llegan solo al empezar a trabajar con el tablero. |
+| Consultar, nunca listar | Encontrar trabajo es una consulta (`status == todo`, `waitingOn == []`); los avisos llegan como diferencia desde tu cursor. |
+| Documentos pequeños, resúmenes cortos | Los documentos de tarea guardan el estado; el texto largo se abre para una tarea cada vez; un traspaso reescribe un resumen de cinco líneas. |
 | Un lote por acción | Tomar una tarea es una sola llamada: tarea, mensaje y cursor juntos, con comprobación de versión. |
-| Datos que se reparan solos | Mientras alguien tiene el tablero abierto, la página corrige `waitingOn`, y `board_start` comprueba la disponibilidad contra las propias tareas de las que depende y la repara de paso, así que los agentes no gastan llamadas en contabilidad. |
-| La misma lista para todos | La lista de herramientas y las instrucciones del servidor son idénticas para cada miembro, así que la caché de prompts las conserva; los límites de tamaño son pruebas. |
+| Datos que se reparan solos | La página y `board_start` mantienen `waitingOn` al día, así que los agentes nunca gastan llamadas en contabilidad. |
 
-## Referencia
+<details>
+<summary><b>Documentos</b></summary>
+
+| Pieza | Qué guarda | Quién la lee |
+| --- | --- | --- |
+| `tasks/<id>` | Solo el estado: responsable, dependencias, `waitingOn`, quién la tomó, rama, PR, archivos que toca | La página; los agentes mediante consultas |
+| `details/<id>` | Dónde está la especificación, criterio de aceptación, resumen de cinco líneas | Los agentes, solo para la tarea en curso |
+| `tasks/<id>/messages` | El hilo: avances, preguntas, traspasos, bloqueos | Los agentes leen los últimos ocho; las personas, todo |
+| `notices` | Lo que todos deben saber | Los agentes solo leen lo posterior a su cursor |
+| `cursors/<person>` | Cuándo leyeron los avisos por última vez los agentes de esa persona | Agentes |
+| `meta/config` | Título, personas, idioma, repositorios, cualquier texto de la interfaz | La página |
+| `meta/rules`, `meta/notes` | Las reglas propias del proyecto; el estado compartido | Las personas en la página; los agentes al empezar a trabajar con el tablero, o cuando lo necesitan |
+| `map/<repo>` | El mapa de código de un repositorio: índice y fragmentos | Los agentes mediante `board_map`; la sección Code map de la página |
+| `docs/artiboard.md` (repo, tableros artifact) | Las reglas del tablero, copiadas tal cual (un sitio las da en `board_start`) | Los agentes, solo en sesiones que usan el tablero |
+
+</details>
 
 <details>
 <summary><b>Claves de <code>meta/config</code></b></summary>
@@ -334,8 +280,9 @@ flowchart LR
 | `title` | `"Acme Board"` | Encabezado de la página |
 | `subtitle` | `"Para qué sirve este tablero."` | Una línea bajo el encabezado |
 | `milestone` | `"M1"` | Hito actual |
-| `lang` | `"en"`, `"ko"` | Idioma integrado de la interfaz. Los demás se muestran en inglés; el español se cubre con `strings`. |
-| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | El orden fija los colores. Seis colores y luego se repiten. Un `uid` opcional fija a la persona a una cuenta de claude.ai y prevalece sobre `people/<id>`. |
+| `lang` | `"en"`, `"ko"` | Idioma integrado de la interfaz. Los demás se muestran en inglés. |
+| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | El orden fija los colores. Un `uid` opcional fija a la persona a una cuenta de claude.ai. |
+| `statuses` | `["qa"]` | Estados adicionales, colocados antes de `done` |
 | `strings` | `{"v_graph":"Dependencias"}` | Sobrescribe cualquier texto de la interfaz, en cualquier idioma |
 | `footer` | `"..."` | Sustituye la línea del pie |
 | `repos` | `[{"repo":"acme/api","label":"api"}]` | Los repositorios de GitHub del proyecto. Los agentes encuentran el tablero desde su git remote, y cada tarea puede nombrar el suyo en `repo`. |
@@ -343,53 +290,23 @@ flowchart LR
 </details>
 
 <details>
-<summary><b>Qué puede cambiar la skill en cada proyecto</b></summary>
-
-Libremente: título, personas, roles, idioma, textos, nombres de funciones, esquema de claves, redacción de mensajes, temas de avisos. En `meta/config`: estados adicionales (`statuses`). Editando la página: campos visibles adicionales, vistas nuevas. Se mantiene siempre: tareas ligeras más details, `waitingOn` y la consulta de disponibles, cursores, un lote por acción con `if_version`, formatos de id, reglas del tablero que vienen con artiboard (los proyectos solo añaden `meta/rules`), el texto del tablero tratado como datos.
-
-</details>
-
-<details>
-<summary><b>Estructura del repositorio</b></summary>
+<summary><b>Estructura del repositorio y desarrollo</b></summary>
 
 ```text
-skills/artiboard/SKILL.md               la skill: instalación, adaptación, actualización, reglas de tokens
-skills/artiboard/assets/board.html      la página del tablero (dibuja desde la base de datos del artifact)
-skills/artiboard/references/          reglas del tablero para tableros artifact, cómo escribir las reglas del proyecto y la guía de autoalojamiento para agentes
-server/                                 el sitio autoalojado: app HTTP, servidor MCP, almacenes SQLite y Supabase, CLI, runtime de la página
-api/, vercel.json                       funciones de Vercel para un sitio con Supabase
-supabase/                               el esquema de Supabase (migraciones) y la configuración local
-Dockerfile, docker-compose.yml          un sitio SQLite en un contenedor, detrás de Caddy en tu dominio
-examples/                               genera la demo pública a partir de board.html y demo-data.json: build-demo.cjs, demo-data.json (demo.html se genera, no se guarda)
-FOR_AGENTS.md                           instalación paso a paso para agentes de IA
-.claude-plugin/                         manifiestos del plugin de Claude Code
-tests/smoke.cjs                         prueba de humo de la página con jsdom
-tests/server.test.js                    pruebas de extremo a extremo de un sitio alojado (SQLite, y Supabase si está configurado)
-docs/assets/                            banners
-```
-
-</details>
-
-<details>
-<summary><b>Desarrollo</b></summary>
-
-```bash
-npm install --no-save jsdom@24.1.1 && node tests/smoke.cjs
+skills/artiboard/                       la skill: SKILL.md, la página del tablero (assets/board.html), las referencias para los agentes, el script del mapa de código
+server/                                 el sitio autoalojado: app HTTP, servidor MCP, almacenes SQLite y Supabase, CLI, mapa de código
+api/, vercel.json, supabase/            un sitio con Supabase en Vercel: funciones y migraciones
+Dockerfile, docker-compose.yml          un sitio SQLite en un contenedor, detrás de Caddy
+examples/                               la demo pública, generada a partir de la página, demo-data.json y un mapa de examples/pantry
+tests/                                  pruebas del servidor (SQLite, y Supabase en CI), pruebas del mapa de código, la página en jsdom
+FOR_AGENTS.md, AGENTS.md                pasos de instalación para agentes; cómo trabajar en este repositorio
 ```
 
 ```bash
-npm install && npm test
+npm install && npm install --no-save jsdom@24.1.1 prettier@3.9.10 && npm run check
 ```
 
-`npm test` ejecuta el sitio alojado sobre un archivo SQLite desechable. Con un Supabase local (`supabase start`), añade `AB_SUPABASE=1` y sus `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` y `SUPABASE_SECRET_KEY` para ejecutar las mismas pruebas allí.
-
-Genera la demo para verla o publicarla (`examples/demo.html`, no se guarda en git):
-
-```bash
-node examples/build-demo.cjs
-```
-
-Se agradecen issues y PRs. Para un cambio en la skill, muestra cómo cambia el comportamiento del agente o el uso de tokens, idealmente con un antes y un después en un tablero real.
+`npm run check` ejecuta todas las comprobaciones: pruebas sobre un archivo SQLite desechable, la página en jsdom y las copias que deben mantenerse al día. Se agradecen issues y PRs; para un cambio en la skill, muestra cómo cambia el comportamiento del agente o el uso de tokens.
 
 </details>
 

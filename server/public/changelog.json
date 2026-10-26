@@ -4,7 +4,9 @@
     {
       "version": "1.20.0",
       "date": "2026-10-26",
-      "prs": [],
+      "prs": [
+        51
+      ],
       "lines": {
         "en": [
           "The board uses the window's width: the kanban, the item table, people's lanes and the code map spread out, while notes, rules and feeds keep an easy line length.",
@@ -17,9 +19,26 @@
       }
     },
     {
+      "version": "1.19.1",
+      "date": "2026-10-26",
+      "prs": [
+        50
+      ],
+      "lines": {
+        "en": [
+          "The README is shorter: install in two commands (or one prompt), what you get in four points, and the reference folded away."
+        ],
+        "ko": [
+          "README가 짧아졌어요. 설치는 명령 두 개(또는 프롬프트 하나), 무엇을 얻는지는 네 줄로 보이고, 참고 자료는 접어 두었어요."
+        ]
+      }
+    },
+    {
       "version": "1.19.0",
       "date": "2026-10-26",
-      "prs": [49],
+      "prs": [
+        49
+      ],
       "lines": {
         "en": [
           "The kanban scrolls with the page both ways, so a wheel or a swipe over a column moves the page instead of getting stuck in a box.",
