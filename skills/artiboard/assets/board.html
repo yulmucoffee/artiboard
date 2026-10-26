@@ -68,7 +68,11 @@ h2{font-size:18px;font-weight:650;letter-spacing:-.015em;margin:0;text-wrap:bala
 h3{font-size:14.5px;font-weight:700;margin:0}
 p{margin:0}
 .muted{color:var(--muted)}
-.page{max-width:1180px;margin-inline:auto;display:flex;flex-direction:column;gap:28px}
+/* the page uses the window's width: the kanban, the item table, people's lanes, the code map and the graph gain
+   from it. Text people read top to bottom keeps a line length that stays easy to read. */
+.page{display:flex;flex-direction:column;gap:28px}
+header.top,section[data-fold="now"],section[data-fold="activity"],section[data-fold="notices"],
+section[data-fold="notes"],section[data-fold="rules"],section[data-fold="guide"]{max-width:1180px}
 .board{display:flex;flex-direction:column;gap:28px;min-width:0}
 .view{display:flex;flex-direction:column;gap:36px;min-width:0}
 section{display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -340,6 +344,11 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .card .title{font-weight:600;line-height:1.38;font-size:13.5px;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .card.done .title{color:var(--text2);font-weight:500}
 .card.done{box-shadow:none;background:transparent;border-color:var(--line)}
+/* finished work is looked up, not worked on: one line each, so a column holds about three times as many */
+.card.line{flex-direction:row;align-items:center;gap:8px;padding:6px 10px;font-size:12px;color:var(--muted)}
+.card.line .key{flex:none;font-size:11.5px}
+.card.line .title{flex:1;min-width:0;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.card.line .when{flex:none}
 .cards .morebtn{align-self:center;padding:4px 0}
 .sheet .acts{margin-top:4px}
 /* the owner as a round initial in their color; a ring when an agent has it, pulsing while it is posting */
@@ -5653,6 +5662,7 @@ td.what .overlap{margin-left:8px}
     return null;
   }
   function kanbanCard(t, s) {
+    if (s === 'done' || s === 'archive') return doneLine(t);
     var meta = [t.feature, t.repo].filter(Boolean).join(' · ');
     return el(
       'button',
@@ -5673,6 +5683,29 @@ td.what .overlap{margin-left:8px}
           el('span', { class: 'right' }, [overlapFlag(t), cardFlag(t), avatar(t, true)])
         ]),
         el('div', { class: 'title', text: t.title || T('untitled') })
+      ]
+    );
+  }
+  // a finished task on one line: what it is, who did it, the day it was done
+  function doneLine(t) {
+    return el(
+      'button',
+      {
+        type: 'button',
+        class: 'card done line',
+        'data-k': t.id,
+        'aria-current': String(openId === t.id),
+        title: t.title || T('untitled'),
+        onclick: function () {
+          openSheet(t.id);
+        }
+      },
+      [
+        el('span', { class: 'key', text: t.key }),
+        el('span', { class: 'title', text: t.title || T('untitled') }),
+        newDot(isNew(t)),
+        avatar(t, true),
+        t.doneAt ? el('span', { class: 'when', text: localDay(t.doneAt).slice(5) }) : null
       ]
     );
   }
@@ -5806,9 +5839,11 @@ td.what .overlap{margin-left:8px}
       y = b.archivedAt || '';
     return x < y ? 1 : x > y ? -1 : byKey(a, b);
   }
-  // the done column and the archive show the latest; a long-lived board keeps the rest behind "more"
-  var DONE_SHOWN = 30,
-    kanbanExpanded = {};
+  // the done column and the archive show the latest ten; each "more" brings twenty, so a long-lived board never
+  // unrolls its whole history at once. A search shows every match.
+  var DONE_FIRST = 10,
+    DONE_STEP = 20,
+    kanbanShown = {};
   function renderKanban() {
     var root = $('kanban');
     root.textContent = '';
@@ -5823,8 +5858,9 @@ td.what .overlap{margin-left:8px}
         })
         .sort(arch ? byArchived : s === 'done' ? byDone : byKey);
       var cs = colState(s),
-        capped = (s === 'done' || arch) && !kanbanExpanded[s] && !filtering(),
-        list = capped ? all.slice(0, DONE_SHOWN) : all;
+        capped = (s === 'done' || arch) && !filtering(),
+        shown = capped ? Math.min(kanbanShown[s] || DONE_FIRST, all.length) : all.length,
+        list = all.slice(0, shown);
       var name = arch ? T('archN') : statusLabel(s),
         tools = el('span', { class: 'tools' });
       if (s === 'done' && !cs.fold && all.length && writable()) tools.appendChild(archiveButton(all));
@@ -5877,14 +5913,15 @@ td.what .overlap{margin-left:8px}
           order.push(t.id);
           cards.appendChild(kanbanCard(t, s));
         });
-        if (capped || kanbanExpanded[s])
-          if (all.length > DONE_SHOWN)
-            cards.appendChild(
-              moreBtn(!!kanbanExpanded[s], all.length - DONE_SHOWN, function () {
-                kanbanExpanded[s] = !kanbanExpanded[s];
-                renderKanban();
-              })
-            );
+        if (capped && all.length > DONE_FIRST) {
+          var rest = all.length - shown;
+          cards.appendChild(
+            moreBtn(!rest, Math.min(DONE_STEP, rest), function () {
+              kanbanShown[s] = rest ? shown + DONE_STEP : DONE_FIRST;
+              renderKanban();
+            })
+          );
+        }
       }
       cols.appendChild(
         el(

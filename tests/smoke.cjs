@@ -818,6 +818,52 @@ const meLane = (d) => {
     'a column takes two card columns, remembered'
   );
 
+  console.log('# a long done column');
+  const doneDocs = {};
+  for (let i = 1; i <= 35; i++)
+    doneDocs['tasks/D-' + i] = {
+      key: 'D-' + i,
+      title: 'Finished ' + i,
+      status: 'done',
+      owner: 'ben',
+      deps: [],
+      waitingOn: [],
+      doneAt: `2026-01-${String(i % 28 || 28).padStart(2, '0')}T09:00:00.000Z`,
+      updatedAt: T0
+    };
+  b = boot({ docs: doneDocs, storage: { 'ab-view': 'kanban' } });
+  all.push(b);
+  await tick();
+  const doneCol = () =>
+    [...b.d.querySelectorAll('.col')].find((c) => c.querySelector('h3').textContent.startsWith('Done'));
+  const doneMore = () => doneCol().querySelector('.morebtn');
+  const doneTotal = Number(doneCol().querySelector('h3 .n').textContent);
+  ok(
+    doneTotal > 30 &&
+      doneCol().querySelectorAll('.card.line').length === 10 &&
+      !doneCol().querySelector('.card:not(.line)') &&
+      /^\d\d-\d\d$/.test(doneCol().querySelector('.card.line .when').textContent) &&
+      b.d.querySelector('.col .card:not(.line) .top'),
+    'done work shows as one-line cards, the latest ten first; open work keeps its two-line cards'
+  );
+  ok(/20 more/.test(doneMore().textContent), 'more brings the next twenty');
+  doneMore().click();
+  await tick();
+  ok(
+    doneCol().querySelectorAll('.card.line').length === 30 &&
+      new RegExp(`${doneTotal - 30} more`).test(doneMore().textContent),
+    'then the rest'
+  );
+  doneMore().click();
+  await tick();
+  ok(
+    doneCol().querySelectorAll('.card.line').length === doneTotal && /Show fewer/.test(doneMore().textContent),
+    'all shown, it folds back'
+  );
+  doneMore().click();
+  await tick();
+  ok(doneCol().querySelectorAll('.card.line').length === 10, 'to the latest ten');
+
   console.log('# the page follows the task rules');
   b = boot({ docs: { 'tasks/M1-1': { ...seed()['tasks/M1-1'], owner: 'ben' } } });
   all.push(b);

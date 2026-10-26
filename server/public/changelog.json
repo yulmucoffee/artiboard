@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.20.0",
+      "date": "2026-10-26",
+      "prs": [
+        51
+      ],
+      "lines": {
+        "en": [
+          "The board uses the window's width: the kanban, the item table, people's lanes and the code map spread out, while notes, rules and feeds keep an easy line length.",
+          "Done and archived work shows as one-line cards, the latest ten first; each \"more\" brings the next twenty."
+        ],
+        "ko": [
+          "보드가 창 너비를 다 써요. 칸반, 항목 표, 사람별 흐름, 코드 지도는 넓게 펼쳐지고, 메모 · 규칙 · 소식 같은 글은 읽기 좋은 폭을 지켜요.",
+          "완료와 보관함의 일은 한 줄 카드로 최근 10개부터 보이고, '더 보기'를 누를 때마다 20개씩 더 나와요."
+        ]
+      }
+    },
+    {
       "version": "1.19.1",
       "date": "2026-10-26",
       "prs": [
