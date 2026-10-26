@@ -718,6 +718,34 @@ for (const backend of backends) {
       assert.equal(field.value.code, 'invalid_argument');
       assert.equal((await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `${C}/T-1`, data: {}, if_absent: true }] })).value.code, 'already_exists');
       assert.equal((await call(board, 'board_get', { project: 'no-such-project', path: 'meta/config' })).value.code, 'not_found');
+      assert.equal((await call(board, 'board_get', { project: P, path: C })).value.code, 'invalid_argument', 'a collection is not a document, on either database');
+      assert.match((await call(board, 'board_task', { project: P, id: 'tasks/T-1' })).value, /^invalid_argument: not a document path/);
+    });
+
+    test('two writers setting one new document with if_absent: exactly one writes it', async () => {
+      const path = `${C}/once-${R}`;
+      const tries = await Promise.all(['a', 'b', 'c', 'd'].map((who) => call(board, 'board_batch', { project: P, writes: [{ op: 'set', path, data: { who }, if_absent: true }] })));
+      assert.equal(tries.filter((t) => !t.error).length, 1, JSON.stringify(tries.map((t) => t.value)));
+      assert.deepEqual(tries.filter((t) => t.error).map((t) => t.value.code), ['already_exists', 'already_exists', 'already_exists']);
+      assert.equal((await call(board, 'board_get', { project: P, path })).value.version, 1, 'nobody overwrote the first');
+    });
+
+    test('a task with more dependents than one write takes still finishes, and every dependent hears it', async () => {
+      const X = `hub-${R}`, at = new Date().toISOString(), n = 120;
+      await store.createProject(null, { id: X, title: 'Hub', lang: 'en' });
+      try {
+        const task = (key, deps) => ({ op: 'set', path: `tasks/${key}`, data: { key, title: key, status: 'todo', deps, waitingOn: deps, updatedAt: at } });
+        const writes = [task('H-1', []), ...Array.from({ length: n }, (_, i) => task(`D-${i + 1}`, ['H-1']))];
+        for (let i = 0; i < writes.length; i += 100) assert.equal((await call(board, 'board_batch', { project: X, writes: writes.slice(i, i + 100) })).error, false);
+        assert.match((await call(board, 'board_claim', { project: X, id: 'H-1' })).value, /^claimed /);
+        const done = await call(board, 'board_post', { project: X, task: 'H-1', status: 'done', text: 'shipped' });
+        assert.equal(done.error, false, JSON.stringify(done.value));
+        assert.equal(/^ok H-1 → done · unblocked (.*)$/.exec(done.value)?.[1].split(', ').length, n);
+        const waiting = await call(board, 'board_query', { project: X, collection: 'tasks', where: [{ field: 'waitingOn', op: 'array-contains', value: 'H-1' }] });
+        assert.deepEqual(waiting.value.docs, [], 'no dependent still waits on the finished task');
+      } finally {
+        await store.dropProject(X).catch(() => {});
+      }
     });
 
     test('a viewer reads but cannot write', async () => {
@@ -1436,6 +1464,34 @@ for (const backend of backends) {
     });
 
     if (backend.name === 'sqlite') {
+      // the raw document routes exist on SQLite only: on Supabase the page reads and writes the database itself
+      test('the raw batch route drops an agent token\'s override; a page session keeps it, and board_batch records it', async () => {
+        const id = K('raw'), at = new Date().toISOString(), me = people.admin.person;
+        await store.apply(null, P, [{ op: 'set', path: `tasks/${id}`, data: { key: id, title: 'held', status: 'doing', owner: me, claimedBy: { who: me, at }, deps: [], waitingOn: [], updatedAt: at } }]);
+        try {
+          const write = { op: 'update', path: `tasks/${id}`, data: { title: 'retitled by a token' }, override: true };
+          const byToken = await api(`/api/p/${P}/batch`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.member}` }, body: { writes: [write] } });
+          assert.equal(byToken.status, 403, 'a token\'s override is dropped on the raw route, so the holder\'s rule applies');
+          assert.equal((await byToken.json()).code, 'not_yours');
+          assert.equal((await store.get(P, `tasks/${id}`)).data.title, 'held');
+          const cookie = (await api('/api/login', { method: 'POST', body: { token: tokens.member } })).headers.get('set-cookie').split(';')[0];
+          const bySession = await api(`/api/p/${P}/batch`, { method: 'POST', cookie, headers: { Origin: BASE }, body: { writes: [{ ...write, data: { title: 'retitled on the page' } }] } });
+          assert.equal(bySession.status, 200, `the page keeps its override: ${await bySession.text()}`);
+          assert.equal((await store.get(P, `tasks/${id}`)).data.title, 'retitled on the page');
+          const other = await connect(tokens.member);
+          try {
+            const r = await call(other, 'board_batch', { project: P, override: true, writes: [{ op: 'update', path: `tasks/${id}`, data: { title: 'retitled by board_batch' } }] });
+            assert.equal(r.error, false, JSON.stringify(r.value));
+          } finally {
+            await other.close();
+          }
+          const said = (await call(board, 'board_query', { project: P, collection: `tasks/${id}/messages`, order_by: [{ field: 'at', dir: 'desc' }], limit: 1 })).value.docs[0]?.data.text;
+          assert.match(said || '', /override/, 'the thread says the override happened');
+        } finally {
+          await store.apply(null, P, [{ op: 'delete', path: `tasks/${id}` }]);
+        }
+      });
+
       test('the page signs in with a token or a one-time link, reads, writes and hears changes live', async () => {
         assert.equal((await api('/api/login', { method: 'POST', body: { token: 'abt_wrong-token-wrong-token-00' } })).status, 401);
         const login = await api('/api/login', { method: 'POST', body: { token: tokens.member } });

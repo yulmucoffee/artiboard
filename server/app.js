@@ -168,7 +168,10 @@ export function makeApp({ store, cfg }) {
     if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, { Allow: 'POST' });
     const b = (await body(req)) || {};
     if (action === 'read') return send(res, 200, await store.readRows(project, b));
-    if (action === 'batch') return send(res, 200, await store.apply(member.uid, project, b.writes));
+    // an agent overrides through board_batch, which records in the thread who overrode what; the page leaves its own
+    // note, so a session keeps the flag here and a token loses it
+    const writes = bearer(req) && Array.isArray(b.writes) ? b.writes.map((w) => (w && typeof w === 'object' ? { ...w, override: undefined } : w)) : b.writes;
+    if (action === 'batch') return send(res, 200, await store.apply(member.uid, project, writes));
     send(res, 404, { error: 'not_found' });
   }
 
