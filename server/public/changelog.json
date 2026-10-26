@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.17.1",
+      "date": "2026-10-26",
+      "prs": [
+        44
+      ],
+      "lines": {
+        "en": [
+          "On the code map, groups that sit under one deep folder (src/main/java/…) show the part of their name that differs, with the shared folder said once under the picture; long names keep their end."
+        ],
+        "ko": [
+          "코드 맵에서 한 깊은 폴더(src/main/java/…) 아래 묶음들은 서로 다른 부분만 이름으로 보이고, 공통 폴더는 그림 아래에 한 번만 적혀요. 긴 이름은 끝부분을 남겨요."
+        ]
+      }
+    },
+    {
       "version": "1.17.0",
       "date": "2026-10-25",
       "prs": [
