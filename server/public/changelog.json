@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.18.1",
+      "date": "2026-10-26",
+      "prs": [
+        46
+      ],
+      "lines": {
+        "en": [
+          "A task's title, feature or milestone with line breaks reaches agents as one line, so it cannot pass for the board's own lines.",
+          "Revoking, demoting or removing a member ends the live updates their open pages still receive."
+        ],
+        "ko": [
+          "작업 제목·기능·마일스톤에 줄바꿈이 있어도 에이전트에게는 한 줄로 가요. 게시판이 직접 쓴 줄처럼 보일 수 없어요.",
+          "멤버의 토큰을 회수하거나 권한을 낮추거나 내보내면, 그 멤버가 열어 둔 페이지의 실시간 업데이트도 끊겨요."
+        ]
+      }
+    },
+    {
       "version": "1.18.0",
       "date": "2026-10-26",
       "prs": [
