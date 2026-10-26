@@ -231,7 +231,7 @@ approval_mode = "approve"
 
 Then ask the agent to "set up the board for this repo".
 
-**Code map** (optional, self-hosted). A map says which commit and branch it describes. Keep it current from CI or a git hook; with `--if-changed` it builds only when the checkout has changed since the last map ([Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current)). From the repository's checkout, build and upload its map:
+**Code map** (optional, self-hosted). A map says which commit and branch it describes. Keep it current with one flag on the command below: `--workflow` writes a CI workflow for the default branch (it needs an `ARTIBOARD_TOKEN` repository secret), and `--hook` installs git hooks in a checkout only you commit to; use one per repository, never both ([Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current)). From the repository's checkout, build and upload its map:
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api

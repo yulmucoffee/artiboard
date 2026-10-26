@@ -231,7 +231,7 @@ approval_mode = "approve"
 
 그런 다음 에이전트에게 "이 저장소에 보드 세팅해줘"라고 하면 됩니다.
 
-**코드 맵**(선택, 직접 호스팅 전용). 맵은 어느 커밋과 브랜치를 그렸는지 알려 줘요. CI나 git 훅으로 최신으로 유지할 수 있고, `--if-changed`를 붙이면 마지막 맵 이후 체크아웃이 바뀌었을 때만 만들어요(직접 호스팅 안내의 [Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current)). 저장소 체크아웃에서 맵을 만들어 올려요:
+**코드 맵**(선택, 직접 호스팅 전용). 맵은 어느 커밋과 브랜치를 그렸는지 알려 줘요. 아래 명령에 플래그 하나를 붙이면 최신으로 유지돼요. `--workflow`는 기본 브랜치용 CI 워크플로를 쓰고(저장소 시크릿 `ARTIBOARD_TOKEN`이 필요해요), `--hook`은 나만 커밋하는 체크아웃에 git 훅을 깔아요. 저장소마다 둘 중 하나만 쓰세요(직접 호스팅 안내의 [Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current)). 저장소 체크아웃에서 맵을 만들어 올려요:
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api

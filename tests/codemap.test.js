@@ -890,23 +890,23 @@ test('explain: one node and its connections, grouped; ambiguous and unknown name
     'Cart · class · src/cart.ts:17 · community src (cart.ts) · degree 4',
     'export class Cart extends Store<CartItem>',
     'called by:',
-    '  src/index.js#main [x]',
-    '  src/api/client.js#fetchCart [x]',
+    '  src/index.js: main',
+    '  src/api/client.js: fetchCart',
     'extends:',
-    '  src/store.ts#Store [x]',
+    '  src/store.ts: Store',
     'mentioned in:',
-    '  README.md#cart [i]',
+    '  README.md: ?cart',
   ]);
   assert.equal(G.explain('cart').id, 'src/cart.ts#Cart', 'any case; the code wins over the README section of that name');
   assert.equal(G.explain('save').id, 'src/store.ts#Store.save', 'a method by its own name');
   assert.deepEqual(G.explain('src/util/parse.js').lines, [
     'parse.js · file · src/util/parse.js · community src (index.js) · degree 2',
     'defines:',
-    '  src/util/parse.js#parseAmount [x]',
+    '  here: parseAmount',
     'imports:',
-    '  src/util/format.js [x]',
+    '  src/util/format.js',
     'imported by:',
-    '  src/util/format.js [x]',
+    '  src/util/format.js',
   ]);
   const amb = G.explain('formatPrice');
   assert.deepEqual(amb.ambiguous, ['src/legacy/orphan.js#formatPrice', 'src/util/format.js#formatPrice']);
@@ -919,11 +919,11 @@ test('explain: one node and its connections, grouped; ambiguous and unknown name
     'export function formatPrice(cents)',
     '// Old pricing code nobody imports any more; it keeps a second formatPrice.',
     'used by:',
-    '  src/legacy/orphan.js#Ledger.record [x]',
+    '  here: Ledger.record',
   ]);
   const capped = G.explain('src/cart.ts', { limit: 2 }).lines;
-  assert.deepEqual(capped.slice(0, 5), ['cart.ts · file · src/cart.ts · community src (cart.ts) · degree 5', 'defines:',
-    '  src/cart.ts#Price [x]', '  src/cart.ts#Currency [x]', '  … 6 more (limit 10)'], 'definitions in line order, capped, saying how to see them all');
+  assert.deepEqual(capped.slice(0, 4), ['cart.ts · file · src/cart.ts · community src (cart.ts) · degree 5', 'defines:',
+    '  here: Price, Currency', '  … 6 more (limit 10)'], 'definitions in line order, capped, saying how to see them all');
 });
 
 test('explain, file and impact show 30 per group by default, and say which limit shows the rest', () => {
@@ -934,43 +934,42 @@ test('explain, file and impact show 30 per group by default, and say which limit
   ]), {});
   const g = loadGraph(b.index, b.chunks);
   const ex = g.explain('m.js').lines;
-  assert.deepEqual([ex[1], ex[2], ex[31], ex[32]], ['defines:', '  m.js#f0 [x]', '  m.js#f29 [x]', '  … 5 more (limit 40)']);
+  assert.deepEqual(ex.slice(1, 5), ['defines:', '  here: f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19, f20, f21',
+    '    f22, f23, f24, f25, f26, f27, f28, f29', '  … 5 more (limit 40)'], 'thirty names on wrapped lines, then how many more');
   const fl = g.file('m.js').lines;
-  assert.deepEqual([fl[1], fl[31], fl[32]], ['symbols:', '  f29 fn 30 · export function f29()', '  … 5 more (limit 40)']);
+  assert.deepEqual([fl[1], fl[31], fl[32]], ['symbols:', '  30 export function f29()', '  … 5 more (limit 40)']);
   const im = g.impact('m.js#f0').lines;
-  assert.deepEqual([im[0], im[1], im.length, im[32]], ['impact of m.js#f0: 35 dependents within 2 steps', 'depth 1:', 33, '  … 5 more (limit 40)']);
-  assert.equal(g.explain('m.js', { limit: 40 }).lines.length, 2 + 35 + 2, 'every definition, and the importer');
+  assert.deepEqual([im[0], im[1], im.length, im[4]], ['impact of m.js#f0: 35 dependents within 2 steps', 'depth 1:', 5, '  … 5 more (limit 40)']);
+  const all = g.explain('m.js', { limit: 40 }).lines;
+  assert.equal(all.length, 6, 'every definition on two lines, and the importer');
+  assert.match(all[3], /f34$/);
 });
 
 test('file: a file\'s symbols, imports, importers and mentions; a doc\'s sections', () => {
   assert.deepEqual(G.file('src/util/format.js').lines, [
     'src/util/format.js · file · community src (index.js) · 5 symbols · imported by 5',
     'symbols:',
-    '  LABEL const 6 · const LABEL',
-    '  CURRENCY const 8 · export const CURRENCY',
-    '  formatPrice fn 10 · export function formatPrice(value)',
-    '  formatLine fn 15 · export function formatLine(item)',
-    '  shout fn 19 · function shout(text)',
+    '  6 const LABEL',
+    '  8 export const CURRENCY',
+    '  10 export function formatPrice(value)',
+    '  15 export function formatLine(item)',
+    '  19 function shout(text)',
     'imports:',
-    '  src/util/parse.js [x]',
+    '  src/util/parse.js',
     'imported by:',
-    '  src/api/client.js [x]',
-    '  src/cart.ts [x]',
-    '  src/components/Badge.jsx [x]',
-    '  src/index.js [x]',
-    '  src/util/parse.js [x]',
+    '  src/api/client.js, src/cart.ts, src/components/Badge.jsx, src/index.js, src/util/parse.js',
   ]);
   assert.deepEqual(G.file('docs/guide.md').lines, [
     'docs/guide.md · doc · community src/api · 3 sections · imported by 0',
     'sections:',
-    '  Guide h1 1',
-    '  Paying h2 3',
-    '  Paying h2 7',
+    '  1 h1 Guide',
+    '  3 h2 Paying',
+    '  7 h2 Paying',
     'mentions:',
-    '  src/api/client.js [x]',
-    '  src/cart.ts#applyDiscount [i]',
+    '  src/api/client.js',
+    '  src/cart.ts: ?applyDiscount',
     'mentioned in:',
-    '  README.md#cart [x]',
+    '  README.md: cart',
   ]);
   assert.equal(G.file('format.js').id, 'src/util/format.js', 'by its name');
   assert.equal(G.file('Cart').id, 'src/cart.ts', 'a symbol\'s file');
@@ -1005,12 +1004,12 @@ test('query: words score names, path parts and text, weighted by connections; ne
     '  src/util/parse.js · 1 symbols · src (index.js)',
     '  src/util/format.js · 5 symbols · src (index.js)',
     'symbols:',
-    '  src/util/parse.js#parseAmount · fn · 4 · export function parseAmount(value)',
-    '  src/util/format.js#formatPrice · fn · 10 · export function formatPrice(value)',
+    '  src/util/parse.js#parseAmount · 4 · export function parseAmount(value)',
+    '  src/util/format.js#formatPrice · 10 · export function formatPrice(value)',
   ]);
   assert.deepEqual(q.symbols, ['src/util/parse.js#parseAmount', 'src/util/format.js#formatPrice']);
   assert.deepEqual(G.query('Where do we parse an amount?', { limit: 2 }).lines,
-    ['files:', '  src/util/parse.js · 1 symbols · src (index.js)', 'symbols:', '  src/util/parse.js#parseAmount · fn · 4 · export function parseAmount(value)']);
+    ['files:', '  src/util/parse.js · 1 symbols · src (index.js)', 'symbols:', '  src/util/parse.js#parseAmount · 4 · export function parseAmount(value)']);
   assert.deepEqual(G.query('and the zzz'), { lines: ['nothing in the map matches: and the zzz'], missing: true });
   // 'cart' matches 8 nodes (more than 5, and 4 times or more the 1 'discount' matches): common. Only applyDiscount
   // matches 'discount'; its neighbors come at a quarter of its score
@@ -1018,9 +1017,9 @@ test('query: words score names, path parts and text, weighted by connections; ne
     'files:',
     '  src/cart.ts · 8 symbols · src (cart.ts)',
     'symbols:',
-    '  src/cart.ts#applyDiscount · fn · 30 · export function applyDiscount(cart: Cart, rate: number)',
-    '  src/cart.ts#Cart.total · method · 23 · total(): number',
-    '  src/index.js#main · fn · 11 · export async function main(id)',
+    '  src/cart.ts#applyDiscount · 30 · export function applyDiscount(cart: Cart, rate: number)',
+    '  src/cart.ts#Cart.total · 23 · total(): number',
+    '  src/index.js#main · 11 · export async function main(id)',
     'docs:',
     '  docs/guide.md#paying · h2 · 3',
   ], 'Cart, fetchCart and the README\'s Cart section match only the common word');
@@ -1041,8 +1040,8 @@ test('query: tests come after the code they test, and docs make a group of four 
     '  lib/sort.js · 1 symbols · lib',
     '  tests/sort.test.js · 1 symbols · lib',
     'symbols:',
-    '  lib/sort.js#sortItems · fn · 1 · export function sortItems(a)',
-    '  tests/sort.test.js#sort · fn · 2 · function sort()',
+    '  lib/sort.js#sortItems · 1 · export function sortItems(a)',
+    '  tests/sort.test.js#sort · 2 · function sort()',
     'docs:',
     '  docs/a.md#sorting · h1 · 1',
     '  docs/b.md#sorting · h1 · 1',
@@ -1055,27 +1054,25 @@ test('impact: dependents by depth; a file\'s own symbols are not its dependents'
   const lines = [
     'impact of src/util/parse.js: 11 dependents within 2 steps',
     'depth 1:',
-    '  src/util/format.js [x] imports',
-    '  src/util/format.js#formatPrice [x] calls',
+    '  src/util/format.js',
+    '  src/util/format.js: formatPrice',
     'depth 2:',
-    '  src/api/client.js [x] imports',
-    '  src/api/client.js#fetchCart [x] calls',
-    '  src/cart.ts [x] imports',
-    '  src/cart.ts#Cart.label [x] calls',
-    '  src/components/Badge.jsx [x] imports',
-    '  src/components/Badge.jsx#Badge [x] calls',
-    '  src/index.js [x] imports',
-    '  src/index.js#main [i] calls',
-    '  src/util/format.js#formatLine [x] calls',
+    '  src/api/client.js, src/cart.ts, src/components/Badge.jsx, src/index.js',
+    '  src/api/client.js: fetchCart',
+    '  src/cart.ts: Cart.label',
+    '  src/components/Badge.jsx: Badge',
+    '  src/index.js: ?main',
+    '  src/util/format.js: formatLine',
   ];
   assert.deepEqual(G.impact('src/util/parse.js').lines, lines);
-  assert.deepEqual(G.impact('src/util/parse.js', { limit: 5 }).lines, [...lines.slice(0, 10), '  … 4 more (limit 10)'], 'capped per depth');
+  assert.deepEqual(G.impact('src/util/parse.js', { limit: 5 }).lines, [...lines.slice(0, 5), '  src/api/client.js, src/cart.ts, src/components/Badge.jsx',
+    '  src/api/client.js: fetchCart', '  src/cart.ts: Cart.label', '  … 4 more (limit 10)'], 'capped per depth, the first five of the step');
   assert.deepEqual(G.impact('src/util/parse.js', { depth: 1 }).levels, [['src/util/format.js', 'src/util/format.js#formatPrice']]);
   assert.deepEqual(G.impact('Store').lines, ['impact of src/store.ts#Store: 3 dependents within 2 steps', 'depth 1:',
-    '  src/cart.ts#Cart [x] extends', 'depth 2:', '  src/api/client.js#fetchCart [x] calls', '  src/index.js#main [x] calls']);
+    '  src/cart.ts: Cart', 'depth 2:', '  src/api/client.js: fetchCart', '  src/index.js: main']);
   assert.deepEqual(G.impact('src/legacy/orphan.js').lines, ['nothing depends on src/legacy/orphan.js'], 'its own uses do not count');
   assert.deepEqual(G.impact('src/legacy/orphan.js#formatPrice').lines, ['impact of src/legacy/orphan.js#formatPrice: 1 dependents within 2 steps',
-    'depth 1:', '  src/legacy/orphan.js#Ledger.record [x] uses'], 'a function passed as a value is depended on');
+    'depth 1:', '  here: Ledger.record'], 'a function passed as a value is depended on');
 });
 
 test('inside: what a symbol or file calls, uses and extends, by depth; the opposite of impact', () => {
@@ -1084,25 +1081,22 @@ test('inside: what a symbol or file calls, uses and extends, by depth; the oppos
   const lines = [
     'inside src/index.js#main: 9 callees within 2 steps',
     'depth 1:',
-    '  src/api/client.js#fetchCart [x] calls',
-    '  src/cart.ts#Cart [x] calls',
-    '  src/cart.ts#Cart.add [i] calls',
-    '  src/cart.ts#applyDiscount [x] calls',
-    '  src/util/format.js#formatLine [i] calls',
+    '  src/api/client.js: fetchCart',
+    '  src/cart.ts: Cart, ?Cart.add, applyDiscount',
+    '  src/util/format.js: ?formatLine',
     'depth 2:',
-    '  src/cart.ts#Cart.total [i] calls',
-    '  src/store.ts#Store [x] extends',
-    '  src/store.ts#Store.save [i] calls',
-    '  src/util/format.js#formatPrice [x] calls',
+    '  src/cart.ts: ?Cart.total',
+    '  src/store.ts: Store, ?Store.save',
+    '  src/util/format.js: formatPrice',
   ];
   assert.deepEqual(G.inside('main').lines, lines);
-  assert.deepEqual(G.inside('main', { depth: 3 }).lines.slice(12),
-    ['depth 3:', '  src/store.ts#Store.touch [x] calls', '  src/util/parse.js#parseAmount [x] calls']);
-  assert.deepEqual(G.inside('main', { limit: 2 }).lines, [...lines.slice(0, 4), '  … 3 more (limit 10)', 'depth 2:', ...lines.slice(8, 10),
-    '  … 2 more (limit 10)']);
+  assert.deepEqual(G.inside('main', { depth: 3 }).lines.slice(9),
+    ['depth 3:', '  src/store.ts: Store.touch', '  src/util/parse.js: parseAmount']);
+  assert.deepEqual(G.inside('main', { limit: 2 }).lines, [...lines.slice(0, 3), '  src/cart.ts: Cart', '  … 3 more (limit 10)', 'depth 2:',
+    '  src/cart.ts: ?Cart.total', '  src/store.ts: Store', '  … 2 more (limit 10)']);
   assert.deepEqual(G.inside('src/util/parse.js').lines, ['inside src/util/parse.js: 1 callees within 2 steps', 'depth 1:',
-    '  src/util/format.js#formatPrice [x] calls'], 'a file starts from its symbols; its import of format.js is not a call');
-  assert.deepEqual(G.inside('src/legacy/orphan.js#Ledger.record').lines.slice(1), ['depth 1:', '  src/legacy/orphan.js#formatPrice [x] uses']);
+    '  src/util/format.js: formatPrice'], 'a file starts from its symbols; its import of format.js is not a call');
+  assert.deepEqual(G.inside('src/legacy/orphan.js#Ledger.record').lines.slice(1), ['depth 1:', '  here: formatPrice']);
   assert.deepEqual(G.inside('src/cart.ts#Price').lines, ['src/cart.ts#Price calls and uses nothing in the map']);
   assert.deepEqual(G.inside('formatPrice').ambiguous, ['src/legacy/orphan.js#formatPrice', 'src/util/format.js#formatPrice']);
   assert.equal(G.inside('nope').missing, true);
@@ -1123,6 +1117,8 @@ test('links: how many code edges join each pair of communities, in the index and
 test('the page-facing API: a name\'s nodes, one node with its edges and degree, a file\'s symbols by line, a community\'s files', () => {
   assert.deepEqual(G.find('Cart'), ['src/cart.ts#Cart']);
   assert.deepEqual(G.find('nothing-here'), []);
+  assert.deepEqual(G.find('client.js#fetchCart'), ['src/api/client.js#fetchCart'], "a path's end with a name, as an overview prints it");
+  assert.deepEqual(G.find('index.js#main'), ['src/index.js#main'], 'the end that has the name');
   assert.equal(G.node('src/cart.ts#Cart').t, 'class');
   assert.equal(G.node('nope'), null);
   const { out, in: into } = G.edges('src/cart.ts#Cart');
@@ -1142,6 +1138,29 @@ test('the page-facing API: a name\'s nodes, one node with its edges and degree, 
   assert.deepEqual([loose.files(-1), loose.files(0)], [['a.js'], ['b.js']], 'a file of no community is under -1');
 });
 
+test('answers stay small on a big map: a hub with 300 callers, a file with 400 symbols, their impact and inside', () => {
+  const files = new Map([['lib/el.js', 'export function el() {}\n']]);
+  for (let f = 0; f < 6; f++) {
+    const fns = Array.from({ length: 50 }, (_, k) => `export function view${f}_${k}(x) { return el(x); }`);
+    files.set(`ui/part${f}.js`, `import { el } from '../lib/el.js';\n${fns.join('\n')}\n`);
+  }
+  files.set('big.js', "import { el } from './lib/el.js';\n" + Array.from({ length: 400 }, (_, k) => `export function big${k}(a, b) { return el(a) + ${k}; }`).join('\n') + '\n');
+  const g = loadGraph(...Object.values(buildGraph(files, {})));
+  const size = (r) => r.lines.join('\n').length;
+  assert.equal(g.degree('lib/el.js#el'), 700);
+  const ex = g.explain('el');
+  assert.ok(size(ex) < 450, `explain of a 700-caller hub: ${size(ex)} chars`);
+  const called = ex.lines.slice(ex.lines.indexOf('called by:') + 1);
+  assert.match(called[0], /^  big\.js: big\d+(, big\d+)+$/, 'names by file');
+  assert.equal(called.join(' ').match(/big\d+/g).length, 30, 'thirty of them, on wrapped lines');
+  assert.equal(called[called.length - 1], '  … 670 more (limit 200)', 'then how many more, up to the limit the tool takes');
+  assert.ok(size(g.impact('el')) < 450, `impact of the hub: ${size(g.impact('el'))} chars`);
+  assert.ok(size(g.file('big.js')) < 1200, `a 400-symbol file: ${size(g.file('big.js'))} chars`);
+  assert.ok(size(g.inside('big.js')) < 100, `inside a 400-symbol file: ${size(g.inside('big.js'))} chars`);
+  assert.ok(size(g.query('view big part')) < 1100, `a broad query: ${size(g.query('view big part'))} chars`);
+  assert.ok(size(g.explain('el', { limit: 200 })) > 1500, 'limit asks for more on purpose');
+});
+
 test('overview: counts, languages, communities and the most connected nodes', () => {
   const lines = G.overview().lines;
   assert.deepEqual(lines.slice(0, 6), [
@@ -1150,7 +1169,7 @@ test('overview: counts, languages, communities and the most connected nodes', ()
     'communities:',
     '  src (index.js) · 5 files · src/index.js, src/index.js#main, src/util/format.js',
     '  src (cart.ts) · 4 files · src/cart.ts, src/cart.ts#Cart, src/cart.ts#Cart.add',
-    '  src/api · 3 files · src/api/client.js, src/api/client.js#fetchCart, src/api/index.js',
+    '  src/api · 3 files · client.js, client.js#fetchCart, index.js',
   ]);
   assert.deepEqual(lines.slice(6, 9), ['most connected:', '  src/index.js · file · degree 7', '  src/index.js#main · fn · degree 6']);
   assert.equal(lines.length, 6 + 1 + 10 + 1);

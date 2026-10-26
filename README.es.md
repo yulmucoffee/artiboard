@@ -231,7 +231,7 @@ approval_mode = "approve"
 
 Luego pide al agente "prepara el tablero para este repositorio".
 
-**Mapa de código** (opcional, solo autoalojado). Un mapa dice qué commit y qué rama describe. Mantenlo al día desde CI o con un hook de git; con `--if-changed` solo se crea cuando el checkout cambió desde el último mapa ([Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current), en la guía de autoalojamiento). Desde el checkout del repositorio, crea su mapa y súbelo:
+**Mapa de código** (opcional, solo autoalojado). Un mapa dice qué commit y qué rama describe. Para mantenerlo al día basta una opción en el comando de abajo: `--workflow` escribe un workflow de CI para la rama por defecto (necesita el secreto `ARTIBOARD_TOKEN` en el repositorio) y `--hook` instala hooks de git en un checkout donde solo tú haces commits; usa uno por repositorio, nunca los dos ([Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current), en la guía de autoalojamiento). Desde el checkout del repositorio, crea su mapa y súbelo:
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api
