@@ -2424,6 +2424,18 @@ td.what .overlap{margin-left:8px}
       })
       .catch(refused);
   }
+  // a write that did not go through: a toast with the code it failed on (saveFail, postFail or claimFail)
+  function writeFailed(e, what) {
+    toast(T(what || 'saveFail', { e: errText(e) }));
+    refused(e);
+  }
+  // messages and notices are named by when they were written and by whom
+  function writtenId(at) {
+    return at.replace(/:/g, '-') + '-' + me;
+  }
+  function postNotice(at, text) {
+    return db.doc('notices/n-' + writtenId(at)).set({ at: at, author: me, kind: 'human', type: 'note', text: text });
+  }
   // a viewer the platform said nothing about finds out on the first refused write; from then on the page is read-only
   function refused(e) {
     if (e && e.code === 'invalid_argument' && canWrite == null) {
@@ -2793,13 +2805,12 @@ td.what .overlap{margin-left:8px}
       .update(patch, o)
       .then(function () {
         return db
-          .doc('tasks/' + t.id + '/messages/' + at.replace(/:/g, '-') + '-' + me)
+          .doc('tasks/' + t.id + '/messages/' + writtenId(at))
           .set({ at: at, author: me, kind: 'human', type: 'update', text: bits.join(' · ') + (extra || '') });
       })
       .catch(function (e) {
         if (e && e.code === 'version_conflict' && typeof ifVersion === 'number') return 'stale';
-        toast(T('saveFail', { e: errText(e) }));
-        refused(e);
+        writeFailed(e);
         return false;
       });
   }
@@ -2876,10 +2887,7 @@ td.what .overlap{margin-left:8px}
     return db
       .doc('tasks/' + id)
       .update(patch)
-      .catch(function (e) {
-        toast(T('saveFail', { e: errText(e) }));
-        refused(e);
-      });
+      .catch(writeFailed);
   }
 
   // ---------- header and toolbar ----------
@@ -3274,8 +3282,7 @@ td.what .overlap{margin-left:8px}
     }
     attempt(1)
       .catch(function (e) {
-        toast(T('claimFail', { e: errText(e) }));
-        refused(e);
+        writeFailed(e, 'claimFail');
       })
       .then(function () {
         btn.disabled = false;
@@ -3705,16 +3712,14 @@ td.what .overlap{margin-left:8px}
         if (!v) return;
         btn.disabled = true;
         var at = now();
-        db.doc('notices/n-' + at.replace(/:/g, '-') + '-' + me)
-          .set({ at: at, author: me, kind: 'human', type: 'note', text: v })
+        postNotice(at, v)
           .then(function () {
             ta.value = '';
             composing = false;
             renderFeed();
           })
           .catch(function (e) {
-            toast(T('postFail', { e: errText(e) }));
-            refused(e);
+            writeFailed(e, 'postFail');
           })
           .then(function () {
             btn.disabled = false;
@@ -3841,15 +3846,11 @@ td.what .overlap{margin-left:8px}
               d.editing = false;
               d.draft = null;
               render();
-              if (tell.checked && me)
-                return db
-                  .doc('notices/n-' + at.replace(/:/g, '-') + '-' + me)
-                  .set({ at: at, author: me, kind: 'human', type: 'note', text: T(k + 'Changed', { r: rev }) });
+              if (tell.checked && me) return postNotice(at, T(k + 'Changed', { r: rev }));
             })
             .catch(function (e) {
               ok.disabled = false;
-              toast(T('saveFail', { e: errText(e) }));
-              refused(e);
+              writeFailed(e);
             });
         });
         var cancel = button({
@@ -5786,8 +5787,7 @@ td.what .overlap{margin-left:8px}
           return ids.length;
         },
         function (e) {
-          toast(T('saveFail', { e: errText(e) }));
-          refused(e);
+          writeFailed(e);
           return 0;
         }
       );
@@ -6671,8 +6671,7 @@ td.what .overlap{margin-left:8px}
         })
         .catch(function (e) {
           ok.disabled = false;
-          toast(T('saveFail', { e: errText(e) }));
-          refused(e);
+          writeFailed(e);
         });
     });
     return el('div', { class: 'block' }, [
@@ -6903,15 +6902,14 @@ td.what .overlap{margin-left:8px}
       send.disabled = true;
       var at = now();
       markSeen(t.id, at);
-      db.doc('tasks/' + t.id + '/messages/' + at.replace(/:/g, '-') + '-' + me)
+      db.doc('tasks/' + t.id + '/messages/' + writtenId(at))
         .set({ at: at, author: me, kind: 'human', type: ty.value, text: v })
         .then(function () {
           ta.value = '';
           return db.doc('tasks/' + t.id).update({ lastMessageAt: at, lastMessageBy: me, updatedAt: at });
         })
         .catch(function (e) {
-          toast(T('postFail', { e: errText(e) }));
-          refused(e);
+          writeFailed(e, 'postFail');
         })
         .then(function () {
           send.disabled = false;
