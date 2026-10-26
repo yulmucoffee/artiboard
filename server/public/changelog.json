@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.21.0",
+      "date": "2026-10-26",
+      "prs": [
+        54
+      ],
+      "lines": {
+        "en": [
+          "The kanban and the dependency graph sit in the middle of a wide window, under the board's heading, instead of against its left edge.",
+          "When either is wider than the window, arrows at its edges move it sideways about a screen at a time; each shows only while there is more on its side."
+        ],
+        "ko": [
+          "넓은 창에서 칸반과 선행 그래프가 왼쪽에 붙지 않고 보드 제목 아래 가운데에 놓여요.",
+          "창보다 넓으면 양옆 화살표로 한 화면씩 옆으로 넘길 수 있어요. 화살표는 그쪽에 더 볼 게 있을 때만 보여요."
+        ]
+      }
+    },
+    {
       "version": "1.20.2",
       "date": "2026-10-26",
       "prs": [

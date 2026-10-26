@@ -304,6 +304,17 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 body[data-view="kanban"] .board{width:max-content;min-width:100%}
 body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);max-width:none;margin-left:calc(-1 * var(--page-l));padding-inline:var(--col-l) var(--col-r)}
 .kanban{--colw:296px;padding-bottom:12px}
+/* the kanban and the graph sit in the window's middle, at least as wide as the heading's column and wider when their
+   columns need it; their descriptions wrap to that width instead of setting it */
+#viewKanban>section,#viewGraph>section{width:fit-content;min-width:min(100%,1180px);max-width:100%;margin-inline:auto}
+#viewKanban .sec-head p,#viewGraph .sec-head p,.gbar{contain:inline-size}
+#viewKanban .sec-head p,#viewGraph .sec-head p{flex:1 1 320px}
+/* arrows at the edges move a wide kanban or graph about a screen sideways, for a mouse without a sideways wheel; each
+   shows while there is more on its side, halfway down the part of the board in view. Touch screens swipe instead. */
+.side{position:fixed;z-index:4;width:36px;height:36px;margin-top:-18px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-hi);display:grid;place-items:center}
+.side:hover{border-color:var(--edge)}
+.side[hidden]{display:none}
+@media (pointer:coarse){.side{display:none}}
 /* a touch browser meets a page wider than the screen by widening its layout viewport, which unpins the toolbar, so
    there the board swipes sideways in its own box and only the vertical scroll is the page's */
 @media (pointer:coarse){
@@ -365,7 +376,7 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .crit b{color:var(--ink)}
 .crit .path{font-family:var(--f-mono);font-size:12.5px;color:var(--accent);overflow-wrap:anywhere}
 .graph-wrap{overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:min(78vh,900px)}
-.graph{position:relative}
+.graph{position:relative;margin-inline:auto}
 .graph svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 .gcol{position:absolute;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
 .gcol span{font-weight:400}
@@ -641,6 +652,8 @@ td.what .overlap{margin-left:8px}
       <section aria-labelledby="h-kanban">
         <div class="sec-head"><h2 id="h-kanban"></h2><p id="kanbanSub"></p></div>
         <div class="kanban" id="kanban"></div>
+        <button type="button" class="side" id="kanbanPrev" hidden></button>
+        <button type="button" class="side" id="kanbanNext" hidden></button>
       </section>
     </div>
 
@@ -652,6 +665,8 @@ td.what .overlap{margin-left:8px}
           <div class="legend" id="glegend"></div>
         </div>
         <div class="graph-wrap" id="graphWrap" tabindex="0"></div>
+        <button type="button" class="side" id="graphPrev" hidden></button>
+        <button type="button" class="side" id="graphNext" hidden></button>
       </section>
     </div>
   </div>
@@ -856,7 +871,9 @@ td.what .overlap{margin-left:8px}
       startLate: 'start {d} passed',
       h_kanban: 'Kanban',
       kanbanSub:
-        'Grouped by status. Top right: the owner (ringed while an agent has it) or what to know now. Give a column two card columns; scroll sideways with Shift and the wheel.',
+        'Grouped by status. Top right: the owner (ringed while an agent has it) or what to know now. Give a column two card columns; scroll sideways with the arrows at the edges, or Shift and the wheel.',
+      sidePrev: 'Scroll left',
+      sideNext: 'Scroll right',
       colTwo: 'Two card columns',
       colOne: 'One card column',
       archN: 'Archived',
@@ -1174,7 +1191,9 @@ td.what .overlap{margin-left:8px}
       startLate: '{d} 착수 · 늦음',
       h_kanban: '칸반',
       kanbanSub:
-        '상태별로 모았어요. 카드 오른쪽 위는 담당(테두리면 에이전트) 또는 지금 알아야 할 것이에요. 칸은 2열로 볼 수 있고, Shift+휠로 옆으로 넘겨요.',
+        '상태별로 모았어요. 카드 오른쪽 위는 담당(테두리면 에이전트) 또는 지금 알아야 할 것이에요. 칸은 2열로 볼 수 있고, 양옆 화살표나 Shift+휠로 옆으로 넘겨요.',
+      sidePrev: '왼쪽으로 넘기기',
+      sideNext: '오른쪽으로 넘기기',
       colTwo: '2열로 보기',
       colOne: '1열로 보기',
       archN: '보관함',
@@ -2519,6 +2538,12 @@ td.what .overlap{margin-left:8px}
     $('codemapSub').textContent = T('codemapSub');
     $('kanbanSub').textContent = T('kanbanSub');
     $('graphSub').textContent = T('graphSub');
+    SIDES.forEach(function (key) {
+      [$(key + 'Prev'), $(key + 'Next')].forEach(function (b, i) {
+        b.title = T(i ? 'sideNext' : 'sidePrev');
+        b.setAttribute('aria-label', b.title);
+      });
+    });
     $('setBtn').textContent = T('settings');
     $('filters').setAttribute('aria-label', T('filterGroup'));
     renderThead();
@@ -6269,6 +6294,72 @@ td.what .overlap{margin-left:8px}
     });
   }
 
+  // ---------- sideways arrows ----------
+  // a wide kanban scrolls with the page, the graph in its own box
+  var SIDES = ['kanban', 'graph'];
+  function sideArrows() {
+    SIDES.forEach(function (key) {
+      var prev = $(key + 'Prev'),
+        next = $(key + 'Next');
+      prev.hidden = next.hidden = true;
+      if (view !== key) return;
+      var page = document.documentElement,
+        box = key === 'kanban' ? page : $('graphWrap'),
+        x = key === 'kanban' ? window.scrollX : box.scrollLeft,
+        r = (key === 'kanban' ? $('kanban') : box).getBoundingClientRect(),
+        top = Math.max(r.top, $('toolbar').getBoundingClientRect().bottom),
+        bottom = Math.min(r.bottom, window.innerHeight),
+        left = key === 'kanban' ? 0 : Math.max(r.left, 0),
+        right =
+          key === 'kanban' ? page.clientWidth : Math.min(r.left + box.clientLeft + box.clientWidth, page.clientWidth);
+      if (bottom - top < 48) return;
+      prev.style.top = next.style.top = (top + bottom) / 2 + 'px';
+      prev.style.left = left + 8 + 'px';
+      next.style.left = right - 44 + 'px';
+      prev.hidden = x < 1;
+      next.hidden = x > box.scrollWidth - box.clientWidth - 1;
+    });
+  }
+  SIDES.forEach(function (key) {
+    [-1, 1].forEach(function (dir) {
+      var b = $(key + (dir < 0 ? 'Prev' : 'Next'));
+      b.appendChild(
+        svgEl(
+          'svg',
+          {
+            width: 14,
+            height: 14,
+            viewBox: '0 0 14 14',
+            fill: 'none',
+            stroke: 'currentColor',
+            'stroke-width': 1.75,
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+            'aria-hidden': 'true'
+          },
+          [svgEl('path', { d: dir < 0 ? 'M8.5 3.5 5 7l3.5 3.5' : 'M5.5 3.5 9 7l-3.5 3.5' })]
+        )
+      );
+      b.addEventListener('click', function () {
+        var box = key === 'kanban' ? window : $('graphWrap'),
+          width = key === 'kanban' ? document.documentElement.clientWidth : box.clientWidth;
+        box.scrollBy({
+          left: dir * Math.max(240, width * 0.8),
+          behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+        });
+      });
+    });
+  });
+  window.addEventListener('scroll', sideArrows, { passive: true });
+  $('graphWrap').addEventListener('scroll', sideArrows, { passive: true });
+  // the room to scroll changes with the window, the board's content and a page scrollbar coming or going
+  if (window.ResizeObserver) {
+    var sideSizes = new ResizeObserver(sideArrows);
+    [document.documentElement, $('kanban'), $('graphWrap')].forEach(function (n) {
+      sideSizes.observe(n);
+    });
+  } else window.addEventListener('resize', sideArrows);
+
   // ---------- views and keyboard cursor ----------
   function renderView() {
     $('viewDoc').hidden = view !== 'doc';
@@ -6297,6 +6388,7 @@ td.what .overlap{margin-left:8px}
     }
     if (cursor && order.indexOf(cursor) < 0) cursor = null;
     applyCursor();
+    sideArrows();
   }
   function applyCursor(scroll) {
     document.querySelectorAll('[data-k].cursor').forEach(function (n) {
