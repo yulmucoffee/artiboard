@@ -68,11 +68,12 @@ h2{font-size:18px;font-weight:650;letter-spacing:-.015em;margin:0;text-wrap:bala
 h3{font-size:14.5px;font-weight:700;margin:0}
 p{margin:0}
 .muted{color:var(--muted)}
-/* the page uses the window's width: the kanban, the item table, people's lanes, the code map and the graph gain
-   from it. Text people read top to bottom keeps a line length that stays easy to read. */
+/* below the tabs the page uses the window's width: the kanban, the item table, people's lanes, the code map and the
+   graph gain from it. The board's heading, the tabs and the text people read top to bottom stay on a centered
+   1180 px column, so a line of text keeps an easy length and the top of the page does not stretch. */
 .page{display:flex;flex-direction:column;gap:28px}
-header.top,section[data-fold="now"],section[data-fold="activity"],section[data-fold="notices"],
-section[data-fold="notes"],section[data-fold="rules"],section[data-fold="guide"]{max-width:1180px}
+header.top,.toolbar,section[data-fold="now"],section[data-fold="activity"],section[data-fold="notices"],
+section[data-fold="notes"],section[data-fold="rules"],section[data-fold="guide"]{width:100%;max-width:1180px;margin-inline:auto}
 .board{display:flex;flex-direction:column;gap:28px;min-width:0}
 .view{display:flex;flex-direction:column;gap:36px;min-width:0}
 section{display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -301,7 +302,7 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
    one width, fold to a strip or take two card columns. A card is two lines: what it is with who has it (or that it
    is free) at the right, then its title. */
 body[data-view="kanban"] .board{width:max-content;min-width:100%}
-body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);margin-left:calc(-1 * var(--page-l));padding-inline:var(--page-l) var(--page-r)}
+body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);max-width:none;margin-left:calc(-1 * var(--page-l));padding-inline:var(--col-l) var(--col-r)}
 .kanban{--colw:296px;padding-bottom:12px}
 /* a touch browser meets a page wider than the screen by widening its layout viewport, which unpins the toolbar, so
    there the board swipes sideways in its own box and only the vertical scroll is the page's */
@@ -5755,19 +5756,21 @@ td.what .overlap{margin-left:8px}
     write('ab-kcol', JSON.stringify(kanbanColumns));
     renderKanban();
   }
-  // the toolbar spans the window from its left edge while its content stays on the page's column, and column headers
-  // stick under it. Edges are measured as if the page were not scrolled sideways; the width goes first, since it can
-  // wrap the toolbar onto another line and change its height.
+  // the toolbar spans the window from its left edge while its content stays on the heading's centered column, and
+  // column headers stick under it. Edges are measured as if the page were not scrolled sideways; the width goes first,
+  // since it can wrap the toolbar onto another line and change its height.
   function sizeBoard() {
     var tb = $('toolbar'),
       style = document.body.style;
     if (view !== 'kanban') return;
-    var r = document.querySelector('.page').getBoundingClientRect(),
+    var page = document.querySelector('.page').getBoundingClientRect(),
+      column = document.querySelector('header.top').getBoundingClientRect(),
       cw = document.documentElement.clientWidth,
-      left = r.left + window.scrollX;
+      x = window.scrollX;
     style.setProperty('--vw', cw + 'px');
-    style.setProperty('--page-l', left + 'px');
-    style.setProperty('--page-r', cw - (r.right + window.scrollX) + 'px');
+    style.setProperty('--page-l', page.left + x + 'px');
+    style.setProperty('--col-l', column.left + x + 'px');
+    style.setProperty('--col-r', cw - (column.right + x) + 'px');
     style.setProperty('--tb-h', (getComputedStyle(tb).position === 'sticky' ? tb.offsetHeight : 0) + 'px');
   }
   window.addEventListener('resize', sizeBoard);

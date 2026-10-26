@@ -388,8 +388,9 @@ const meLane = (d) => {
   ok(scrolls.join() === '-350,-140', 'a toolbar that scrolled away comes back with the view');
   toolbarPosition = 'sticky';
   // the kanban scrolls with the page instead of inside a box of its own; the toolbar spans the window there, keeping
-  // its content on the page's column, and column headers stick under it
+  // its content on the heading's centered column, and column headers stick under it
   d.querySelector('.page').getBoundingClientRect = () => ({ left: 24, right: 1000 });
+  d.querySelector('header.top').getBoundingClientRect = () => ({ left: 100, right: 900 });
   Object.defineProperty(d.documentElement, 'clientWidth', { value: 1024, configurable: true });
   Object.defineProperty(d.getElementById('toolbar'), 'offsetHeight', { value: 50, configurable: true });
   key('2');
@@ -402,8 +403,9 @@ const meLane = (d) => {
   ok(
     bodyStyle.getPropertyValue('--vw') === '1024px' &&
       bodyStyle.getPropertyValue('--page-l') === '24px' &&
-      bodyStyle.getPropertyValue('--page-r') === '24px',
-    'the toolbar spans the window with the kanban, its content on the page column'
+      bodyStyle.getPropertyValue('--col-l') === '100px' &&
+      bodyStyle.getPropertyValue('--col-r') === '124px',
+    'the toolbar spans the window with the kanban, its content on the heading column'
   );
   ok(bodyStyle.getPropertyValue('--tb-h') === '50px', 'column headers stick under a sticky toolbar');
   key('1');
