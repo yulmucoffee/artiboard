@@ -44,6 +44,8 @@ function dateBits(d) {
   return bits;
 }
 
+// A task's line is one line: any writer sets its fields, and a line break in a title would start a line that reads
+// like the board's own (a second "project rules" block) in every agent's answer.
 function taskLine(d, id, withStatus) {
   const bits = [d.key || id];
   if (withStatus) bits.push(d.status || 'todo');
@@ -52,10 +54,10 @@ function taskLine(d, id, withStatus) {
   if (d.branch && withStatus) bits.push(d.branch);
   if (d.pr && withStatus) bits.push(d.pr);
   bits.push(...dateBits(d));
-  return `${bits.join(' ')} ${d.title || ''}`.trim();
+  return oneLine(`${bits.join(' ')} ${d.title || ''}`);
 }
-const reviewLine = (d, id) => [d.key || id, d.feature && `[${d.feature}]`, d.repo && `repo:${d.repo}`, d.pr, ...dateBits(d), d.title]
-  .filter(Boolean).join(' ') + (holderOf(d) ? ` · ${holderOf(d)}` : '');
+const reviewLine = (d, id) => oneLine([d.key || id, d.feature && `[${d.feature}]`, d.repo && `repo:${d.repo}`, d.pr, ...dateBits(d), d.title]
+  .filter(Boolean).join(' ') + (holderOf(d) ? ` · ${holderOf(d)}` : ''));
 const msgLine = (m) => `${short(m.at)} ${m.author || '?'}${m.type && m.type !== 'note' ? ` ${m.type}` : ''}: ${oneLine(m.text)}`;
 const repoList = (repos) => repos.map((r) => `${r.repo}${r.label ? ` (${r.label})` : ''}`).join(' · ');
 
@@ -325,7 +327,7 @@ export function makeFlow(store) {
     // someone else's work waiting for a review, which anyone may finish after the merge or send back
     const toReview = got.inReview.filter((t) => holderOf(t.data) !== me && scope.here(t)).sort(byDocKey);
 
-    const out = [`${me} · ${project}${config.milestone ? ` · ${config.milestone}` : ''} · artiboard ${VERSION}`];
+    const out = [`${me} · ${project}${config.milestone ? ` · ${oneLine(config.milestone)}` : ''} · artiboard ${VERSION}`];
     if (scope.repos.length) out.push(`repos: ${repoList(scope.repos)}`);
     out.push(...got.maps.map((m) => `code map: ${mapLine(m, scope.repos)}`));
     if (scope.stray) out.push(scope.stray);
@@ -396,7 +398,7 @@ export function makeFlow(store) {
   // opens that thread first, then work under way before work not started; work in review waits on others, so it is one
   // line of keys. A person holding a great many sees the first ones and how many more, not a page per session.
   function mineLines(mine, me) {
-    const other = (d) => d.lastMessageBy && d.lastMessageBy !== me ? d.lastMessageBy : null;
+    const other = (d) => d.lastMessageBy && d.lastMessageBy !== me ? oneLine(d.lastMessageBy) : null;
     const rank = (d) => (other(d) ? 0 : 1) * 10 + ({ doing: 0, blocked: 1, todo: 3 }[statusOf(d)] ?? 2);
     const working = mine.filter((t) => t.data.status !== 'review').sort((a, b) => rank(a.data) - rank(b.data) || byDocKey(a, b));
     const waiting = mine.filter((t) => t.data.status === 'review').sort((a, b) => (other(a.data) ? 0 : 1) - (other(b.data) ? 0 : 1) || byDocKey(a, b));

@@ -89,7 +89,9 @@ function sameOrigin(req) {
 
 export function makeApp({ store, cfg }) {
   const { mapsMeta, setMap } = makeFlow(store);
+  // each member's open live-update streams, so revoking, demoting or removing them ends what they already hold open
   const streams = new Map();
+  const endStreams = (uid) => { for (const res of streams.get(uid) || []) res.end(); };
   const secure = cfg.boardUrl.startsWith('https:');
   const sessionCookie = (sid, maxAge) => `ab_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 
@@ -141,15 +143,26 @@ export function makeApp({ store, cfg }) {
   async function docs(req, res, member, project, action) {
     if (action === 'events') {
       await store.readRows(project, {});
-      if ((streams.get(member.uid) || 0) >= 20) return send(res, 429, { error: 'too_many_streams' });
-      streams.set(member.uid, (streams.get(member.uid) || 0) + 1);
-      req.on('close', () => { const n = streams.get(member.uid) - 1; if (n > 0) streams.set(member.uid, n); else streams.delete(member.uid); });
+      const open = streams.get(member.uid) || new Set();
+      if (open.size >= 20) return send(res, 429, { error: 'too_many_streams' });
+      streams.set(member.uid, open.add(res));
       res.writeHead(200, { ...SECURITY, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
       res.write(': live\n\n');
       // a rebuilt code map's chunks are large and pages read them when a search needs them: they are not pushed
-      const off = store.subscribe(project, (row) => { if (!MAP_CHUNKS.test(row.collection)) res.write(`data: ${JSON.stringify(row)}\n\n`); });
-      const ping = setInterval(() => res.write(': ping\n\n'), 25000);
-      req.on('close', () => { off(); clearInterval(ping); });
+      // a stream ended by a revoke stays open until its close event: nothing more is written to it in between
+      const write = (text) => { if (!res.writableEnded) res.write(text); };
+      const off = store.subscribe(project, (row) => { if (!MAP_CHUNKS.test(row.collection)) write(`data: ${JSON.stringify(row)}\n\n`); });
+      // sign-in is checked again on every ping, so a stream outlives a revoke from the command line by one ping at most;
+      // a store that cannot answer this once keeps the stream
+      const ping = setInterval(async () => {
+        const still = await memberFor(req).then((m) => m?.uid === member.uid, () => true);
+        if (still) write(': ping\n\n'); else res.end();
+      }, 25000);
+      req.on('close', () => {
+        off(); clearInterval(ping);
+        open.delete(res);
+        if (!open.size && streams.get(member.uid) === open) streams.delete(member.uid);
+      });
       return;
     }
     if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' }, { Allow: 'POST' });
@@ -182,14 +195,16 @@ export function makeApp({ store, cfg }) {
     switch (m[2]) {
       case 'token': { const token = await store.issueToken(target.uid, 'agent'); return send(res, 200, { token, connect: connectLines(cfg.boardUrl, token) }); }
       case 'link': return send(res, 200, { url: await store.loginLink(target) });
-      case 'revoke': return send(res, 200, { revoked: await store.revokeTokens(target.uid) });
+      case 'revoke': { const revoked = await store.revokeTokens(target.uid); endStreams(target.uid); return send(res, 200, { revoked }); }
       case 'access':
         if (target.uid === me.uid) throw new BoardError('invalid_argument', 'ask another admin to change your own access');
         await store.setRole(target.uid, b.access);
+        endStreams(target.uid);
         return send(res, 200, { ok: true });
       case 'remove':
         if (target.uid === me.uid) throw new BoardError('invalid_argument', 'ask another admin to remove you');
         await removeMember(store, target);
+        endStreams(target.uid);
         return send(res, 200, { ok: true });
     }
   }
