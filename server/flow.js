@@ -591,10 +591,13 @@ export function makeFlow(store) {
           writes.unshift(det ? { op: 'update', path: `details/${id}`, if_version: det.version, data: s, ...o } : { op: 'set', path: `details/${id}`, if_absent: true, data: s, ...o });
         }
       });
-      const { more, unblocked } = status === 'done' ? await unblockDependents(project, keys, patches) : { more: [], unblocked: [] };
-      writes.push(...more);
       if (writes.length > 100) throw new BoardError('invalid_argument', `${writes.length} writes is more than one call takes (100): pass fewer tasks`);
-      await apply(member, project, writes);
+      const { more, unblocked } = status === 'done' ? await unblockDependents(project, keys, patches) : { more: [], unblocked: [] };
+      // the dependents' waitingOn go in the same write while they fit; a task with more dependents than that still
+      // finishes, and the rest follow best effort, as readiness repairs do: start and claim check readiness against the
+      // deps themselves, so one that is lost heals there
+      await apply(member, project, [...writes, ...more.splice(0, 100 - writes.length)]);
+      for (let i = 0; i < more.length; i += 100) await apply(member, project, more.slice(i, i + 100)).catch(() => {});
       return [`ok ${keys.join(', ')}${status ? ` → ${status}` : ''}`, unblocked.length && `unblocked ${unblocked.sort(keyOrder).join(', ')}`].filter(Boolean).join(' · ');
     });
     if (!posted) return line;
