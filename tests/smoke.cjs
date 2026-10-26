@@ -822,6 +822,12 @@ const meLane = (d) => {
     'the done column has no two-column switch'
   );
   ok(!b.d.querySelector('.col.folded, .colbtn[aria-expanded]'), 'columns do not fold');
+  const arrows = (k) => [b.d.getElementById(k + 'Prev'), b.d.getElementById(k + 'Next')];
+  ok(
+    arrows('kanban').every((a) => a && a.hidden && /^Scroll (left|right)$/.test(a.getAttribute('aria-label'))) &&
+      arrows('graph').every((a) => a && a.hidden),
+    'the kanban and the graph have sideways arrows, hidden while nothing is off screen'
+  );
 
   console.log('# a long done column');
   const doneDocs = {};
