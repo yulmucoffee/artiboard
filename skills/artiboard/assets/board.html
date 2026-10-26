@@ -3891,50 +3891,7 @@ td.what .overlap{margin-left:8px}
         return;
       }
       if (d.editing) {
-        var ta = el('textarea', { id: tid, 'aria-label': T('h_' + k) });
-        ta.value = d.draft != null ? d.draft : (own || legacy || {}).text || '';
-        ta.addEventListener('input', function () {
-          d.draft = ta.value;
-        });
-        var tell = el('input', { type: 'checkbox', checked: tellByDefault ? '' : null });
-        var ok = button({ class: 'btn primary small', text: T('save') });
-        ok.addEventListener('click', function () {
-          var rev = ((d.doc && d.doc.rev) || 0) + 1,
-            at = now();
-          ok.disabled = true;
-          db.doc(path)
-            .set({ text: ta.value.trim(), rev: rev, updatedAt: at, by: me || null })
-            .then(function () {
-              d.editing = false;
-              d.draft = null;
-              render();
-              if (tell.checked && me) return postNotice(at, T(k + 'Changed', { r: rev }));
-            })
-            .catch(function (e) {
-              ok.disabled = false;
-              writeFailed(e);
-            });
-        });
-        var cancel = button({
-          class: 'btn small',
-          text: T('cancel'),
-          onclick: function () {
-            d.editing = false;
-            d.draft = null;
-            render();
-          }
-        });
-        body.appendChild(
-          el('div', { class: 'block' }, [
-            warnLine(),
-            ta,
-            el('div', { class: 'form-row' }, [
-              ok,
-              cancel,
-              me ? el('label', { class: 'muted tell' }, [tell, T('tellAll')]) : null
-            ])
-          ])
-        );
+        body.appendChild(editor((own || legacy || {}).text || ''));
         return;
       }
       if (!own && !legacy) {
@@ -3943,6 +3900,45 @@ td.what .overlap{margin-left:8px}
       }
       if (legacy) body.appendChild(el('p', { class: 'rules-note', text: T('rulesLegacy') }));
       body.appendChild(el('div', { class: 'rules' }, ruleCards((own || legacy).text)));
+    }
+    function stopEditing() {
+      d.editing = false;
+      d.draft = null;
+      render();
+    }
+    // the text with its draft, save (telling everyone in a notice when asked) and cancel
+    function editor(text) {
+      var ta = el('textarea', { id: tid, 'aria-label': T('h_' + k) });
+      ta.value = d.draft != null ? d.draft : text;
+      ta.addEventListener('input', function () {
+        d.draft = ta.value;
+      });
+      var tell = el('input', { type: 'checkbox', checked: tellByDefault ? '' : null });
+      var ok = button({ class: 'btn primary small', text: T('save') });
+      ok.addEventListener('click', function () {
+        var rev = ((d.doc && d.doc.rev) || 0) + 1,
+          at = now();
+        ok.disabled = true;
+        db.doc(path)
+          .set({ text: ta.value.trim(), rev: rev, updatedAt: at, by: me || null })
+          .then(function () {
+            stopEditing();
+            if (tell.checked && me) return postNotice(at, T(k + 'Changed', { r: rev }));
+          })
+          .catch(function (e) {
+            ok.disabled = false;
+            writeFailed(e);
+          });
+      });
+      return el('div', { class: 'block' }, [
+        warnLine(),
+        ta,
+        el('div', { class: 'form-row' }, [
+          ok,
+          button({ class: 'btn small', text: T('cancel'), onclick: stopEditing }),
+          me ? el('label', { class: 'muted tell' }, [tell, T('tellAll')]) : null
+        ])
+      ]);
     }
     $(k + 'Edit').addEventListener('click', function () {
       d.editing = true;
