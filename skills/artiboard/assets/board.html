@@ -5948,6 +5948,8 @@ td.what .overlap{margin-left:8px}
       g.style.zoom = next;
       wrap.scrollLeft = (wrap.scrollLeft + px) * k - px;
       wrap.scrollTop = (wrap.scrollTop + py) * k - py;
+      // zooming out at the top left scrolls nothing, so no scroll event says the arrows changed
+      sideArrows();
     },
     { passive: false }
   );
@@ -6335,9 +6337,13 @@ td.what .overlap{margin-left:8px}
   });
   window.addEventListener('scroll', sideArrows, { passive: true });
   $('graphWrap').addEventListener('scroll', sideArrows, { passive: true });
-  // the room to scroll changes with the window, the board's content and a page scrollbar coming or going
+  // the room to scroll changes with the window, the board's content and a page scrollbar coming or going, and the
+  // toolbar spans what the window shows, which a scrollbar narrows
   if (window.ResizeObserver) {
-    var sideSizes = new ResizeObserver(sideArrows);
+    var sideSizes = new ResizeObserver(function () {
+      sizeBoard();
+      sideArrows();
+    });
     [document.documentElement, $('kanban'), $('graphWrap')].forEach(function (n) {
       sideSizes.observe(n);
     });
