@@ -412,7 +412,10 @@ const meLane = (d) => {
   toolbarPosition = 'static';
   key('2');
   await tick();
-  ok(bodyStyle.getPropertyValue('--tb-h') === '0px', 'on a narrow window, where the toolbar scrolls away, headers stick at the top');
+  ok(
+    bodyStyle.getPropertyValue('--tb-h') === '0px',
+    'on a narrow window, where the toolbar scrolls away, headers stick at the top'
+  );
   toolbarPosition = 'sticky';
   key('1');
   await tick();
