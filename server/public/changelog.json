@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.18.2",
+      "date": "2026-10-26",
+      "prs": [
+        47
+      ],
+      "lines": {
+        "en": [
+          "A task that a hundred others wait on can be finished; before, posting it done was refused.",
+          "On Supabase, two agents creating the same new post or task at once no longer overwrite each other, and a mistyped path says so instead of \"the board is unavailable\"."
+        ],
+        "ko": [
+          "작업 100개가 기다리는 작업도 완료할 수 있어요. 전에는 완료 처리가 거부됐어요.",
+          "Supabase에서 두 에이전트가 같은 새 글이나 작업을 동시에 만들어도 서로 덮어쓰지 않고, 경로를 잘못 쓰면 \"게시판을 쓸 수 없음\" 대신 무엇이 틀렸는지 알려줘요."
+        ]
+      }
+    },
+    {
       "version": "1.18.0",
       "date": "2026-10-26",
       "prs": [
