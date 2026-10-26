@@ -718,6 +718,34 @@ for (const backend of backends) {
       assert.equal(field.value.code, 'invalid_argument');
       assert.equal((await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `${C}/T-1`, data: {}, if_absent: true }] })).value.code, 'already_exists');
       assert.equal((await call(board, 'board_get', { project: 'no-such-project', path: 'meta/config' })).value.code, 'not_found');
+      assert.equal((await call(board, 'board_get', { project: P, path: C })).value.code, 'invalid_argument', 'a collection is not a document, on either database');
+      assert.match((await call(board, 'board_task', { project: P, id: 'tasks/T-1' })).value, /^invalid_argument: not a document path/);
+    });
+
+    test('two writers setting one new document with if_absent: exactly one writes it', async () => {
+      const path = `${C}/once-${R}`;
+      const tries = await Promise.all(['a', 'b', 'c', 'd'].map((who) => call(board, 'board_batch', { project: P, writes: [{ op: 'set', path, data: { who }, if_absent: true }] })));
+      assert.equal(tries.filter((t) => !t.error).length, 1, JSON.stringify(tries.map((t) => t.value)));
+      assert.deepEqual(tries.filter((t) => t.error).map((t) => t.value.code), ['already_exists', 'already_exists', 'already_exists']);
+      assert.equal((await call(board, 'board_get', { project: P, path })).value.version, 1, 'nobody overwrote the first');
+    });
+
+    test('a task with more dependents than one write takes still finishes, and every dependent hears it', async () => {
+      const X = `hub-${R}`, at = new Date().toISOString(), n = 120;
+      await store.createProject(null, { id: X, title: 'Hub', lang: 'en' });
+      try {
+        const task = (key, deps) => ({ op: 'set', path: `tasks/${key}`, data: { key, title: key, status: 'todo', deps, waitingOn: deps, updatedAt: at } });
+        const writes = [task('H-1', []), ...Array.from({ length: n }, (_, i) => task(`D-${i + 1}`, ['H-1']))];
+        for (let i = 0; i < writes.length; i += 100) assert.equal((await call(board, 'board_batch', { project: X, writes: writes.slice(i, i + 100) })).error, false);
+        assert.match((await call(board, 'board_claim', { project: X, id: 'H-1' })).value, /^claimed /);
+        const done = await call(board, 'board_post', { project: X, task: 'H-1', status: 'done', text: 'shipped' });
+        assert.equal(done.error, false, JSON.stringify(done.value));
+        assert.equal(/^ok H-1 → done · unblocked (.*)$/.exec(done.value)?.[1].split(', ').length, n);
+        const waiting = await call(board, 'board_query', { project: X, collection: 'tasks', where: [{ field: 'waitingOn', op: 'array-contains', value: 'H-1' }] });
+        assert.deepEqual(waiting.value.docs, [], 'no dependent still waits on the finished task');
+      } finally {
+        await store.dropProject(X).catch(() => {});
+      }
     });
 
     test('a viewer reads but cannot write', async () => {
