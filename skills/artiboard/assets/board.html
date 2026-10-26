@@ -182,7 +182,7 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border
 .rows .t{background:none;border:0;padding:0;text-align:left;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .rows .t:hover{text-decoration:underline;text-underline-offset:3px}
 .rows .side{display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:12.5px;color:var(--muted);white-space:nowrap;min-width:0;overflow:hidden}
-.rows .side a{font-size:12.5px}
+a.prlink{font-size:13px}
 @media (max-width:640px){.rows>li,.rows.ready>li{grid-template-columns:auto minmax(0,1fr)}.rows .t{grid-column:1/-1;white-space:normal}.rows .side{justify-content:flex-start;flex-wrap:wrap;white-space:normal}.rows.ready .side{grid-column:1/-1}}
 .btn{min-height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:500}
 .btn:hover{background:var(--sunk)}
@@ -191,6 +191,8 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border
 .btn.small{min-height:26px;padding:0 10px;font-size:12.5px}
 .btn:disabled{opacity:.5;cursor:default}
 .empty{color:var(--muted);font-size:13.5px}
+/* a muted line where something has nothing to show yet */
+.aside{font-size:13.5px}
 
 /* people lanes */
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
@@ -270,6 +272,8 @@ td.date .arrow{color:var(--muted);font-size:12px;margin-right:6px}
 .feed li:last-child{border-bottom:0}
 .feed li.new{background:var(--accent-soft)}
 .feed .at{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.feed .at .when{display:flex;align-items:center;gap:6px}
+.feed .at .by{display:flex;gap:4px;flex-wrap:wrap}
 .feed .text{white-space:pre-wrap;overflow-wrap:anywhere}
 .feed li.form{display:flex;flex-direction:column;gap:8px;background:var(--bg);border-radius:0 0 12px 12px}
 .feed li.more{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding-block:10px}
@@ -334,6 +338,8 @@ body[data-view="kanban"] .board{width:max-content;min-width:100%}
 .col.arch{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
 .col.arch h3{background:var(--bg)}
 .cards{display:flex;flex-direction:column;gap:6px;padding:0 8px 8px}
+.cards>.empty{padding:4px 4px 8px}
+.cards>.arch-hint{padding:0 4px 4px;font-size:12px;line-height:1.5}
 /* two equal tracks that never grow past the column: a title with a long path or link in it wraps inside its card
    instead of widening its track under the next column */
 .col.two .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
@@ -376,6 +382,7 @@ body[data-view="kanban"] .board{width:max-content;min-width:100%}
 .crit .path{font-family:var(--f-mono);font-size:12.5px;color:var(--accent);overflow-wrap:anywhere}
 /* the page does not anchor its scroll inside the graph, so zooming it keeps the page still */
 .graph-wrap{overflow:auto;overflow-anchor:none;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:min(78vh,900px)}
+.graph-wrap>.empty{padding:16px}
 .graph{position:relative;margin-inline:auto}
 .graph svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 .gcol{position:absolute;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
@@ -404,6 +411,9 @@ body[data-view="kanban"] .board{width:max-content;min-width:100%}
 .graph.focus path.e:not(.hi){opacity:.12}
 .graph .node.nomatch{opacity:.25}
 .legend i.swatch{display:inline-block;width:18px;height:0;border-radius:0;background:none;border-top:2px solid;vertical-align:4px;margin-right:6px}
+.legend i.lg-crit{border-color:var(--accent)}
+.legend i.lg-met{border-color:var(--muted)}
+.legend i.lg-wait{border-color:var(--edge)}
 
 /* detail sheet */
 .scrim{position:fixed;inset:0;background:var(--scrim);z-index:10}
@@ -419,16 +429,24 @@ body[data-view="kanban"] .board{width:max-content;min-width:100%}
 .sheet .body{flex:1;overflow-y:auto;padding:18px 20px 12px;display:flex;flex-direction:column;gap:18px}
 .sheet h2{font-size:18px;line-height:1.4}
 .sheet .bar h2{font-size:15px}
+.sheet .bar .spacer{margin-left:auto}
 .setform{display:flex;flex-direction:column;gap:14px}
 .setform label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
 .setform input,.setform textarea{width:100%;font-weight:400;color:var(--ink)}
 .setform textarea{min-height:110px;font-family:var(--f-mono);font-size:13px}
 .setform .hint2{font-size:12.5px;font-weight:400;color:var(--muted);line-height:1.5}
+.setform .fineprint{font-size:12.5px}
 .fields{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px 12px;align-items:center;font-size:13.5px}
 .fields .k{color:var(--muted);font-size:13px;font-weight:600}
 .fields select,.fields input{width:100%}
 .block{display:flex;flex-direction:column;gap:6px}
 .block h3{font-size:13px;color:var(--muted);font-weight:600}
+.block h3.summary-head{display:flex;gap:8px;align-items:baseline}
+.summary-head .summary-at{font-weight:400}
+.sheet-tags{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.deps-pending{color:var(--warn);font-size:13.5px}
+.claim-line{font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tell{font-size:13px;display:inline-flex;gap:6px;align-items:center}
 .block .pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .deplist{display:flex;flex-wrap:wrap;gap:6px}
 .deplist button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:2px 8px;font-size:13px}
@@ -437,12 +455,14 @@ body[data-view="kanban"] .board{width:max-content;min-width:100%}
 .msg.agent{background:var(--agent-soft);border-color:transparent}
 .msg.new{box-shadow:inset 3px 0 0 var(--accent)}
 .msg .h{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.msg .h .new-mark{color:var(--accent);font-weight:600}
 .msg .text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 .type{font-size:11.5px;font-weight:600;padding:0 6px;border-radius:4px;line-height:19px;color:var(--text2);background:var(--sunk)}
 .type.question{color:var(--warn);background:var(--warn-soft)}
 .type.blocker{color:var(--danger);background:var(--danger-soft)}
 .type.handoff{color:var(--accent);background:var(--accent-soft)}
 .sheet .composer{border-top:1px solid var(--line-soft);padding:12px 20px 16px;display:flex;flex-direction:column;gap:8px}
+.composer .send-hint{font-size:12px}
 .err{color:var(--danger);font-size:13px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:20;background:var(--ink);color:var(--surface);border-radius:8px;padding:8px 14px;font-size:13.5px;max-width:calc(100% - 32px)}
 
@@ -2353,7 +2373,7 @@ td.what .overlap{margin-left:8px}
   }
   function prEls(t) {
     return prLinks(t).map(function (l) {
-      return el('a', { href: l.href, target: '_blank', rel: 'noopener', style: 'font-size:13px', text: l.text + ' ↗' });
+      return el('a', { href: l.href, target: '_blank', rel: 'noopener', class: 'prlink', text: l.text + ' ↗' });
     });
   }
 
@@ -3267,7 +3287,7 @@ td.what .overlap{margin-left:8px}
     }
     if (!tasks.length) {
       box.appendChild(emptyNote(T('noTasks')));
-      box.appendChild(el('p', { class: 'muted', style: 'font-size:13.5px', text: T('emptyHint') }));
+      box.appendChild(el('p', { class: 'muted aside', text: T('emptyHint') }));
       return;
     }
     box.appendChild(peopleRow());
@@ -3696,8 +3716,8 @@ td.what .overlap{margin-left:8px}
       ul.appendChild(
         el('li', { class: nw ? 'new' : null }, [
           el('div', { class: 'at' }, [
-            el('span', { style: 'display:flex;align-items:center;gap:6px' }, [stamp(n.at), newDot(nw)]),
-            el('span', { style: 'display:flex;gap:4px;flex-wrap:wrap' }, [
+            el('span', { class: 'when' }, [stamp(n.at), newDot(nw)]),
+            el('span', { class: 'by' }, [
               personChip(n.author),
               n.kind === 'agent' ? el('span', { class: 'agent-mark', text: T('agent') }) : null
             ])
@@ -3905,13 +3925,7 @@ td.what .overlap{margin-left:8px}
             el('div', { class: 'form-row' }, [
               ok,
               cancel,
-              me
-                ? el(
-                    'label',
-                    { class: 'muted', style: 'font-size:13px;display:inline-flex;gap:6px;align-items:center' },
-                    [tell, T('tellAll')]
-                  )
-                : null
+              me ? el('label', { class: 'muted tell' }, [tell, T('tellAll')]) : null
             ])
           ])
         );
@@ -4091,7 +4105,7 @@ td.what .overlap{margin-left:8px}
     return sheetBlock(T('touches'), 'code', [
       mine.length
         ? el('div', { class: 'touches' }, mine.map(chip))
-        : el('p', { class: 'muted', style: 'font-size:13.5px', text: T('touchesNone') }),
+        : el('p', { class: 'muted aside', text: T('touchesNone') }),
       overlaps.length
         ? el(
             'ul',
@@ -5863,13 +5877,9 @@ td.what .overlap{margin-left:8px}
           )
         );
       var cards = el('div', { class: 'cards' });
-      if (!loaded) cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: loadingText() }));
-      else if (!all.length)
-        cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: T('empty') }));
-      if (arch)
-        cards.appendChild(
-          el('p', { class: 'muted', style: 'padding:0 4px 4px;font-size:12px;line-height:1.5', text: T('archHint') })
-        );
+      if (!loaded) cards.appendChild(emptyNote(loadingText()));
+      else if (!all.length) cards.appendChild(emptyNote(T('empty')));
+      if (arch) cards.appendChild(el('p', { class: 'muted arch-hint', text: T('archHint') }));
       list.forEach(function (t) {
         order.push(t.id);
         cards.appendChild(kanbanCard(t, s));
@@ -6067,11 +6077,11 @@ td.what .overlap{margin-left:8px}
     var gl = $('glegend');
     gl.textContent = '';
     if (!loaded) {
-      wrap.appendChild(el('p', { class: 'empty', style: 'padding:16px', text: loadingText() }));
+      wrap.appendChild(emptyNote(loadingText()));
       return;
     }
     if (!tasks.length) {
-      wrap.appendChild(el('p', { class: 'empty', style: 'padding:16px', text: T('noTasks') }));
+      wrap.appendChild(emptyNote(T('noTasks')));
       return;
     }
     var m = graphModel();
@@ -6105,9 +6115,9 @@ td.what .overlap{margin-left:8px}
             : T('noChain')
         })
       );
-    gl.appendChild(el('span', {}, [el('i', { class: 'swatch', style: 'border-color:var(--accent)' }), T('lgCrit')]));
-    gl.appendChild(el('span', {}, [el('i', { class: 'swatch', style: 'border-color:var(--muted)' }), T('lgMet')]));
-    gl.appendChild(el('span', {}, [el('i', { class: 'swatch', style: 'border-color:var(--edge)' }), T('lgWait')]));
+    gl.appendChild(el('span', {}, [el('i', { class: 'swatch lg-crit' }), T('lgCrit')]));
+    gl.appendChild(el('span', {}, [el('i', { class: 'swatch lg-met' }), T('lgMet')]));
+    gl.appendChild(el('span', {}, [el('i', { class: 'swatch lg-wait' }), T('lgWait')]));
     people.forEach(function (p) {
       gl.appendChild(
         el('span', { class: personClass(p.id).trim() }, [el('i', { style: 'background:var(--pb)' }), p.name || p.id])
@@ -6604,7 +6614,7 @@ td.what .overlap{margin-left:8px}
     showDialog(
       'setTitle',
       closeSettings,
-      [el('h2', { id: 'setTitle', text: T('s_head') }), el('span', { style: 'margin-left:auto' })],
+      [el('h2', { id: 'setTitle', text: T('s_head') }), el('span', { class: 'spacer' })],
       [
         el('div', { class: 'body' }, [
           el('div', { class: 'setform' }, [
@@ -6612,7 +6622,7 @@ td.what .overlap{margin-left:8px}
             el('label', {}, [T('s_subtitle'), su]),
             el('label', {}, [T('s_milestone'), mi]),
             el('label', {}, [T('s_repos'), re, el('span', { class: 'hint2', text: T('s_reposHint') })]),
-            el('p', { class: 'muted', style: 'font-size:12.5px', text: T('s_people') }),
+            el('p', { class: 'muted fineprint', text: T('s_people') }),
             err,
             el('div', { class: 'form-row' }, [ok, button({ class: 'btn', text: T('cancel'), onclick: closeSettings })])
           ])
@@ -6625,10 +6635,10 @@ td.what .overlap{margin-left:8px}
 
   function summaryBlock(t, keep) {
     var sum = (detailsDoc && detailsDoc.summary) || '';
-    var head = el('h3', { style: 'display:flex;gap:8px;align-items:baseline' }, [
+    var head = el('h3', { class: 'summary-head' }, [
       T('summary'),
       detailsDoc && detailsDoc.summaryAt
-        ? el('span', { style: 'font-weight:400', text: stamp(detailsDoc.summaryAt) })
+        ? el('span', { class: 'summary-at', text: stamp(detailsDoc.summaryAt) })
         : null,
       writable() && !summaryEditing
         ? button({
@@ -6646,9 +6656,7 @@ td.what .overlap{margin-left:8px}
     if (!summaryEditing)
       return el('div', { class: 'block' }, [
         head,
-        sum
-          ? el('div', { class: 'pre', text: sum })
-          : el('p', { class: 'muted', style: 'font-size:13.5px', text: T('summaryEmpty') })
+        sum ? el('div', { class: 'pre', text: sum }) : el('p', { class: 'muted aside', text: T('summaryEmpty') })
       ]);
     var ta = el('textarea', { id: 'sumText', 'aria-label': T('summary') });
     ta.value = keep.sumText != null ? keep.sumText : sum;
@@ -6793,7 +6801,7 @@ td.what .overlap{margin-left:8px}
   function sheetHead(t) {
     var waiting = unmet(t);
     return el('div', { class: 'block' }, [
-      el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center' }, [
+      el('div', { class: 'sheet-tags' }, [
         el('span', { class: 'tag', text: t.feature || '' }),
         repoTag(t),
         statusChip(knownStatus(t)),
@@ -6806,7 +6814,7 @@ td.what .overlap{margin-left:8px}
       ]),
       el('h2', { id: 'sheetTitle', text: titleOf(t) }),
       knownStatus(t) !== 'done' && waiting.length
-        ? el('p', { style: 'color:var(--warn);font-size:13.5px', text: T('depsPending', { k: waiting.join(', ') }) })
+        ? el('p', { class: 'deps-pending', text: T('depsPending', { k: waiting.join(', ') }) })
         : null,
       actions(t)
     ]);
@@ -6841,7 +6849,7 @@ td.what .overlap{margin-left:8px}
   }
   function claimLine(t) {
     if (!t.claimedBy) return null;
-    return el('p', { class: 'muted', style: 'font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center' }, [
+    return el('p', { class: 'muted claim-line' }, [
       T('claimedBy'),
       personChip(t.claimedBy.who),
       t.claimedBy.agent ? el('span', { class: 'agent-mark', text: T('agent') }) : null,
@@ -6867,7 +6875,7 @@ td.what .overlap{margin-left:8px}
               text: T('ty_' + (TYPES.indexOf(m.type) >= 0 ? m.type : 'note'))
             }),
             el('span', { text: stamp(m.at) }),
-            nw ? el('span', { style: 'color:var(--accent);font-weight:600', text: T('newMsg') }) : null
+            nw ? el('span', { class: 'new-mark', text: T('newMsg') }) : null
           ]),
           el('div', { class: 'text', text: m.text || '' })
         ])
@@ -6914,11 +6922,7 @@ td.what .overlap{margin-left:8px}
     return el('div', { class: 'composer' }, [
       warnLine(),
       ta,
-      el('div', { class: 'form-row' }, [
-        ty,
-        send,
-        el('span', { class: 'muted', style: 'font-size:12px', text: T('sendHint') })
-      ])
+      el('div', { class: 'form-row' }, [ty, send, el('span', { class: 'muted send-hint', text: T('sendHint') })])
     ]);
   }
   function sheetNav(t) {
