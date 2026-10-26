@@ -68,12 +68,11 @@ h2{font-size:18px;font-weight:650;letter-spacing:-.015em;margin:0;text-wrap:bala
 h3{font-size:14.5px;font-weight:700;margin:0}
 p{margin:0}
 .muted{color:var(--muted)}
-/* below the tabs the page uses the window's width: the kanban, the item table, people's lanes, the code map and the
-   graph gain from it. The board's heading, the tabs and the text people read top to bottom stay on a centered
-   1180 px column, so a line of text keeps an easy length and the top of the page does not stretch. */
+/* the board's heading, the tabs and the document view stay on a centered 1180 px column, so a line keeps an easy
+   length and nothing stretches across a wide window; only the kanban and the graph grow past it when their columns
+   need the room */
 .page{display:flex;flex-direction:column;gap:28px}
-header.top,.toolbar,section[data-fold="now"],section[data-fold="activity"],section[data-fold="notices"],
-section[data-fold="notes"],section[data-fold="rules"],section[data-fold="guide"]{width:100%;max-width:1180px;margin-inline:auto}
+header.top,#viewDoc>section,footer{width:100%;max-width:1180px;margin-inline:auto}
 .board{display:flex;flex-direction:column;gap:28px;min-width:0}
 .view{display:flex;flex-direction:column;gap:36px;min-width:0}
 section{display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -123,8 +122,9 @@ header.top{display:flex;flex-direction:column;gap:14px}
 .legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:12.5px;color:var(--muted)}
 .legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
 
-/* sticky toolbar */
-.toolbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-block:10px;border-bottom:1px solid var(--line);margin-top:-6px}
+/* sticky toolbar: it spans the window, so what scrolls under it never shows beside it, while its content stays on
+   the heading's column */
+.toolbar{position:sticky;top:env(safe-area-inset-top,0px);left:0;z-index:5;background:var(--bg);display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;align-self:flex-start;width:var(--vw,100%);max-width:none;margin:-6px 0 0 calc(-1 * var(--page-l,0px));padding:10px var(--col-r,0px) 10px var(--col-l,0px);border-bottom:1px solid var(--line)}
 .toolbar .seg button{min-height:30px;padding:0 14px;font-size:13px}
 .search{flex:1 1 220px;max-width:360px;display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:0 6px 0 10px;min-height:34px}
 .search:focus-within{border-color:var(--accent)}
@@ -182,8 +182,8 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border
 .rows .t{background:none;border:0;padding:0;text-align:left;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .rows .t:hover{text-decoration:underline;text-underline-offset:3px}
 .rows .side{display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:12.5px;color:var(--muted);white-space:nowrap;min-width:0;overflow:hidden}
-.rows .side a{font-size:12.5px}
-@media (max-width:640px){.rows>li,.rows.ready>li{grid-template-columns:auto minmax(0,1fr)}.rows .t{grid-column:1/-1;white-space:normal}.rows .side{justify-content:flex-start}}
+a.prlink{font-size:13px}
+@media (max-width:640px){.rows>li,.rows.ready>li{grid-template-columns:auto minmax(0,1fr)}.rows .t{grid-column:1/-1;white-space:normal}.rows .side{justify-content:flex-start;flex-wrap:wrap;white-space:normal}.rows.ready .side{grid-column:1/-1}}
 .btn{min-height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:500}
 .btn:hover{background:var(--sunk)}
 .btn.primary{border-color:transparent;background:var(--accent);color:var(--on-accent)}
@@ -191,6 +191,8 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border
 .btn.small{min-height:26px;padding:0 10px;font-size:12.5px}
 .btn:disabled{opacity:.5;cursor:default}
 .empty{color:var(--muted);font-size:13.5px}
+/* a muted line where something has nothing to show yet */
+.aside{font-size:13.5px}
 
 /* people lanes */
 .lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
@@ -270,6 +272,8 @@ td.date .arrow{color:var(--muted);font-size:12px;margin-right:6px}
 .feed li:last-child{border-bottom:0}
 .feed li.new{background:var(--accent-soft)}
 .feed .at{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.feed .at .when{display:flex;align-items:center;gap:6px}
+.feed .at .by{display:flex;gap:4px;flex-wrap:wrap}
 .feed .text{white-space:pre-wrap;overflow-wrap:anywhere}
 .feed li.form{display:flex;flex-direction:column;gap:8px;background:var(--bg);border-radius:0 0 12px 12px}
 .feed li.more{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding-block:10px}
@@ -297,12 +301,11 @@ footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);paddin
 .back:hover{color:var(--ink)}
 
 /* kanban: the page itself scrolls both ways, so a wheel or a swipe anywhere moves it and no box traps the scroll.
-   The board grows to the columns' width, which leaves the toolbar room to stick to the window's left edge; it spans
-   the window so cards passing under it do not show beside it, and column headers stick right under it. Columns keep
+   The board grows to the columns' width, which leaves the toolbar room to stick to the window's left edge, and column
+   headers stick right under the toolbar. Columns keep
    one width or take two card columns. A card is two lines: what it is with who has it (or that it is free) at the
    right, then its title. */
 body[data-view="kanban"] .board{width:max-content;min-width:100%}
-body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);max-width:none;margin-left:calc(-1 * var(--page-l));padding-inline:var(--col-l) var(--col-r)}
 .kanban{--colw:296px;padding-bottom:12px}
 /* the kanban and the graph sit in the window's middle, at least as wide as the heading's column and wider when their
    columns need it; their descriptions wrap to that width instead of setting it */
@@ -311,10 +314,10 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 #viewKanban .sec-head p,#viewGraph .sec-head p{flex:1 1 320px}
 /* arrows at the edges move a wide kanban or graph about a screen sideways, for a mouse without a sideways wheel; each
    shows while there is more on its side, halfway down the part of the board in view. Touch screens swipe instead. */
-.side{position:fixed;z-index:4;width:36px;height:36px;margin-top:-18px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-hi);display:grid;place-items:center}
-.side:hover{border-color:var(--edge)}
-.side[hidden]{display:none}
-@media (pointer:coarse){.side{display:none}}
+.pan{position:fixed;z-index:4;width:36px;height:36px;margin-top:-18px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-hi);display:grid;place-items:center}
+.pan:hover{border-color:var(--edge)}
+.pan[hidden]{display:none}
+@media (pointer:coarse){.pan{display:none}}
 /* a touch browser meets a page wider than the screen by widening its layout viewport, which unpins the toolbar, so
    there the board swipes sideways in its own box and only the vertical scroll is the page's */
 @media (pointer:coarse){
@@ -335,6 +338,8 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .col.arch{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
 .col.arch h3{background:var(--bg)}
 .cards{display:flex;flex-direction:column;gap:6px;padding:0 8px 8px}
+.cards>.empty{padding:4px 4px 8px}
+.cards>.arch-hint{padding:0 4px 4px;font-size:12px;line-height:1.5}
 /* two equal tracks that never grow past the column: a title with a long path or link in it wraps inside its card
    instead of widening its track under the next column */
 .col.two .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
@@ -375,7 +380,9 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .crit{font-size:13.5px;color:var(--text2)}
 .crit b{color:var(--ink)}
 .crit .path{font-family:var(--f-mono);font-size:12.5px;color:var(--accent);overflow-wrap:anywhere}
-.graph-wrap{overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:min(78vh,900px)}
+/* the page does not anchor its scroll inside the graph, so zooming it keeps the page still */
+.graph-wrap{overflow:auto;overflow-anchor:none;background:var(--surface);border:1px solid var(--line);border-radius:10px;max-height:min(78vh,900px)}
+.graph-wrap>.empty{padding:16px}
 .graph{position:relative;margin-inline:auto}
 .graph svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 .gcol{position:absolute;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
@@ -404,6 +411,9 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .graph.focus path.e:not(.hi){opacity:.12}
 .graph .node.nomatch{opacity:.25}
 .legend i.swatch{display:inline-block;width:18px;height:0;border-radius:0;background:none;border-top:2px solid;vertical-align:4px;margin-right:6px}
+.legend i.lg-crit{border-color:var(--accent)}
+.legend i.lg-met{border-color:var(--muted)}
+.legend i.lg-wait{border-color:var(--edge)}
 
 /* detail sheet */
 .scrim{position:fixed;inset:0;background:var(--scrim);z-index:10}
@@ -419,16 +429,24 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .sheet .body{flex:1;overflow-y:auto;padding:18px 20px 12px;display:flex;flex-direction:column;gap:18px}
 .sheet h2{font-size:18px;line-height:1.4}
 .sheet .bar h2{font-size:15px}
+.sheet .bar .spacer{margin-left:auto}
 .setform{display:flex;flex-direction:column;gap:14px}
 .setform label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
 .setform input,.setform textarea{width:100%;font-weight:400;color:var(--ink)}
 .setform textarea{min-height:110px;font-family:var(--f-mono);font-size:13px}
 .setform .hint2{font-size:12.5px;font-weight:400;color:var(--muted);line-height:1.5}
+.setform .fineprint{font-size:12.5px}
 .fields{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px 12px;align-items:center;font-size:13.5px}
 .fields .k{color:var(--muted);font-size:13px;font-weight:600}
 .fields select,.fields input{width:100%}
 .block{display:flex;flex-direction:column;gap:6px}
 .block h3{font-size:13px;color:var(--muted);font-weight:600}
+.block h3.summary-head{display:flex;gap:8px;align-items:baseline}
+.summary-head .summary-at{font-weight:400}
+.sheet-tags{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.deps-pending{color:var(--warn);font-size:13.5px}
+.claim-line{font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tell{font-size:13px;display:inline-flex;gap:6px;align-items:center}
 .block .pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .deplist{display:flex;flex-wrap:wrap;gap:6px}
 .deplist button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:2px 8px;font-size:13px}
@@ -437,12 +455,14 @@ body[data-view="kanban"] .toolbar{left:0;align-self:flex-start;width:var(--vw);m
 .msg.agent{background:var(--agent-soft);border-color:transparent}
 .msg.new{box-shadow:inset 3px 0 0 var(--accent)}
 .msg .h{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.msg .h .new-mark{color:var(--accent);font-weight:600}
 .msg .text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 .type{font-size:11.5px;font-weight:600;padding:0 6px;border-radius:4px;line-height:19px;color:var(--text2);background:var(--sunk)}
 .type.question{color:var(--warn);background:var(--warn-soft)}
 .type.blocker{color:var(--danger);background:var(--danger-soft)}
 .type.handoff{color:var(--accent);background:var(--accent-soft)}
 .sheet .composer{border-top:1px solid var(--line-soft);padding:12px 20px 16px;display:flex;flex-direction:column;gap:8px}
+.composer .send-hint{font-size:12px}
 .err{color:var(--danger);font-size:13px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:20;background:var(--ink);color:var(--surface);border-radius:8px;padding:8px 14px;font-size:13.5px;max-width:calc(100% - 32px)}
 
@@ -551,7 +571,7 @@ td.what .overlap{margin-left:8px}
   h1{font-size:24px}
   .box,.lane{padding:16px}
   .toolbar{position:static}
-  .feed li,.activity li{grid-template-columns:1fr}
+  .feed li,.activity li{grid-template-columns:minmax(0,1fr)}
   .feed .at{flex-direction:row;flex-wrap:wrap;align-items:center}
 }
 @media (prefers-reduced-motion:reduce){.node,.graph path.e,.cnode,.cmap-pic .e{transition:none}.agent-mark.live::before{animation:none}}
@@ -652,8 +672,8 @@ td.what .overlap{margin-left:8px}
       <section aria-labelledby="h-kanban">
         <div class="sec-head"><h2 id="h-kanban"></h2><p id="kanbanSub"></p></div>
         <div class="kanban" id="kanban"></div>
-        <button type="button" class="side" id="kanbanPrev" hidden></button>
-        <button type="button" class="side" id="kanbanNext" hidden></button>
+        <button type="button" class="pan" id="kanbanPrev" hidden></button>
+        <button type="button" class="pan" id="kanbanNext" hidden></button>
       </section>
     </div>
 
@@ -665,8 +685,8 @@ td.what .overlap{margin-left:8px}
           <div class="legend" id="glegend"></div>
         </div>
         <div class="graph-wrap" id="graphWrap" tabindex="0"></div>
-        <button type="button" class="side" id="graphPrev" hidden></button>
-        <button type="button" class="side" id="graphNext" hidden></button>
+        <button type="button" class="pan" id="graphPrev" hidden></button>
+        <button type="button" class="pan" id="graphNext" hidden></button>
       </section>
     </div>
   </div>
@@ -891,7 +911,7 @@ td.what .overlap{margin-left:8px}
       startShort: 'start {d} passed',
       h_graph: 'Dependency graph',
       graphSub:
-        'A column unlocks when the columns to its left are done. Hover a task to keep only what it depends on and unlocks.',
+        'A column unlocks when the columns to its left are done. Hover a task to keep only what it depends on and unlocks. Zoom with ⌘ or Ctrl and the wheel.',
       nowSub: 'In progress {a} · review {b} · blocked {c}',
       noneYet: 'Nothing claimed yet',
       meTag: 'me',
@@ -1210,7 +1230,8 @@ td.what .overlap{margin-left:8px}
       waitShort: '선행 {k}',
       startShort: '{d} 착수 지남',
       h_graph: '선행 그래프',
-      graphSub: '왼쪽 단계가 끝나야 오른쪽이 풀려요. 태스크에 마우스를 올리면 앞뒤로 이어진 것만 남아요.',
+      graphSub:
+        '왼쪽 단계가 끝나야 오른쪽이 풀려요. 태스크에 마우스를 올리면 앞뒤로 이어진 것만 남아요. ⌘ 또는 Ctrl+휠로 확대·축소해요.',
       nowSub: '진행 중 {a} · 검토 {b} · 막힘 {c}',
       noneYet: '아직 집은 일 없음',
       meTag: '나',
@@ -2085,6 +2106,10 @@ td.what .overlap{margin-left:8px}
     });
     return n;
   }
+  // every button on the page is a plain button: none sits in a form it could submit
+  function button(a, kids) {
+    return el('button', Object.assign({ type: 'button' }, a), kids);
+  }
   var SVGNS = 'http://www.w3.org/2000/svg';
   function svgEl(tag, a, kids) {
     var n = document.createElementNS(SVGNS, tag);
@@ -2093,6 +2118,35 @@ td.what .overlap{margin-left:8px}
       n.appendChild(c);
     });
     return n;
+  }
+  // the page's line icons, 14 px in the text's color: one or two card columns, and the sideways arrows
+  var ICONS = {
+    one: [['rect', { x: 3.5, y: 2.5, width: 7, height: 9, rx: 1.5 }]],
+    two: [
+      ['rect', { x: 1.5, y: 2.5, width: 4.5, height: 9, rx: 1.2 }],
+      ['rect', { x: 8, y: 2.5, width: 4.5, height: 9, rx: 1.2 }]
+    ],
+    left: [['path', { d: 'M8.5 3.5 5 7l3.5 3.5' }]],
+    right: [['path', { d: 'M5.5 3.5 9 7l-3.5 3.5' }]]
+  };
+  function icon(name, weight) {
+    return svgEl(
+      'svg',
+      {
+        width: 14,
+        height: 14,
+        viewBox: '0 0 14 14',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': weight || 1.5,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        'aria-hidden': 'true'
+      },
+      ICONS[name].map(function (shape) {
+        return svgEl(shape[0], shape[1]);
+      })
+    );
   }
   function $(id) {
     return document.getElementById(id);
@@ -2140,6 +2194,11 @@ td.what .overlap{margin-left:8px}
   }
   function knownStatus(t) {
     return STATUS.indexOf(t.status) >= 0 ? t.status : 'todo';
+  }
+  function countStatus(list, s) {
+    return list.filter(function (t) {
+      return knownStatus(t) === s;
+    }).length;
   }
   function statusLabel(s) {
     var l = T('st_' + s);
@@ -2319,7 +2378,7 @@ td.what .overlap{margin-left:8px}
   }
   function prEls(t) {
     return prLinks(t).map(function (l) {
-      return el('a', { href: l.href, target: '_blank', rel: 'noopener', style: 'font-size:13px', text: l.text + ' ↗' });
+      return el('a', { href: l.href, target: '_blank', rel: 'noopener', class: 'prlink', text: l.text + ' ↗' });
     });
   }
 
@@ -2342,9 +2401,27 @@ td.what .overlap{margin-left:8px}
       renderView();
     });
   });
+  // the click handler of anything that stands for a task: it opens the task's sheet
+  function opens(t) {
+    return function () {
+      openSheet(t.id);
+    };
+  }
+  function titleOf(t) {
+    return t.title || T('untitled');
+  }
+  function loadingText() {
+    return failed || T('loading');
+  }
+  function emptyNote(text) {
+    return el('p', { class: 'empty', text: text });
+  }
+  // a list's one line when it has nothing (or nothing yet) to show, under the column the dates take
+  function emptyItem(text) {
+    return el('li', {}, [el('span', {}), el('span', { class: 'empty', text: text })]);
+  }
   function moreBtn(on, n, toggle) {
-    return el('button', {
-      type: 'button',
+    return button({
       class: 'morebtn',
       'aria-expanded': String(on),
       text: on ? T('showLess') : T('moreN', { n: n }),
@@ -2419,6 +2496,18 @@ td.what .overlap{margin-left:8px}
         });
       })
       .catch(refused);
+  }
+  // a write that did not go through: a toast with the code it failed on (saveFail, postFail or claimFail)
+  function writeFailed(e, what) {
+    toast(T(what || 'saveFail', { e: errText(e) }));
+    refused(e);
+  }
+  // messages and notices are named by when they were written and by whom
+  function writtenId(at) {
+    return at.replace(/:/g, '-') + '-' + me;
+  }
+  function postNotice(at, text) {
+    return db.doc('notices/n-' + writtenId(at)).set({ at: at, author: me, kind: 'human', type: 'note', text: text });
   }
   // a viewer the platform said nothing about finds out on the first refused write; from then on the page is read-only
   function refused(e) {
@@ -2522,22 +2611,14 @@ td.what .overlap{margin-left:8px}
     $('readAll').textContent = T('readAll');
     $('noticeRead').textContent = T('noticeRead');
     kbdText($('hint'), T('hint'));
+    // each section's heading and the line under it; the now section's line counts, so renderNow writes it
     ['now', 'activity', 'people', 'items', 'codemap', 'notices', 'notes', 'rules', 'guide', 'kanban', 'graph'].forEach(
       function (k) {
         $('h-' + k).textContent = T('h_' + k);
+        if (k !== 'now') $(k + 'Sub').textContent = T(k + 'Sub');
       }
     );
-    $('activitySub').textContent = T('activitySub');
     renderTheme();
-    $('peopleSub').textContent = T('peopleSub');
-    $('itemsSub').textContent = T('itemsSub');
-    $('noticesSub').textContent = T('noticesSub');
-    $('rulesSub').textContent = T('rulesSub');
-    $('notesSub').textContent = T('notesSub');
-    $('guideSub').textContent = T('guideSub');
-    $('codemapSub').textContent = T('codemapSub');
-    $('kanbanSub').textContent = T('kanbanSub');
-    $('graphSub').textContent = T('graphSub');
     SIDES.forEach(function (key) {
       [$(key + 'Prev'), $(key + 'Next')].forEach(function (b, i) {
         b.title = T(i ? 'sideNext' : 'sidePrev');
@@ -2556,8 +2637,7 @@ td.what .overlap{margin-left:8px}
     s.setAttribute('aria-label', T('theme'));
     THEMES.forEach(function (v) {
       s.appendChild(
-        el('button', {
-          type: 'button',
+        button({
           'aria-pressed': String(v === cur),
           text: T('th_' + v),
           onclick: function () {
@@ -2591,8 +2671,7 @@ td.what .overlap{margin-left:8px}
       var on = sort.by === by;
       th.appendChild(
         el('th', { 'aria-sort': on ? (sort.dir === 'desc' ? 'descending' : 'ascending') : null }, [
-          el('button', {
-            type: 'button',
+          button({
             title: T('sortBy', { c: x }),
             text: x,
             onclick: function () {
@@ -2645,9 +2724,7 @@ td.what .overlap{margin-left:8px}
     }
     people.forEach(function (p) {
       if (uid && uidOf(p.id)) return;
-      ms.appendChild(
-        el('button', { type: 'button', 'data-me': p.id, 'aria-pressed': String(p.id === me), text: p.name || p.id })
-      );
+      ms.appendChild(button({ 'data-me': p.id, 'aria-pressed': String(p.id === me), text: p.name || p.id }));
     });
   }
 
@@ -2793,13 +2870,12 @@ td.what .overlap{margin-left:8px}
       .update(patch, o)
       .then(function () {
         return db
-          .doc('tasks/' + t.id + '/messages/' + at.replace(/:/g, '-') + '-' + me)
+          .doc('tasks/' + t.id + '/messages/' + writtenId(at))
           .set({ at: at, author: me, kind: 'human', type: 'update', text: bits.join(' · ') + (extra || '') });
       })
       .catch(function (e) {
         if (e && e.code === 'version_conflict' && typeof ifVersion === 'number') return 'stale';
-        toast(T('saveFail', { e: errText(e) }));
-        refused(e);
+        writeFailed(e);
         return false;
       });
   }
@@ -2811,8 +2887,7 @@ td.what .overlap{margin-left:8px}
       bs = [];
     function addAction(label, patch, primary, extra) {
       bs.push(
-        el('button', {
-          type: 'button',
+        button({
           class: 'btn small' + (primary ? ' primary' : ''),
           text: label,
           onclick: function (e) {
@@ -2834,8 +2909,7 @@ td.what .overlap{margin-left:8px}
     } else if (statusOf(t) === 'todo' && !t.claimedBy && (!h || h === me)) {
       if (!unmet(t).length)
         bs.push(
-          el('button', {
-            type: 'button',
+          button({
             class: 'btn small primary',
             text: T('act_claim'),
             onclick: function (e) {
@@ -2851,7 +2925,7 @@ td.what .overlap{margin-left:8px}
       addAction(T('act_release'), { status: 'todo' });
     }
     if (h && h !== me && s !== 'done') {
-      var tk = el('button', { type: 'button', class: 'btn small', text: T('act_take', { p: personName(h) }) });
+      var tk = button({ class: 'btn small', text: T('act_take', { p: personName(h) }) });
       tk.addEventListener('click', function () {
         if (!tk.dataset.sure) {
           tk.dataset.sure = '1';
@@ -2878,10 +2952,7 @@ td.what .overlap{margin-left:8px}
     return db
       .doc('tasks/' + id)
       .update(patch)
-      .catch(function (e) {
-        toast(T('saveFail', { e: errText(e) }));
-        refused(e);
-      });
+      .catch(writeFailed);
   }
 
   // ---------- header and toolbar ----------
@@ -2901,7 +2972,7 @@ td.what .overlap{margin-left:8px}
       c[knownStatus(t)]++;
     });
     $('mCount').textContent = !loaded
-      ? failed || T('loading')
+      ? loadingText()
       : T('tasksCount', { n: allTasks.length, d: c.done }) +
         (archived.length ? ' · ' + T('archivedCount', { n: archived.length }) : '');
     var last = tasks
@@ -2919,6 +2990,17 @@ td.what .overlap{margin-left:8px}
     bk.hidden = !window.AB_PROJECT;
     bk.textContent = T('back');
     $('setBtn').hidden = !loaded || !writable();
+    renderRepos();
+    var unread = notices.filter(noticeNew).length;
+    $('noticesN').textContent = unread ? T('newN', { n: unread }) : '';
+    $('itemsN').textContent = loaded ? T('total', { n: tasks.length }) : '';
+    var lv = $('mLive');
+    lv.hidden = live == null || !loaded;
+    lv.textContent = live ? T('live') : T('offline');
+    lv.className = 'live' + (live ? '' : ' off');
+    renderProgress(c);
+  }
+  function renderRepos() {
     var rb = $('repos'),
       rs = repoList();
     rb.textContent = '';
@@ -2932,13 +3014,9 @@ td.what .overlap{margin-left:8px}
         )
       );
     });
-    var unread = notices.filter(noticeNew).length;
-    $('noticesN').textContent = unread ? T('newN', { n: unread }) : '';
-    $('itemsN').textContent = loaded ? T('total', { n: tasks.length }) : '';
-    var lv = $('mLive');
-    lv.hidden = live == null || !loaded;
-    lv.textContent = live ? T('live') : T('offline');
-    lv.className = 'live' + (live ? '' : ' off');
+  }
+  // the bar of the board's tasks by status, and its legend with the counts (c: tasks per status)
+  function renderProgress(c) {
     var p = $('progress');
     p.textContent = '';
     var lg = $('legend');
@@ -3088,9 +3166,7 @@ td.what .overlap{margin-left:8px}
         return t.owner === p.id;
       });
       var n = function (s) {
-        return held.filter(function (t) {
-          return knownStatus(t) === s;
-        }).length;
+        return countStatus(held, s);
       };
       var bits = [];
       ['doing', 'review', 'blocked'].forEach(function (s) {
@@ -3125,14 +3201,11 @@ td.what .overlap{margin-left:8px}
     return row;
   }
   function titleButton(t) {
-    return el('button', {
-      type: 'button',
+    return button({
       class: 't',
-      text: t.title || T('untitled'),
+      text: titleOf(t),
       title: t.title || '',
-      onclick: function () {
-        openSheet(t.id);
-      }
+      onclick: opens(t)
     });
   }
   // a few rows, the rest behind "more"; which lists stay open is kept in nowExpanded by name
@@ -3183,8 +3256,7 @@ td.what .overlap{margin-left:8px}
         dateChip(t)
       ]),
       me && writable()
-        ? el('button', {
-            type: 'button',
+        ? button({
             class: 'btn small',
             text: T('claim', { p: personName(me) }),
             title: T('claimTitle', { p: personName(me) }),
@@ -3198,26 +3270,24 @@ td.what .overlap{margin-left:8px}
   function renderNow() {
     var box = $('now');
     box.textContent = '';
-    var count = function (s) {
-      return tasks.filter(function (t) {
-        return knownStatus(t) === s;
-      }).length;
-    };
     var late = tasks.filter(function (t) {
       var a = attention(t);
       return a && a.o === 1;
     }).length;
     $('nowSub').textContent = loaded
-      ? T('nowSub', { a: count('doing'), b: count('review'), c: count('blocked') }) +
-        (late ? ' · ' + T('lateN', { n: late }) : '')
+      ? T('nowSub', {
+          a: countStatus(tasks, 'doing'),
+          b: countStatus(tasks, 'review'),
+          c: countStatus(tasks, 'blocked')
+        }) + (late ? ' · ' + T('lateN', { n: late }) : '')
       : '';
     if (!loaded) {
-      box.appendChild(el('p', { class: 'empty', text: failed || T('loading') }));
+      box.appendChild(emptyNote(loadingText()));
       return;
     }
     if (!tasks.length) {
-      box.appendChild(el('p', { class: 'empty', text: T('noTasks') }));
-      box.appendChild(el('p', { class: 'muted', style: 'font-size:13.5px', text: T('emptyHint') }));
+      box.appendChild(emptyNote(T('noTasks')));
+      box.appendChild(el('p', { class: 'muted aside', text: T('emptyHint') }));
       return;
     }
     box.appendChild(peopleRow());
@@ -3244,7 +3314,7 @@ td.what .overlap{margin-left:8px}
       el('div', { class: 'subhead' }, [T('ready'), el('span', { class: 'n', text: String(pickable.length) })])
     );
     if (!pickable.length) {
-      box.appendChild(el('p', { class: 'empty', text: T('readyNone') }));
+      box.appendChild(emptyNote(T('readyNone')));
       return;
     }
     nowRows('ready', 'rows ready', pickable, readyRow).forEach(function (n) {
@@ -3278,8 +3348,7 @@ td.what .overlap{margin-left:8px}
     }
     attempt(1)
       .catch(function (e) {
-        toast(T('claimFail', { e: errText(e) }));
-        refused(e);
+        writeFailed(e, 'claimFail');
       })
       .then(function () {
         btn.disabled = false;
@@ -3339,14 +3408,14 @@ td.what .overlap{margin-left:8px}
       return;
     }
     if (!loaded) {
-      ul.appendChild(el('li', {}, [el('span', {}), el('span', { class: 'empty', text: failed || T('loading') })]));
+      ul.appendChild(emptyItem(loadingText()));
       return;
     }
     var ids = recentIds();
     watchActivity(ids);
     $('activityN').textContent = ids.length ? String(ids.length) : '';
     if (!ids.length) {
-      ul.appendChild(el('li', {}, [el('span', {}), el('span', { class: 'empty', text: T('noActivity') })]));
+      ul.appendChild(emptyItem(T('noActivity')));
       return;
     }
     ids.forEach(function (id) {
@@ -3370,12 +3439,9 @@ td.what .overlap{margin-left:8px}
           el('div', {}, [
             el('div', { class: 'head' }, [
               el('span', { class: 'key', text: t.key }),
-              el('button', {
-                type: 'button',
-                text: t.title || T('untitled'),
-                onclick: function () {
-                  openSheet(t.id);
-                }
+              button({
+                text: titleOf(t),
+                onclick: opens(t)
               }),
               statusChip(knownStatus(t)),
               t.owner ? personChip(t.owner) : null,
@@ -3401,73 +3467,12 @@ td.what .overlap{margin-left:8px}
       var openList = openAll.filter(match).sort(function (a, b) {
         return ORDER[knownStatus(a)] - ORDER[knownStatus(b)] || byDue(a, b);
       });
-      var ul = el('ul', { class: 'todo' }),
-        all = filtering() || laneExpanded[p.id];
-      (all ? openList : openList.slice(0, LANE_MAX)).forEach(function (t) {
-        var u = unmet(t),
-          bits = [t.feature, t.repo];
-        if (u.length) bits.push(T('waitingDeps', { k: u.join(', ') }));
-        if (t.branch) bits.push(t.branch);
-        ul.appendChild(
-          el('li', {}, [
-            el('span', { class: 't' }, [
-              statusChip(knownStatus(t)),
-              el('span', { class: 'key', text: t.key }),
-              el('button', {
-                type: 'button',
-                class: 'link',
-                text: t.title || T('untitled'),
-                onclick: function () {
-                  openSheet(t.id);
-                }
-              }),
-              dateChip(t),
-              agentMark(t),
-              newDot(isNew(t))
-            ]),
-            el('span', { class: 'd', text: bits.filter(Boolean).join(' · ') })
-          ])
-        );
-      });
-      // done work stays folded under the lane, newest first, with the day it was finished
+      var all = filtering() || laneExpanded[p.id];
       var doneList = mine
         .filter(function (t) {
           return knownStatus(t) === 'done' && match(t);
         })
         .sort(byDone);
-      var foot = doneList.length
-        ? el(
-            'details',
-            {
-              class: 'done-list',
-              open: doneOpen[p.id] ? '' : null,
-              ontoggle: function (e) {
-                doneOpen[p.id] = e.currentTarget.open;
-              }
-            },
-            [
-              el('summary', { text: T('laneDone', { n: mine.length - openAll.length }) }),
-              el(
-                'ul',
-                {},
-                doneList.map(function (t) {
-                  return el('li', {}, [
-                    el('span', { class: 'key', text: t.key }),
-                    el('button', {
-                      type: 'button',
-                      class: 'link',
-                      text: t.title || T('untitled'),
-                      onclick: function () {
-                        openSheet(t.id);
-                      }
-                    }),
-                    dateChip(t)
-                  ]);
-                })
-              )
-            ]
-          )
-        : T('laneDone', { n: mine.length - openAll.length });
       root.appendChild(
         el('div', { class: 'lane' + personClass(p.id) }, [
           el('div', { class: 'head' }, [
@@ -3477,20 +3482,66 @@ td.what .overlap{margin-left:8px}
             el('span', { class: 'muted', text: T('laneOpen', { n: openAll.length }) })
           ]),
           !loaded
-            ? el('p', { class: 'empty', text: failed || T('loading') })
+            ? emptyNote(loadingText())
             : openList.length
-              ? ul
-              : el('p', { class: 'empty', text: openAll.length ? T('laneNoMatch') : T('laneEmpty') }),
+              ? el('ul', { class: 'todo' }, (all ? openList : openList.slice(0, LANE_MAX)).map(laneItem))
+              : emptyNote(openAll.length ? T('laneNoMatch') : T('laneEmpty')),
           !filtering() && openList.length > LANE_MAX
             ? moreBtn(!!laneExpanded[p.id], openList.length - LANE_MAX, function () {
                 laneExpanded[p.id] = !laneExpanded[p.id];
                 renderLanes();
               })
             : null,
-          el('div', { class: 'foot' }, [foot])
+          el('div', { class: 'foot' }, [laneDone(p, doneList, mine.length - openAll.length)])
         ])
       );
     });
+  }
+  // an open task in a person's lane: status, key and title, then its feature, repo, what it waits on and its branch
+  function laneItem(t) {
+    var u = unmet(t),
+      bits = [t.feature, t.repo];
+    if (u.length) bits.push(T('waitingDeps', { k: u.join(', ') }));
+    if (t.branch) bits.push(t.branch);
+    return el('li', {}, [
+      el('span', { class: 't' }, [
+        statusChip(knownStatus(t)),
+        el('span', { class: 'key', text: t.key }),
+        button({ class: 'link', text: titleOf(t), onclick: opens(t) }),
+        dateChip(t),
+        agentMark(t),
+        newDot(isNew(t))
+      ]),
+      el('span', { class: 'd', text: bits.filter(Boolean).join(' · ') })
+    ]);
+  }
+  // done work stays folded under the lane, newest first, with the day it was finished
+  function laneDone(p, doneList, n) {
+    if (!doneList.length) return T('laneDone', { n: n });
+    return el(
+      'details',
+      {
+        class: 'done-list',
+        open: doneOpen[p.id] ? '' : null,
+        ontoggle: function (e) {
+          doneOpen[p.id] = e.currentTarget.open;
+        }
+      },
+      [
+        el('summary', { text: T('laneDone', { n: n }) }),
+        el(
+          'ul',
+          {},
+          doneList.map(function (t) {
+            return el('li', {}, [
+              el('span', { class: 'key', text: t.key }),
+              button({ class: 'link', text: titleOf(t), onclick: opens(t) }),
+              dateChip(t)
+            ]);
+          })
+        )
+      ]
+    );
   }
 
   function renderTable() {
@@ -3498,6 +3549,41 @@ td.what .overlap{margin-left:8px}
     if (loaded && featureFilter !== 'all' && fs.indexOf(featureFilter) < 0) featureFilter = 'all';
     // done work stays out of the table until asked for, except while searching or showing what is new
     var hideDone = !showDone && !searchText && !newOnly;
+    featureChips(fs, hideDone);
+    var body = $('rows');
+    body.textContent = '';
+    order = [];
+    if (!loaded) {
+      body.appendChild(tableNote(loadingText()));
+      return;
+    }
+    (featureFilter === 'all' ? fs : [featureFilter]).forEach(function (f) {
+      var all = tasks.filter(function (t) {
+        return featOf(t) === f;
+      });
+      var hits = sorted(all.filter(match));
+      if (!hits.length) return;
+      var list = hideDone
+          ? hits.filter(function (t) {
+              return knownStatus(t) !== 'done';
+            })
+          : hits,
+        shut = !!groupFold[f] && !filtering();
+      body.appendChild(groupRow(f, all, hits.length - list.length, shut));
+      if (shut) return;
+      list.forEach(function (t) {
+        order.push(t.id);
+        body.appendChild(itemRow(t));
+      });
+    });
+    if (!body.children.length) body.appendChild(tableNote(T('noMatch')));
+  }
+  // one line across the table: loading, or nothing matches
+  function tableNote(text) {
+    return el('tr', {}, [el('td', { colspan: '7', class: 'empty', text: text })]);
+  }
+  // a chip per feature with how many of its tasks show, and the switch that shows done work
+  function featureChips(fs, hideDone) {
     var fr = $('filters');
     fr.textContent = '';
     ['all'].concat(fs).forEach(function (f) {
@@ -3513,8 +3599,7 @@ td.what .overlap{margin-left:8px}
           return !hideDone || knownStatus(t) !== 'done';
         }).length;
       fr.appendChild(
-        el('button', {
-          type: 'button',
+        button({
           class: 'chip',
           'aria-pressed': String(featureFilter === f),
           text: (f === 'all' ? T('all') : f) + ' ' + n,
@@ -3527,13 +3612,10 @@ td.what .overlap{margin-left:8px}
         })
       );
     });
-    var doneN = tasks.filter(function (t) {
-      return knownStatus(t) === 'done';
-    }).length;
+    var doneN = countStatus(tasks, 'done');
     if (doneN)
       fr.appendChild(
-        el('button', {
-          type: 'button',
+        button({
           class: 'chip toggle',
           'aria-pressed': String(showDone),
           text: T('showDone', { n: doneN }),
@@ -3545,106 +3627,78 @@ td.what .overlap{margin-left:8px}
           }
         })
       );
-    var body = $('rows');
-    body.textContent = '';
-    order = [];
-    if (!loaded) {
-      body.appendChild(el('tr', {}, [el('td', { colspan: '7', class: 'empty', text: failed || T('loading') })]));
-      return;
-    }
-    (featureFilter === 'all' ? fs : [featureFilter]).forEach(function (f) {
-      var all = tasks.filter(function (t) {
-        return featOf(t) === f;
-      });
-      var hits = sorted(all.filter(match));
-      if (!hits.length) return;
-      var list = hideDone
-          ? hits.filter(function (t) {
-              return knownStatus(t) !== 'done';
+  }
+  // a feature's header row, which folds the group: its name, how much is done and how much done work is hidden
+  function groupRow(f, all, hidden, shut) {
+    return el('tr', { class: 'group' }, [
+      el('th', { colspan: '7', scope: 'colgroup' }, [
+        button(
+          {
+            class: 'fold',
+            'aria-expanded': String(!shut),
+            onclick: function () {
+              if (groupFold[f]) delete groupFold[f];
+              else groupFold[f] = 1;
+              write('ab-groups', JSON.stringify(groupFold));
+              renderTable();
+              applyCursor();
+            }
+          },
+          [
+            el('span', { class: 'gname', text: f }),
+            el('span', {
+              class: 'n',
+              text:
+                T('doneOf', { d: countStatus(all, 'done'), n: all.length }) +
+                (hidden ? ' · ' + T('doneHidden', { n: hidden }) : '')
             })
-          : hits,
-        hidden = hits.length - list.length;
-      var dn = all.filter(function (t) {
-          return knownStatus(t) === 'done';
-        }).length,
-        shut = !!groupFold[f] && !filtering();
-      body.appendChild(
-        el('tr', { class: 'group' }, [
-          el('th', { colspan: '7', scope: 'colgroup' }, [
-            el(
-              'button',
-              {
-                type: 'button',
-                class: 'fold',
-                'aria-expanded': String(!shut),
-                onclick: function () {
-                  if (groupFold[f]) delete groupFold[f];
-                  else groupFold[f] = 1;
-                  write('ab-groups', JSON.stringify(groupFold));
-                  renderTable();
-                  applyCursor();
-                }
-              },
-              [
-                el('span', { class: 'gname', text: f }),
-                el('span', {
-                  class: 'n',
-                  text: T('doneOf', { d: dn, n: all.length }) + (hidden ? ' · ' + T('doneHidden', { n: hidden }) : '')
-                })
-              ]
-            )
-          ])
-        ])
-      );
-      if (shut) return;
-      list.forEach(function (t) {
-        order.push(t.id);
-        var u = unmet(t),
-          ds = t.deps || [];
-        var deps = ds.length
-          ? el(
-              'span',
-              {},
-              ds.map(function (k, i) {
-                return el('span', {
-                  class: u.indexOf(k) >= 0 && knownStatus(t) !== 'done' ? 'wait' : 'ok',
-                  text: (i ? ', ' : '') + k
-                });
-              })
-            )
-          : el('span', { class: 'ok', text: T('none') });
-        body.appendChild(
-          el(
-            'tr',
-            {
-              class: 'item',
-              'data-k': t.id,
-              'aria-current': String(openId === t.id),
-              onclick: function () {
-                openSheet(t.id);
-              }
-            },
-            [
-              el('td', { class: 'keycell' }, [el('span', { class: 'key', text: t.key }), newDot(isNew(t))]),
-              el('td', { class: 'what' }, [
-                el('button', { type: 'button', text: t.title || T('untitled') }),
-                overlapFlag(t),
-                t.repo || t.branch
-                  ? el('span', { class: 'sub' }, [repoTag(t), t.repo && t.branch ? ' ' : null, t.branch || null])
-                  : null
-              ]),
-              el('td', { class: 'deps' }, [deps]),
-              el('td', {}, [personChip(t.owner), ' ', agentMark(t)]),
-              el('td', {}, [statusChip(knownStatus(t))]),
-              el('td', { class: 'date' }, [dateCell(t)]),
-              el('td', { class: 'when', text: ago(lastTouch(t)) })
-            ]
-          )
-        );
-      });
-    });
-    if (!body.children.length)
-      body.appendChild(el('tr', {}, [el('td', { colspan: '7', class: 'empty', text: T('noMatch') })]));
+          ]
+        )
+      ])
+    ]);
+  }
+  function itemRow(t) {
+    return el(
+      'tr',
+      {
+        class: 'item',
+        'data-k': t.id,
+        'aria-current': String(openId === t.id),
+        onclick: opens(t)
+      },
+      [
+        el('td', { class: 'keycell' }, [el('span', { class: 'key', text: t.key }), newDot(isNew(t))]),
+        el('td', { class: 'what' }, [
+          button({ text: titleOf(t) }),
+          overlapFlag(t),
+          t.repo || t.branch
+            ? el('span', { class: 'sub' }, [repoTag(t), t.repo && t.branch ? ' ' : null, t.branch || null])
+            : null
+        ]),
+        el('td', { class: 'deps' }, [depsCell(t)]),
+        el('td', {}, [personChip(t.owner), ' ', agentMark(t)]),
+        el('td', {}, [statusChip(knownStatus(t))]),
+        el('td', { class: 'date' }, [dateCell(t)]),
+        el('td', { class: 'when', text: ago(lastTouch(t)) })
+      ]
+    );
+  }
+  // a task's dependencies, the ones still unfinished marked
+  function depsCell(t) {
+    var u = unmet(t),
+      ds = t.deps || [];
+    return ds.length
+      ? el(
+          'span',
+          {},
+          ds.map(function (k, i) {
+            return el('span', {
+              class: u.indexOf(k) >= 0 && knownStatus(t) !== 'done' ? 'wait' : 'ok',
+              text: (i ? ', ' : '') + k
+            });
+          })
+        )
+      : el('span', { class: 'ok', text: T('none') });
   }
 
   function renderFeed() {
@@ -3653,26 +3707,12 @@ td.what .overlap{margin-left:8px}
       draft = keep ? keep.value : '',
       hadFocus = keep && document.activeElement === keep;
     ul.textContent = '';
-    if (!loaded)
-      ul.appendChild(el('li', {}, [el('span', {}), el('span', { class: 'empty', text: failed || T('loading') })]));
-    else if (!notices.length)
-      ul.appendChild(el('li', {}, [el('span', {}), el('span', { class: 'empty', text: T('noNotices') })]));
+    if (!loaded) ul.appendChild(emptyItem(loadingText()));
+    else if (!notices.length) ul.appendChild(emptyItem(T('noNotices')));
     var unread = notices.filter(noticeNew).length,
       shown = noticesAll ? notices : notices.slice(0, Math.max(3, unread));
     shown.forEach(function (n) {
-      var nw = noticeNew(n);
-      ul.appendChild(
-        el('li', { class: nw ? 'new' : null }, [
-          el('div', { class: 'at' }, [
-            el('span', { style: 'display:flex;align-items:center;gap:6px' }, [stamp(n.at), newDot(nw)]),
-            el('span', { style: 'display:flex;gap:4px;flex-wrap:wrap' }, [
-              personChip(n.author),
-              n.kind === 'agent' ? el('span', { class: 'agent-mark', text: T('agent') }) : null
-            ])
-          ]),
-          el('div', { class: 'text', text: n.text || '' })
-        ])
-      );
+      ul.appendChild(noticeItem(n));
     });
     var canPost = loaded && writable() && me,
       more = notices.length > 3 && (noticesAll || shown.length < notices.length);
@@ -3680,8 +3720,7 @@ td.what .overlap{margin-left:8px}
       ul.appendChild(
         el('li', { class: 'more' }, [
           more
-            ? el('button', {
-                type: 'button',
+            ? button({
                 class: 'linkbtn',
                 text: noticesAll ? T('showLess') : T('showAll', { n: notices.length }),
                 onclick: function () {
@@ -3691,8 +3730,7 @@ td.what .overlap{margin-left:8px}
               })
             : null,
           canPost && !composing && !draft
-            ? el('button', {
-                type: 'button',
+            ? button({
                 class: 'btn small',
                 text: T('writeNotice'),
                 onclick: function () {
@@ -3706,46 +3744,61 @@ td.what .overlap{margin-left:8px}
         ])
       );
     if (canPost && (composing || draft)) {
-      var ta = el('textarea', {
-        id: 'noticeText',
-        'aria-label': T('noticeBtn'),
-        placeholder: T('noticePh', { p: personName(me) })
-      });
-      ta.value = draft;
-      var btn = el('button', { type: 'button', class: 'btn primary', text: T('noticeBtn') });
-      btn.addEventListener('click', function () {
-        var v = ta.value.trim();
-        if (!v) return;
-        btn.disabled = true;
-        var at = now();
-        db.doc('notices/n-' + at.replace(/:/g, '-') + '-' + me)
-          .set({ at: at, author: me, kind: 'human', type: 'note', text: v })
-          .then(function () {
-            ta.value = '';
-            composing = false;
-            renderFeed();
-          })
-          .catch(function (e) {
-            toast(T('postFail', { e: errText(e) }));
-            refused(e);
-          })
-          .then(function () {
-            btn.disabled = false;
-          });
-      });
-      var cancel = el('button', {
-        type: 'button',
-        class: 'btn',
-        text: T('cancel'),
-        onclick: function () {
+      ul.appendChild(noticeForm(draft));
+      if (hadFocus) $('noticeText').focus();
+    }
+  }
+  // a notice: when and by whom, then its text; one the viewer has not seen is marked
+  function noticeItem(n) {
+    var nw = noticeNew(n);
+    return el('li', { class: nw ? 'new' : null }, [
+      el('div', { class: 'at' }, [
+        el('span', { class: 'when' }, [stamp(n.at), newDot(nw)]),
+        el('span', { class: 'by' }, [
+          personChip(n.author),
+          n.kind === 'agent' ? el('span', { class: 'agent-mark', text: T('agent') }) : null
+        ])
+      ]),
+      el('div', { class: 'text', text: n.text || '' })
+    ]);
+  }
+  // writing a notice, with the draft that was there before a redraw
+  function noticeForm(draft) {
+    var ta = el('textarea', {
+      id: 'noticeText',
+      'aria-label': T('noticeBtn'),
+      placeholder: T('noticePh', { p: personName(me) })
+    });
+    ta.value = draft;
+    var btn = button({ class: 'btn primary', text: T('noticeBtn') });
+    btn.addEventListener('click', function () {
+      var v = ta.value.trim();
+      if (!v) return;
+      btn.disabled = true;
+      var at = now();
+      postNotice(at, v)
+        .then(function () {
           ta.value = '';
           composing = false;
           renderFeed();
-        }
-      });
-      ul.appendChild(el('li', { class: 'form' }, [warnLine(), ta, el('div', { class: 'form-row' }, [btn, cancel])]));
-      if (hadFocus) ta.focus();
-    }
+        })
+        .catch(function (e) {
+          writeFailed(e, 'postFail');
+        })
+        .then(function () {
+          btn.disabled = false;
+        });
+    });
+    var cancel = button({
+      class: 'btn',
+      text: T('cancel'),
+      onclick: function () {
+        ta.value = '';
+        composing = false;
+        renderFeed();
+      }
+    });
+    return el('li', { class: 'form' }, [warnLine(), ta, el('div', { class: 'form-row' }, [btn, cancel])]);
   }
 
   // numbered sections ("1. Roles") with "- " bullets become cards; lines before the first number are an intro card
@@ -3834,73 +3887,58 @@ td.what .overlap{margin-left:8px}
       if (shut || (d.editing && $(tid))) return;
       body.textContent = '';
       if (!db) {
-        body.appendChild(el('p', { class: 'empty', text: failed || T('loading') }));
+        body.appendChild(emptyNote(loadingText()));
         return;
       }
       if (d.editing) {
-        var ta = el('textarea', { id: tid, 'aria-label': T('h_' + k) });
-        ta.value = d.draft != null ? d.draft : (own || legacy || {}).text || '';
-        ta.addEventListener('input', function () {
-          d.draft = ta.value;
-        });
-        var tell = el('input', { type: 'checkbox', checked: tellByDefault ? '' : null });
-        var ok = el('button', { type: 'button', class: 'btn primary small', text: T('save') });
-        ok.addEventListener('click', function () {
-          var rev = ((d.doc && d.doc.rev) || 0) + 1,
-            at = now();
-          ok.disabled = true;
-          db.doc(path)
-            .set({ text: ta.value.trim(), rev: rev, updatedAt: at, by: me || null })
-            .then(function () {
-              d.editing = false;
-              d.draft = null;
-              render();
-              if (tell.checked && me)
-                return db
-                  .doc('notices/n-' + at.replace(/:/g, '-') + '-' + me)
-                  .set({ at: at, author: me, kind: 'human', type: 'note', text: T(k + 'Changed', { r: rev }) });
-            })
-            .catch(function (e) {
-              ok.disabled = false;
-              toast(T('saveFail', { e: errText(e) }));
-              refused(e);
-            });
-        });
-        var cancel = el('button', {
-          type: 'button',
-          class: 'btn small',
-          text: T('cancel'),
-          onclick: function () {
-            d.editing = false;
-            d.draft = null;
-            render();
-          }
-        });
-        body.appendChild(
-          el('div', { class: 'block' }, [
-            warnLine(),
-            ta,
-            el('div', { class: 'form-row' }, [
-              ok,
-              cancel,
-              me
-                ? el(
-                    'label',
-                    { class: 'muted', style: 'font-size:13px;display:inline-flex;gap:6px;align-items:center' },
-                    [tell, T('tellAll')]
-                  )
-                : null
-            ])
-          ])
-        );
+        body.appendChild(editor((own || legacy || {}).text || ''));
         return;
       }
       if (!own && !legacy) {
-        body.appendChild(el('p', { class: 'empty', text: d.loaded && d.oldLoaded ? T(k + 'Empty') : T('loading') }));
+        body.appendChild(emptyNote(d.loaded && d.oldLoaded ? T(k + 'Empty') : T('loading')));
         return;
       }
       if (legacy) body.appendChild(el('p', { class: 'rules-note', text: T('rulesLegacy') }));
       body.appendChild(el('div', { class: 'rules' }, ruleCards((own || legacy).text)));
+    }
+    function stopEditing() {
+      d.editing = false;
+      d.draft = null;
+      render();
+    }
+    // the text with its draft, save (telling everyone in a notice when asked) and cancel
+    function editor(text) {
+      var ta = el('textarea', { id: tid, 'aria-label': T('h_' + k) });
+      ta.value = d.draft != null ? d.draft : text;
+      ta.addEventListener('input', function () {
+        d.draft = ta.value;
+      });
+      var tell = el('input', { type: 'checkbox', checked: tellByDefault ? '' : null });
+      var ok = button({ class: 'btn primary small', text: T('save') });
+      ok.addEventListener('click', function () {
+        var rev = ((d.doc && d.doc.rev) || 0) + 1,
+          at = now();
+        ok.disabled = true;
+        db.doc(path)
+          .set({ text: ta.value.trim(), rev: rev, updatedAt: at, by: me || null })
+          .then(function () {
+            stopEditing();
+            if (tell.checked && me) return postNotice(at, T(k + 'Changed', { r: rev }));
+          })
+          .catch(function (e) {
+            ok.disabled = false;
+            writeFailed(e);
+          });
+      });
+      return el('div', { class: 'block' }, [
+        warnLine(),
+        ta,
+        el('div', { class: 'form-row' }, [
+          ok,
+          button({ class: 'btn small', text: T('cancel'), onclick: stopEditing }),
+          me ? el('label', { class: 'muted tell' }, [tell, T('tellAll')]) : null
+        ])
+      ]);
     }
     $(k + 'Edit').addEventListener('click', function () {
       d.editing = true;
@@ -4050,8 +4088,7 @@ td.what .overlap{margin-left:8px}
       return el('span', { class: 'touch', title: touch }, [
         el('span', { text: touch }),
         editable
-          ? el('button', {
-              type: 'button',
+          ? button({
               'aria-label': T('removeTouch', { x: touch }),
               title: T('removeTouch', { x: touch }),
               text: '×',
@@ -4067,33 +4104,26 @@ td.what .overlap{margin-left:8px}
           : null
       ]);
     }
-    return el('div', { class: 'block code' }, [
-      el('h3', { text: T('touches') }),
+    return sheetBlock(T('touches'), 'code', [
       mine.length
         ? el('div', { class: 'touches' }, mine.map(chip))
-        : el('p', { class: 'muted', style: 'font-size:13.5px', text: T('touchesNone') }),
+        : el('p', { class: 'muted aside', text: T('touchesNone') }),
       overlaps.length
         ? el(
             'ul',
             { class: 'overlaps' },
             overlaps.map(function (overlap) {
               return el('li', {}, [
-                el('button', {
-                  type: 'button',
+                button({
                   text: overlapText(overlap),
-                  onclick: function () {
-                    openSheet(overlap.task.id);
-                  }
+                  onclick: opens(overlap.task)
                 })
               ]);
             })
           )
         : null,
       editable
-        ? el('div', { class: 'form-row' }, [
-            input,
-            el('button', { type: 'button', class: 'btn small', text: T('addTouch'), onclick: add })
-          ])
+        ? el('div', { class: 'form-row' }, [input, button({ class: 'btn small', text: T('addTouch'), onclick: add })])
         : null
     ]);
   }
@@ -4167,7 +4197,7 @@ td.what .overlap{margin-left:8px}
         id: active.getAttribute('data-id')
       };
     body.textContent = '';
-    if (!maps) body.appendChild(el('p', { class: 'empty', text: failed || T('loading') }));
+    if (!maps) body.appendChild(emptyNote(loadingText()));
     else if (!maps.length) body.appendChild(noMapYet());
     else {
       body.appendChild(el('div', { class: 'cmaps' }, maps.map(mapCard)));
@@ -4204,8 +4234,8 @@ td.what .overlap{margin-left:8px}
     var rs = repoList(),
       cmd = buildCommand(rs.length === 1 ? rs[0].repo : 'owner/name');
     return el('div', { class: 'cmap-none' }, [
-      el('p', { class: 'empty', text: T('codemapNone') }),
-      cmd ? el('p', { class: 'empty', text: T('codemapHow') }) : null,
+      emptyNote(T('codemapNone')),
+      cmd ? emptyNote(T('codemapHow')) : null,
       cmd ? el('code', { class: 'cmap-cmd', text: cmd }) : null
     ]);
   }
@@ -4320,8 +4350,7 @@ td.what .overlap{margin-left:8px}
         built,
         index.dirty === true ? el('span', { class: 'cmap-dirty', text: T('codemapDirty') }) : null,
         cmd
-          ? el('button', {
-              type: 'button',
+          ? button({
               class: 'linkbtn',
               text: T('codemapRebuild'),
               onclick: function () {
@@ -4396,10 +4425,8 @@ td.what .overlap{margin-left:8px}
     ids.forEach(function (id) {
       var n = card.graph.node(id);
       out.appendChild(
-        el(
-          'button',
+        button(
           {
-            type: 'button',
             class: 'cmap-hit',
             onclick: function () {
               card.input.value = '';
@@ -4987,8 +5014,8 @@ td.what .overlap{margin-left:8px}
     if (!scene && !card.graph && !card.loading && !card.error && db) loadMap(map, card);
     if (!scene) {
       card.svg = null;
-      card.svgWrap.appendChild(el('p', { class: 'empty', text: card.error || T('loading') }));
-    } else if (!scene.nodes.length) card.svgWrap.appendChild(el('p', { class: 'empty', text: T('codemapEmpty') }));
+      card.svgWrap.appendChild(emptyNote(card.error || T('loading')));
+    } else if (!scene.nodes.length) card.svgWrap.appendChild(emptyNote(T('codemapEmpty')));
     else {
       markTasks(scene, card.graph);
       var key = levelKey(level) + '|' + card.builtAt + '|' + W + '|' + scene.nodes.length;
@@ -5020,10 +5047,8 @@ td.what .overlap{margin-left:8px}
     // one level up, in the same place at every depth, so the way back needs no reading of the trail
     if (depth > 1)
       out.appendChild(
-        el(
-          'button',
+        button(
           {
-            type: 'button',
             class: 'back',
             title: levelLabel(map, card, card.trail[depth - 2]),
             onclick: function () {
@@ -5040,8 +5065,7 @@ td.what .overlap{margin-left:8px}
       out.appendChild(
         last
           ? el('b', { text: label, title: level.id || label })
-          : el('button', {
-              type: 'button',
+          : button({
               text: label,
               title: level.id || label,
               onclick: function () {
@@ -5058,8 +5082,7 @@ td.what .overlap{margin-left:8px}
     out.appendChild(zoom);
   }
   function zoomBtn(card, glyph, label, factor) {
-    return el('button', {
-      type: 'button',
+    return button({
       text: glyph,
       title: label,
       'aria-label': label,
@@ -5174,50 +5197,12 @@ td.what .overlap{margin-left:8px}
       'aria-label': T('codemapPicture', { n: scene.nodes.length, e: scene.edges.length })
     });
     card.svg = svg;
-    var defs = svgEl('defs');
-    ['', 'hi'].forEach(function (k) {
-      defs.appendChild(
-        svgEl(
-          'marker',
-          {
-            id: markerId + (k ? '-hi' : ''),
-            class: k,
-            viewBox: '0 0 8 8',
-            refX: '7',
-            refY: '4',
-            markerWidth: '7',
-            markerHeight: '7',
-            markerUnits: 'userSpaceOnUse',
-            orient: 'auto'
-          },
-          [svgEl('path', { d: 'M0 0.5L7 4L0 7.5Z' })]
-        )
-      );
-    });
-    svg.appendChild(defs);
+    svg.appendChild(sceneMarkers(markerId));
     var gEdges = svgEl('g', { class: 'edges' }),
       gNodes = svgEl('g', { class: 'nodes' });
     scene.edges.forEach(function (e) {
-      var a = lay.pos[e.a],
-        b = lay.pos[e.b];
-      if (!a || !b) return;
-      var dx = b[0] - a[0],
-        dy = b[1] - a[1],
-        d = Math.sqrt(dx * dx + dy * dy) || 1,
-        ra = lay.r[e.a] + 1,
-        rb = lay.r[e.b] + (GRAPH_DEPENDS[e.type] ? 4 : 1),
-        line = svgEl('line', {
-          class: 'e ' + e.type,
-          x1: a[0] + (dx / d) * ra,
-          y1: a[1] + (dy / d) * ra,
-          x2: b[0] - (dx / d) * rb,
-          y2: b[1] - (dy / d) * rb,
-          'stroke-width': (1 + (2.5 * Math.log(1 + (e.w || 1))) / Math.log(1 + maxW)).toFixed(2)
-        });
-      if (GRAPH_DEPENDS[e.type]) line.setAttribute('marker-end', 'url(#' + markerId + ')');
-      line.appendChild(
-        svgEl('title', {}, [document.createTextNode(e.a + ' —' + e.type + (e.w > 1 ? ' ×' + e.w : '') + '→ ' + e.b)])
-      );
+      var line = sceneEdge(e, lay, markerId, maxW);
+      if (!line) return;
       edgeEls.push({ el: line, a: e.a, b: e.b, arrow: !!GRAPH_DEPENDS[e.type] });
       gEdges.appendChild(line);
     });
@@ -5302,30 +5287,24 @@ td.what .overlap{margin-left:8px}
       g.addEventListener('blur', function () {
         light(false);
       });
-      g.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (card.dragged) return;
+      // the first choice selects the node and tells about it, the second opens it
+      function choose() {
         if (card.selected === n.id) drill(map, card, n.id);
         else {
           card.selected = n.id;
-          Object.keys(nodeEls).forEach(function (id) {
-            nodeEls[id].classList.toggle('sel', id === n.id);
-          });
+          markSelected(nodeEls, n.id);
           paintDetail(map, card);
         }
+      }
+      g.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!card.dragged) choose();
       });
       g.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           e.stopPropagation();
-          if (card.selected === n.id) drill(map, card, n.id);
-          else {
-            card.selected = n.id;
-            Object.keys(nodeEls).forEach(function (id) {
-              nodeEls[id].classList.toggle('sel', id === n.id);
-            });
-            paintDetail(map, card);
-          }
+          choose();
         }
       });
       nodeEls[n.id] = g;
@@ -5334,7 +5313,64 @@ td.what .overlap{margin-left:8px}
     });
     svg.appendChild(gEdges);
     svg.appendChild(gNodes);
-    // drag pans, ⌘/Ctrl + wheel (a trackpad pinch too) zooms, a click on the background clears the selection
+    panAndZoom(map, card, svg, nodeEls);
+    sceneKeys(map, card, svg, order);
+    return svg;
+  }
+  function markSelected(nodeEls, selected) {
+    Object.keys(nodeEls).forEach(function (id) {
+      nodeEls[id].classList.toggle('sel', id === selected);
+    });
+  }
+  function sceneMarkers(markerId) {
+    var defs = svgEl('defs');
+    ['', 'hi'].forEach(function (k) {
+      defs.appendChild(
+        svgEl(
+          'marker',
+          {
+            id: markerId + (k ? '-hi' : ''),
+            class: k,
+            viewBox: '0 0 8 8',
+            refX: '7',
+            refY: '4',
+            markerWidth: '7',
+            markerHeight: '7',
+            markerUnits: 'userSpaceOnUse',
+            orient: 'auto'
+          },
+          [svgEl('path', { d: 'M0 0.5L7 4L0 7.5Z' })]
+        )
+      );
+    });
+    return defs;
+  }
+  // a line from rim to rim, as thick as how many edges it stands for; one that depends on its end carries an arrow
+  function sceneEdge(e, lay, markerId, maxW) {
+    var a = lay.pos[e.a],
+      b = lay.pos[e.b];
+    if (!a || !b) return null;
+    var dx = b[0] - a[0],
+      dy = b[1] - a[1],
+      d = Math.sqrt(dx * dx + dy * dy) || 1,
+      ra = lay.r[e.a] + 1,
+      rb = lay.r[e.b] + (GRAPH_DEPENDS[e.type] ? 4 : 1),
+      line = svgEl('line', {
+        class: 'e ' + e.type,
+        x1: a[0] + (dx / d) * ra,
+        y1: a[1] + (dy / d) * ra,
+        x2: b[0] - (dx / d) * rb,
+        y2: b[1] - (dy / d) * rb,
+        'stroke-width': (1 + (2.5 * Math.log(1 + (e.w || 1))) / Math.log(1 + maxW)).toFixed(2)
+      });
+    if (GRAPH_DEPENDS[e.type]) line.setAttribute('marker-end', 'url(#' + markerId + ')');
+    line.appendChild(
+      svgEl('title', {}, [document.createTextNode(e.a + ' —' + e.type + (e.w > 1 ? ' ×' + e.w : '') + '→ ' + e.b)])
+    );
+    return line;
+  }
+  // drag pans, ⌘/Ctrl + wheel (a trackpad pinch too) zooms, a click on the background clears the selection
+  function panAndZoom(map, card, svg, nodeEls) {
     var drag = null;
     svg.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
@@ -5366,9 +5402,7 @@ td.what .overlap{margin-left:8px}
     svg.addEventListener('click', function () {
       if (card.dragged || !card.selected) return;
       card.selected = null;
-      Object.keys(nodeEls).forEach(function (id) {
-        nodeEls[id].classList.remove('sel');
-      });
+      markSelected(nodeEls, null);
       paintDetail(map, card);
     });
     svg.addEventListener(
@@ -5382,6 +5416,9 @@ td.what .overlap{margin-left:8px}
       },
       { passive: false }
     );
+  }
+  // Esc or Backspace goes up a level; the arrow keys walk the nodes, moving the one tab stop along
+  function sceneKeys(map, card, svg, stops) {
     svg.addEventListener('keydown', function (e) {
       if ((e.key === 'Escape' || e.key === 'Backspace') && card.trail.length > 1) {
         // a browser that still goes back a page on Backspace would leave the board
@@ -5391,16 +5428,15 @@ td.what .overlap{margin-left:8px}
         return;
       }
       var step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-      if (!step || !order.length) return;
+      if (!step || !stops.length) return;
       e.preventDefault();
-      var at = order.indexOf(document.activeElement),
-        next = order[(at + step + order.length) % order.length];
-      order.forEach(function (g) {
+      var at = stops.indexOf(document.activeElement),
+        next = stops[(at + step + stops.length) % stops.length];
+      stops.forEach(function (g) {
         g.setAttribute('tabindex', g === next ? '0' : '-1');
       });
       next.focus();
     });
-    return svg;
   }
   function legendGlyph(kind) {
     var s = svgEl('svg', { width: '14', height: '14', viewBox: '-7 -7 14 14', 'aria-hidden': 'true' });
@@ -5452,8 +5488,7 @@ td.what .overlap{margin-left:8px}
     if (scene.prefix) out.appendChild(el('span', { text: T('codemapPrefix', { p: scene.prefix }) }));
     // the hint is needed once, so it waits behind a ? that says it on hover; shown in place, the ? keeps the focus
     var hint = el('span', { class: 'cmap-hint', text: T('codemapHint') }),
-      help = el('button', {
-        type: 'button',
+      help = button({
         class: 'cmap-help',
         text: '?',
         title: T('codemapHint'),
@@ -5473,14 +5508,13 @@ td.what .overlap{margin-left:8px}
   // held to it, since a line may break on either side of a button and must not start with a comma
   function mapRef(map, card, label, id, mark) {
     if (!(id && card.graph && card.graph.node(id))) return label + mark;
-    var button = el('button', {
-      type: 'button',
+    var ref = button({
       text: label,
       onclick: function () {
         goTo(map, card, id);
       }
     });
-    return mark ? el('span', { class: 'mapref' }, [button, mark]) : button;
+    return mark ? el('span', { class: 'mapref' }, [ref, mark]) : ref;
   }
   // the comma-separated names of one line, each looked up in its file ('' for a line of files, null for no lookup);
   // the ? of an edge matched by name stays in the label but is not part of the id
@@ -5521,14 +5555,10 @@ td.what .overlap{margin-left:8px}
     });
   }
   function taskChip(t) {
-    return el(
-      'button',
+    return button(
       {
-        type: 'button',
         class: 'cmap-task' + personClass(holderOf(t)),
-        onclick: function () {
-          openSheet(t.id);
-        }
+        onclick: opens(t)
       },
       [el('b', { text: t.key }), el('span', { text: personName(holderOf(t)) })]
     );
@@ -5554,8 +5584,7 @@ td.what .overlap{margin-left:8px}
             'div',
             { class: 'cmap-tasks' },
             god.map(function (gid) {
-              return el('button', {
-                type: 'button',
+              return button({
                 class: 'cmap-task',
                 text: gid,
                 onclick: function () {
@@ -5578,8 +5607,7 @@ td.what .overlap{margin-left:8px}
       });
     var canOpen = levelCenter(level) !== id,
       open = canOpen
-        ? el('button', {
-            type: 'button',
+        ? button({
             class: 'btn small',
             text: T('codemapOpen'),
             onclick: function () {
@@ -5607,10 +5635,10 @@ td.what .overlap{margin-left:8px}
             })
           )
         );
-    } else if (!graph) out.appendChild(el('p', { class: 'empty', text: card.error || T('loading') }));
+    } else if (!graph) out.appendChild(emptyNote(card.error || T('loading')));
     else {
       var n = graph.node(id);
-      if (!n) out.appendChild(el('p', { class: 'empty', text: T('codemapEmpty') }));
+      if (!n) out.appendChild(emptyNote(T('codemapEmpty')));
       else {
         var lines = (n.k === 'file' || n.k === 'doc' ? graph.file(id, {}) : graph.explain(id, {})).lines;
         out.appendChild(el('p', { class: 'cmap-title', text: n.n }));
@@ -5684,16 +5712,12 @@ td.what .overlap{margin-left:8px}
   function kanbanCard(t, s) {
     if (s === 'done' || s === 'archive') return doneLine(t);
     var meta = [t.feature, t.repo].filter(Boolean).join(' · ');
-    return el(
-      'button',
+    return button(
       {
-        type: 'button',
         class: 'card' + (s === 'done' || s === 'archive' ? ' done' : ''),
         'data-k': t.id,
         'aria-current': String(openId === t.id),
-        onclick: function () {
-          openSheet(t.id);
-        }
+        onclick: opens(t)
       },
       [
         el('div', { class: 'top' }, [
@@ -5702,27 +5726,23 @@ td.what .overlap{margin-left:8px}
           newDot(isNew(t)),
           el('span', { class: 'right' }, [overlapFlag(t), cardFlag(t), avatar(t, true)])
         ]),
-        el('div', { class: 'title', text: t.title || T('untitled') })
+        el('div', { class: 'title', text: titleOf(t) })
       ]
     );
   }
   // a finished task on one line: what it is, who did it, the day it was done
   function doneLine(t) {
-    return el(
-      'button',
+    return button(
       {
-        type: 'button',
         class: 'card done line',
         'data-k': t.id,
         'aria-current': String(openId === t.id),
-        title: t.title || T('untitled'),
-        onclick: function () {
-          openSheet(t.id);
-        }
+        title: titleOf(t),
+        onclick: opens(t)
       },
       [
         el('span', { class: 'key', text: t.key }),
-        el('span', { class: 'title', text: t.title || T('untitled') }),
+        el('span', { class: 'title', text: titleOf(t) }),
         newDot(isNew(t)),
         avatar(t, true),
         t.doneAt ? el('span', { class: 'when', text: localDay(t.doneAt).slice(5) }) : null
@@ -5731,33 +5751,6 @@ td.what .overlap{margin-left:8px}
   }
   // each column remembers, in this browser, whether it shows two card columns
   var kanbanColumns = readJSON('ab-kcol') || {};
-  // column header icons: one or two card columns
-  function columnIcon(kind) {
-    var g = {
-      one: [['rect', { x: 3.5, y: 2.5, width: 7, height: 9, rx: 1.5 }]],
-      two: [
-        ['rect', { x: 1.5, y: 2.5, width: 4.5, height: 9, rx: 1.2 }],
-        ['rect', { x: 8, y: 2.5, width: 4.5, height: 9, rx: 1.2 }]
-      ]
-    }[kind];
-    return svgEl(
-      'svg',
-      {
-        width: 14,
-        height: 14,
-        viewBox: '0 0 14 14',
-        fill: 'none',
-        stroke: 'currentColor',
-        'stroke-width': 1.5,
-        'stroke-linecap': 'round',
-        'stroke-linejoin': 'round',
-        'aria-hidden': 'true'
-      },
-      g.map(function (x) {
-        return svgEl(x[0], x[1]);
-      })
-    );
-  }
   // done and archived work is one line per card, which two card columns would cut to a few characters of title
   function canTwo(k) {
     return k !== 'done' && k !== 'archive';
@@ -5781,7 +5774,6 @@ td.what .overlap{margin-left:8px}
   function sizeBoard() {
     var tb = $('toolbar'),
       style = document.body.style;
-    if (view !== 'kanban') return;
     var page = document.querySelector('.page').getBoundingClientRect(),
       column = document.querySelector('header.top').getBoundingClientRect(),
       cw = document.documentElement.clientWidth,
@@ -5824,15 +5816,13 @@ td.what .overlap{margin-left:8px}
           return ids.length;
         },
         function (e) {
-          toast(T('saveFail', { e: errText(e) }));
-          refused(e);
+          writeFailed(e);
           return 0;
         }
       );
   }
   function archiveButton(list) {
-    var b = el('button', {
-      type: 'button',
+    var b = button({
       class: 'colbtn',
       text: T('archBtn'),
       title: T('archAll', { n: list.length })
@@ -5870,28 +5860,54 @@ td.what .overlap{margin-left:8px}
     var root = $('kanban');
     root.textContent = '';
     order = [];
-    var cols = el('div', { class: 'cols' });
-    STATUS.concat(['archive']).forEach(function (s) {
-      var arch = s === 'archive';
-      if (arch && !archived.length) return;
-      var all = (arch ? archived : tasks)
-        .filter(function (t) {
-          return (arch || knownStatus(t) === s) && match(t);
+    root.appendChild(el('div', { class: 'cols' }, STATUS.concat(['archive']).map(kanbanColumn)));
+    sizeBoard();
+  }
+  // a status's column (or the archive's, when it holds anything): its header with its tools, then its cards
+  function kanbanColumn(s) {
+    var arch = s === 'archive';
+    if (arch && !archived.length) return null;
+    var all = (arch ? archived : tasks)
+      .filter(function (t) {
+        return (arch || knownStatus(t) === s) && match(t);
+      })
+      .sort(arch ? byArchived : s === 'done' ? byDone : byKey);
+    var two = showsTwo(s),
+      capped = (s === 'done' || arch) && !filtering(),
+      shown = capped ? Math.min(kanbanShown[s] || DONE_FIRST, all.length) : all.length;
+    var cards = el('div', { class: 'cards' });
+    if (!loaded) cards.appendChild(emptyNote(loadingText()));
+    else if (!all.length) cards.appendChild(emptyNote(T('empty')));
+    if (arch) cards.appendChild(el('p', { class: 'muted arch-hint', text: T('archHint') }));
+    all.slice(0, shown).forEach(function (t) {
+      order.push(t.id);
+      cards.appendChild(kanbanCard(t, s));
+    });
+    if (capped && all.length > DONE_FIRST) {
+      var rest = all.length - shown;
+      cards.appendChild(
+        moreBtn(!rest, Math.min(DONE_STEP, rest), function () {
+          kanbanShown[s] = rest ? shown + DONE_STEP : DONE_FIRST;
+          renderKanban();
         })
-        .sort(arch ? byArchived : s === 'done' ? byDone : byKey);
-      var two = showsTwo(s),
-        capped = (s === 'done' || arch) && !filtering(),
-        shown = capped ? Math.min(kanbanShown[s] || DONE_FIRST, all.length) : all.length,
-        list = all.slice(0, shown);
-      var name = arch ? T('archN') : statusLabel(s),
-        tools = el('span', { class: 'tools' });
-      if (s === 'done' && all.length && writable()) tools.appendChild(archiveButton(all));
-      if (canTwo(s))
-        tools.appendChild(
-          el(
-            'button',
+      );
+    }
+    return el('div', { class: 'col' + (two ? ' two' : '') + (arch ? ' arch' : ''), 'data-status': s }, [
+      el('h3', {}, [
+        arch ? el('span', { class: 'state', text: T('archN') }) : statusChip(s),
+        el('span', { class: 'n', text: String(all.length) }),
+        columnTools(s, all, two)
+      ]),
+      cards
+    ]);
+  }
+  // the done column archives its tasks; the open columns switch between one and two card columns
+  function columnTools(s, all, two) {
+    return el('span', { class: 'tools' }, [
+      s === 'done' && all.length && writable() ? archiveButton(all) : null,
+      canTwo(s)
+        ? button(
             {
-              type: 'button',
               class: 'colbtn',
               'aria-pressed': String(two),
               title: T(two ? 'colOne' : 'colTwo'),
@@ -5900,51 +5916,10 @@ td.what .overlap{margin-left:8px}
                 setTwo(s, !two);
               }
             },
-            [columnIcon(two ? 'one' : 'two')]
+            [icon(two ? 'one' : 'two')]
           )
-        );
-      var cards = el('div', { class: 'cards' });
-      if (!loaded)
-        cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: failed || T('loading') }));
-      else if (!all.length)
-        cards.appendChild(el('p', { class: 'empty', style: 'padding:4px 4px 8px', text: T('empty') }));
-      if (arch)
-        cards.appendChild(
-          el('p', { class: 'muted', style: 'padding:0 4px 4px;font-size:12px;line-height:1.5', text: T('archHint') })
-        );
-      list.forEach(function (t) {
-        order.push(t.id);
-        cards.appendChild(kanbanCard(t, s));
-      });
-      if (capped && all.length > DONE_FIRST) {
-        var rest = all.length - shown;
-        cards.appendChild(
-          moreBtn(!rest, Math.min(DONE_STEP, rest), function () {
-            kanbanShown[s] = rest ? shown + DONE_STEP : DONE_FIRST;
-            renderKanban();
-          })
-        );
-      }
-      cols.appendChild(
-        el(
-          'div',
-          {
-            class: 'col' + (two ? ' two' : '') + (arch ? ' arch' : ''),
-            'data-status': s
-          },
-          [
-            el('h3', {}, [
-              arch ? el('span', { class: 'state', text: name }) : statusChip(s),
-              el('span', { class: 'n', text: String(all.length) }),
-              tools
-            ]),
-            cards
-          ]
-        )
-      );
-    });
-    root.appendChild(cols);
-    sizeBoard();
+        : null
+    ]);
   }
 
   // ---------- dependency graph ----------
@@ -5954,6 +5929,30 @@ td.what .overlap{margin-left:8px}
     return d && !d.archivedAt ? d : null;
   }
   var GRAPH = { W: 224, H: 98, GX: 68, GY: 12, PAD: 18, TOP: 38 };
+  // ⌘ or Ctrl with the wheel zooms the graph around the pointer (a trackpad pinch arrives the same way); the zoom
+  // stays while the page is open
+  var graphZoom = 1;
+  $('graphWrap').addEventListener(
+    'wheel',
+    function (e) {
+      var wrap = $('graphWrap'),
+        g = wrap.querySelector('.graph');
+      if (!(e.ctrlKey || e.metaKey) || !g) return;
+      e.preventDefault();
+      var r = wrap.getBoundingClientRect(),
+        px = e.clientX - r.left - wrap.clientLeft,
+        py = e.clientY - r.top - wrap.clientTop,
+        next = Math.min(2, Math.max(0.3, graphZoom * Math.exp(-e.deltaY * 0.0025))),
+        k = next / graphZoom;
+      graphZoom = next;
+      g.style.zoom = next;
+      wrap.scrollLeft = (wrap.scrollLeft + px) * k - px;
+      wrap.scrollTop = (wrap.scrollTop + py) * k - py;
+      // zooming out at the top left scrolls nothing, so no scroll event says the arrows changed
+      sideArrows();
+    },
+    { passive: false }
+  );
   var graphRel = null;
   function graphModel() {
     var ts = tasks.slice().sort(byKey),
@@ -6082,16 +6081,14 @@ td.what .overlap{margin-left:8px}
     wrap.textContent = '';
     order = [];
     wrap.setAttribute('aria-label', T('v_graph'));
-    var crit = $('crit');
-    crit.textContent = '';
-    var gl = $('glegend');
-    gl.textContent = '';
+    $('crit').textContent = '';
+    $('glegend').textContent = '';
     if (!loaded) {
-      wrap.appendChild(el('p', { class: 'empty', style: 'padding:16px', text: failed || T('loading') }));
+      wrap.appendChild(emptyNote(loadingText()));
       return;
     }
     if (!tasks.length) {
-      wrap.appendChild(el('p', { class: 'empty', style: 'padding:16px', text: T('noTasks') }));
+      wrap.appendChild(emptyNote(T('noTasks')));
       return;
     }
     var m = graphModel();
@@ -6100,6 +6097,43 @@ td.what .overlap{margin-left:8px}
     m.chain.forEach(function (id) {
       critSet[id] = 1;
     });
+    graphCaption(m);
+    var n = m.cols.length,
+      maxRows = 0;
+    m.cols.forEach(function (c) {
+      maxRows = Math.max(maxRows, c.length);
+    });
+    var Wd = GRAPH.PAD * 2 + n * GRAPH.W + (n - 1) * GRAPH.GX,
+      Ht = GRAPH.TOP + maxRows * (GRAPH.H + GRAPH.GY) - GRAPH.GY + GRAPH.PAD;
+    var g = el('div', { class: 'graph', style: 'width:' + Wd + 'px;height:' + Ht + 'px;zoom:' + graphZoom });
+    g.appendChild(graphLinks(m, critSet, Wd, Ht));
+    m.cols.forEach(function (c, ci) {
+      g.appendChild(
+        el('div', { class: 'gcol', style: 'left:' + (GRAPH.PAD + ci * (GRAPH.W + GRAPH.GX)) + 'px;top:12px' }, [
+          T('step', { n: ci + 1 }) + (ci === 0 ? T('stepRoot') : ''),
+          el('span', { text: ' · ' + T('doneOf', { d: countStatus(c, 'done'), n: c.length }) })
+        ])
+      );
+      c.forEach(function (t) {
+        var hit = match(t);
+        if (hit) order.push(t.id);
+        g.appendChild(graphNode(m, t, critSet, hit));
+      });
+    });
+    wrap.appendChild(g);
+    lineage(cursor && view === 'graph' ? cursor : null);
+  }
+  // a card's place: its column is its level, its row its place within the level
+  function cardX(m, t) {
+    return GRAPH.PAD + m.lvl[t.id] * (GRAPH.W + GRAPH.GX);
+  }
+  function cardY(m, t) {
+    return GRAPH.TOP + m.row[t.id] * (GRAPH.H + GRAPH.GY);
+  }
+  // above the picture: the longest chain still to go (or why there is none), then what the lines and colors mean
+  function graphCaption(m) {
+    var crit = $('crit'),
+      gl = $('glegend');
     if (m.chain.length) {
       crit.appendChild(el('b', { text: T('critLabel', { n: m.chain.length }) }));
       crit.appendChild(
@@ -6125,29 +6159,17 @@ td.what .overlap{margin-left:8px}
             : T('noChain')
         })
       );
-    gl.appendChild(el('span', {}, [el('i', { class: 'swatch', style: 'border-color:var(--accent)' }), T('lgCrit')]));
-    gl.appendChild(el('span', {}, [el('i', { class: 'swatch', style: 'border-color:var(--muted)' }), T('lgMet')]));
-    gl.appendChild(el('span', {}, [el('i', { class: 'swatch', style: 'border-color:var(--edge)' }), T('lgWait')]));
+    gl.appendChild(el('span', {}, [el('i', { class: 'swatch lg-crit' }), T('lgCrit')]));
+    gl.appendChild(el('span', {}, [el('i', { class: 'swatch lg-met' }), T('lgMet')]));
+    gl.appendChild(el('span', {}, [el('i', { class: 'swatch lg-wait' }), T('lgWait')]));
     people.forEach(function (p) {
       gl.appendChild(
         el('span', { class: personClass(p.id).trim() }, [el('i', { style: 'background:var(--pb)' }), p.name || p.id])
       );
     });
-
-    var n = m.cols.length,
-      maxRows = 0;
-    m.cols.forEach(function (c) {
-      maxRows = Math.max(maxRows, c.length);
-    });
-    var Wd = GRAPH.PAD * 2 + n * GRAPH.W + (n - 1) * GRAPH.GX,
-      Ht = GRAPH.TOP + maxRows * (GRAPH.H + GRAPH.GY) - GRAPH.GY + GRAPH.PAD;
-    var g = el('div', { class: 'graph', style: 'width:' + Wd + 'px;height:' + Ht + 'px' });
-    function cardX(t) {
-      return GRAPH.PAD + m.lvl[t.id] * (GRAPH.W + GRAPH.GX);
-    }
-    function cardY(t) {
-      return GRAPH.TOP + m.row[t.id] * (GRAPH.H + GRAPH.GY);
-    }
+  }
+  // one curve from each dependency to the task waiting on it, marked as on the longest chain, met or still pending
+  function graphLinks(m, critSet, Wd, Ht) {
     var svg = svgEl('svg', { width: Wd, height: Ht, viewBox: '0 0 ' + Wd + ' ' + Ht, 'aria-hidden': 'true' });
     var defs = svgEl('defs');
     ['line', 'met', 'crit', 'hi'].forEach(function (k) {
@@ -6174,10 +6196,10 @@ td.what .overlap{margin-left:8px}
         (t.deps || []).forEach(function (k) {
           var d = graphTask(k);
           if (!d) return;
-          var x1 = cardX(d) + GRAPH.W,
-            y1 = cardY(d) + GRAPH.H / 2,
-            x2 = cardX(t) - 2,
-            y2 = cardY(t) + GRAPH.H / 2,
+          var x1 = cardX(m, d) + GRAPH.W,
+            y1 = cardY(m, d) + GRAPH.H / 2,
+            x2 = cardX(m, t) - 2,
+            y2 = cardY(m, t) + GRAPH.H / 2,
             cx = Math.max(24, (x2 - x1) / 2);
           var isCrit = critSet[d.id] && critSet[t.id] && m.chain.indexOf(t.id) === m.chain.indexOf(d.id) + 1;
           var kind = isCrit ? 'crit' : knownStatus(d) === 'done' ? 'met' : 'line';
@@ -6193,75 +6215,54 @@ td.what .overlap{margin-left:8px}
         });
       });
     });
-    g.appendChild(svg);
-    m.cols.forEach(function (c, ci) {
-      var dn = c.filter(function (t) {
-        return knownStatus(t) === 'done';
-      }).length;
-      g.appendChild(
-        el('div', { class: 'gcol', style: 'left:' + (GRAPH.PAD + ci * (GRAPH.W + GRAPH.GX)) + 'px;top:12px' }, [
-          T('step', { n: ci + 1 }) + (ci === 0 ? T('stepRoot') : ''),
-          el('span', { text: ' · ' + T('doneOf', { d: dn, n: c.length }) })
-        ])
-      );
-      c.forEach(function (t) {
-        var hit = match(t);
-        if (hit) order.push(t.id);
-        var u = unmet(t),
-          r3 =
-            knownStatus(t) === 'done'
-              ? statusLabel('done')
-              : ready(t)
-                ? T('readyTag')
-                : u.length
-                  ? T('waitingDeps', { k: u.join(', ') })
-                  : personName(t.owner) + ' · ' + statusLabel(knownStatus(t));
-        g.appendChild(
-          el(
-            'button',
-            {
-              type: 'button',
-              'data-k': t.id,
-              'aria-current': String(openId === t.id),
-              class:
-                'node' +
-                personClass(t.owner) +
-                ' ' +
-                knownStatus(t) +
-                (critSet[t.id] ? ' oncrit' : '') +
-                (filtering() && !hit ? ' nomatch' : ''),
-              style: 'left:' + cardX(t) + 'px;top:' + cardY(t) + 'px;width:' + GRAPH.W + 'px;height:' + GRAPH.H + 'px',
-              'aria-label':
-                t.key + ' ' + (t.title || '') + ', ' + statusLabel(knownStatus(t)) + ', ' + personName(t.owner),
-              onclick: function () {
-                openSheet(t.id);
-              },
-              onmouseenter: function () {
-                lineage(t.id);
-              },
-              onmouseleave: function () {
-                lineage(cursor && view === 'graph' ? cursor : null);
-              },
-              onfocus: function () {
-                lineage(t.id);
-              }
-            },
-            [
-              el('div', { class: 'r1' }, [
-                el('span', { class: 'key', text: t.key }),
-                statusChip(knownStatus(t)),
-                agentMark(t),
-                newDot(isNew(t))
-              ]),
-              el('div', { class: 'tt', text: t.title || T('untitled') }),
-              el('div', { class: 'r3' + (ready(t) ? ' ready' : ''), text: r3 })
-            ]
-          )
-        );
-      });
-    });
-    wrap.appendChild(g);
-    lineage(cursor && view === 'graph' ? cursor : null);
+    return svg;
+  }
+  // a task on the graph: key, status and title, then what it waits on or who has it; hovering keeps only its line
+  function graphNode(m, t, critSet, hit) {
+    var u = unmet(t),
+      r3 =
+        knownStatus(t) === 'done'
+          ? statusLabel('done')
+          : ready(t)
+            ? T('readyTag')
+            : u.length
+              ? T('waitingDeps', { k: u.join(', ') })
+              : personName(t.owner) + ' · ' + statusLabel(knownStatus(t));
+    return button(
+      {
+        'data-k': t.id,
+        'aria-current': String(openId === t.id),
+        class:
+          'node' +
+          personClass(t.owner) +
+          ' ' +
+          knownStatus(t) +
+          (critSet[t.id] ? ' oncrit' : '') +
+          (filtering() && !hit ? ' nomatch' : ''),
+        style: 'left:' + cardX(m, t) + 'px;top:' + cardY(m, t) + 'px;width:' + GRAPH.W + 'px;height:' + GRAPH.H + 'px',
+        'aria-label': t.key + ' ' + (t.title || '') + ', ' + statusLabel(knownStatus(t)) + ', ' + personName(t.owner),
+        onclick: opens(t),
+        onmouseenter: function () {
+          lineage(t.id);
+        },
+        onmouseleave: function () {
+          lineage(cursor && view === 'graph' ? cursor : null);
+        },
+        onfocus: function () {
+          lineage(t.id);
+        }
+      },
+      [
+        el('div', { class: 'r1' }, [
+          el('span', { class: 'key', text: t.key }),
+          statusChip(knownStatus(t)),
+          agentMark(t),
+          newDot(isNew(t))
+        ]),
+        el('div', { class: 'tt', text: titleOf(t) }),
+        el('div', { class: 'r3' + (ready(t) ? ' ready' : ''), text: r3 })
+      ]
+    );
   }
   function lineage(id) {
     var g = document.querySelector('.graph');
@@ -6323,23 +6324,7 @@ td.what .overlap{margin-left:8px}
   SIDES.forEach(function (key) {
     [-1, 1].forEach(function (dir) {
       var b = $(key + (dir < 0 ? 'Prev' : 'Next'));
-      b.appendChild(
-        svgEl(
-          'svg',
-          {
-            width: 14,
-            height: 14,
-            viewBox: '0 0 14 14',
-            fill: 'none',
-            stroke: 'currentColor',
-            'stroke-width': 1.75,
-            'stroke-linecap': 'round',
-            'stroke-linejoin': 'round',
-            'aria-hidden': 'true'
-          },
-          [svgEl('path', { d: dir < 0 ? 'M8.5 3.5 5 7l3.5 3.5' : 'M5.5 3.5 9 7l-3.5 3.5' })]
-        )
-      );
+      b.appendChild(icon(dir < 0 ? 'left' : 'right', 1.75));
       b.addEventListener('click', function () {
         var box = key === 'kanban' ? window : $('graphWrap'),
           width = key === 'kanban' ? document.documentElement.clientWidth : box.clientWidth;
@@ -6352,9 +6337,13 @@ td.what .overlap{margin-left:8px}
   });
   window.addEventListener('scroll', sideArrows, { passive: true });
   $('graphWrap').addEventListener('scroll', sideArrows, { passive: true });
-  // the room to scroll changes with the window, the board's content and a page scrollbar coming or going
+  // the room to scroll changes with the window, the board's content and a page scrollbar coming or going, and the
+  // toolbar spans what the window shows, which a scrollbar narrows
   if (window.ResizeObserver) {
-    var sideSizes = new ResizeObserver(sideArrows);
+    var sideSizes = new ResizeObserver(function () {
+      sizeBoard();
+      sideArrows();
+    });
     [document.documentElement, $('kanban'), $('graphWrap')].forEach(function (n) {
       sideSizes.observe(n);
     });
@@ -6388,6 +6377,7 @@ td.what .overlap{margin-left:8px}
     }
     if (cursor && order.indexOf(cursor) < 0) cursor = null;
     applyCursor();
+    sizeBoard();
     sideArrows();
   }
   function applyCursor(scroll) {
@@ -6475,19 +6465,9 @@ td.what .overlap{margin-left:8px}
     if (!t) return;
     if (settingsOpen) settingsOpen = false;
     if (openId !== id) {
-      if (unsub) {
-        unsub();
-        unsub = null;
-      }
-      msgs = [];
+      dropSheetData();
       msgErr = false;
       openPrevSeen = seen[id] || '';
-      if (unsubDetails) {
-        unsubDetails();
-        unsubDetails = null;
-      }
-      detailsDoc = null;
-      summaryEditing = false;
       if (db) {
         unsub = db
           .collection('tasks/' + id + '/messages')
@@ -6530,8 +6510,8 @@ td.what .overlap{margin-left:8px}
     renderView();
     renderSheet(true);
   }
-  function close() {
-    openId = null;
+  // the open task's thread and details stop listening, and what the sheet held goes with them
+  function dropSheetData() {
     if (unsub) {
       unsub();
       unsub = null;
@@ -6543,16 +6523,44 @@ td.what .overlap{margin-left:8px}
     }
     detailsDoc = null;
     summaryEditing = false;
+  }
+  function close() {
+    openId = null;
+    dropSheetData();
     try {
       history.replaceState(null, '', location.pathname + location.search);
     } catch (e) {}
     $('sheetRoot').textContent = '';
     renderView();
-    var back = document.querySelector('.view:not([hidden]) [data-k="' + cursor + '"]') || lastFocus;
-    if (back && back.focus && document.body.contains(back))
+    focusBack(document.querySelector('.view:not([hidden]) [data-k="' + cursor + '"]') || lastFocus);
+  }
+  function focusBack(n) {
+    if (n && n.focus && document.body.contains(n))
       try {
-        back.focus();
+        n.focus();
       } catch (e) {}
+  }
+  // the task sheet and the settings are one kind of dialog: a bar that ends in ×, what follows, and a scrim behind
+  // that closes it
+  function showDialog(labelId, onClose, bar, rest) {
+    var sheet = el(
+      'div',
+      { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': labelId },
+      [
+        el(
+          'div',
+          { class: 'bar' },
+          bar.concat([button({ class: 'x', 'aria-label': T('close'), text: '×', onclick: onClose })])
+        )
+      ].concat(rest)
+    );
+    $('sheetRoot').appendChild(el('div', { class: 'scrim', onclick: onClose }));
+    $('sheetRoot').appendChild(sheet);
+    return sheet;
+  }
+  // a titled part of the sheet
+  function sheetBlock(title, cls, kids) {
+    return el('div', { class: 'block' + (cls ? ' ' + cls : '') }, [el('h3', { text: title })].concat(kids));
   }
   // ---------- board settings: name, one line, milestone, repositories (people stay with site admins) ----------
   function openSettings() {
@@ -6565,14 +6573,27 @@ td.what .overlap{margin-left:8px}
   function closeSettings() {
     settingsOpen = false;
     $('sheetRoot').textContent = '';
-    if (lastFocus && lastFocus.focus && document.body.contains(lastFocus))
-      try {
-        lastFocus.focus();
-      } catch (e) {}
+    focusBack(lastFocus);
+  }
+  // the settings' repository lines, "owner/name label" each: the repositories, or the first line that names none
+  function parseRepos(text) {
+    var repos = [],
+      bad = null;
+    text.split('\n').forEach(function (line) {
+      var parts = line.trim().split(/\s+/);
+      if (!parts[0]) return;
+      var name = repoOf(parts[0]);
+      if (!name) {
+        bad = bad || parts[0];
+        return;
+      }
+      var lb = parts.slice(1).join(' ').slice(0, 40);
+      repos.push(lb ? { repo: name, label: lb } : { repo: name });
+    });
+    return { repos: repos, bad: bad };
   }
   function renderSettings() {
-    var root = $('sheetRoot');
-    root.textContent = '';
+    $('sheetRoot').textContent = '';
     function input(id, v, max) {
       var n = el('input', { type: 'text', id: id, maxlength: String(max) });
       n.value = v || '';
@@ -6588,21 +6609,11 @@ td.what .overlap{margin-left:8px}
       })
       .join('\n');
     var err = el('p', { class: 'err', hidden: '' });
-    var ok = el('button', { type: 'button', class: 'btn primary', text: T('save') });
+    var ok = button({ class: 'btn primary', text: T('save') });
     ok.addEventListener('click', function () {
-      var repos = [],
-        bad = null;
-      re.value.split('\n').forEach(function (line) {
-        var parts = line.trim().split(/\s+/);
-        if (!parts[0]) return;
-        var name = repoOf(parts[0]);
-        if (!name) {
-          bad = bad || parts[0];
-          return;
-        }
-        var lb = parts.slice(1).join(' ').slice(0, 40);
-        repos.push(lb ? { repo: name, label: lb } : { repo: name });
-      });
+      var parsed = parseRepos(re.value),
+        repos = parsed.repos,
+        bad = parsed.bad;
       if (bad) {
         err.textContent = T('s_bad', { r: bad });
         err.hidden = false;
@@ -6626,43 +6637,37 @@ td.what .overlap{margin-left:8px}
           refused(e);
         });
     });
-    var sheet = el('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'setTitle' }, [
-      el('div', { class: 'bar' }, [
-        el('h2', { id: 'setTitle', text: T('s_head') }),
-        el('span', { style: 'margin-left:auto' }),
-        el('button', { type: 'button', class: 'x', 'aria-label': T('close'), text: '×', onclick: closeSettings })
-      ]),
-      el('div', { class: 'body' }, [
-        el('div', { class: 'setform' }, [
-          el('label', {}, [T('s_title'), ti]),
-          el('label', {}, [T('s_subtitle'), su]),
-          el('label', {}, [T('s_milestone'), mi]),
-          el('label', {}, [T('s_repos'), re, el('span', { class: 'hint2', text: T('s_reposHint') })]),
-          el('p', { class: 'muted', style: 'font-size:12.5px', text: T('s_people') }),
-          err,
-          el('div', { class: 'form-row' }, [
-            ok,
-            el('button', { type: 'button', class: 'btn', text: T('cancel'), onclick: closeSettings })
+    showDialog(
+      'setTitle',
+      closeSettings,
+      [el('h2', { id: 'setTitle', text: T('s_head') }), el('span', { class: 'spacer' })],
+      [
+        el('div', { class: 'body' }, [
+          el('div', { class: 'setform' }, [
+            el('label', {}, [T('s_title'), ti]),
+            el('label', {}, [T('s_subtitle'), su]),
+            el('label', {}, [T('s_milestone'), mi]),
+            el('label', {}, [T('s_repos'), re, el('span', { class: 'hint2', text: T('s_reposHint') })]),
+            el('p', { class: 'muted fineprint', text: T('s_people') }),
+            err,
+            el('div', { class: 'form-row' }, [ok, button({ class: 'btn', text: T('cancel'), onclick: closeSettings })])
           ])
         ])
-      ])
-    ]);
-    root.appendChild(el('div', { class: 'scrim', onclick: closeSettings }));
-    root.appendChild(sheet);
+      ]
+    );
     ti.focus();
   }
   $('setBtn').addEventListener('click', openSettings);
 
   function summaryBlock(t, keep) {
     var sum = (detailsDoc && detailsDoc.summary) || '';
-    var head = el('h3', { style: 'display:flex;gap:8px;align-items:baseline' }, [
+    var head = el('h3', { class: 'summary-head' }, [
       T('summary'),
       detailsDoc && detailsDoc.summaryAt
-        ? el('span', { style: 'font-weight:400', text: stamp(detailsDoc.summaryAt) })
+        ? el('span', { class: 'summary-at', text: stamp(detailsDoc.summaryAt) })
         : null,
       writable() && !summaryEditing
-        ? el('button', {
-            type: 'button',
+        ? button({
             class: 'linkbtn',
             text: sum ? T('edit') : T('write'),
             onclick: function () {
@@ -6677,13 +6682,11 @@ td.what .overlap{margin-left:8px}
     if (!summaryEditing)
       return el('div', { class: 'block' }, [
         head,
-        sum
-          ? el('div', { class: 'pre', text: sum })
-          : el('p', { class: 'muted', style: 'font-size:13.5px', text: T('summaryEmpty') })
+        sum ? el('div', { class: 'pre', text: sum }) : el('p', { class: 'muted aside', text: T('summaryEmpty') })
       ]);
     var ta = el('textarea', { id: 'sumText', 'aria-label': T('summary') });
     ta.value = keep.sumText != null ? keep.sumText : sum;
-    var ok = el('button', { type: 'button', class: 'btn primary small', text: T('save') });
+    var ok = button({ class: 'btn primary small', text: T('save') });
     ok.addEventListener('click', function () {
       var patch = { summary: ta.value.trim(), summaryAt: now() },
         o = { override: !mayChange(t, me, { summary: patch.summary }, false) };
@@ -6695,8 +6698,7 @@ td.what .overlap{margin-left:8px}
         })
         .catch(function (e) {
           ok.disabled = false;
-          toast(T('saveFail', { e: errText(e) }));
-          refused(e);
+          writeFailed(e);
         });
     });
     return el('div', { class: 'block' }, [
@@ -6704,8 +6706,7 @@ td.what .overlap{margin-left:8px}
       ta,
       el('div', { class: 'form-row' }, [
         ok,
-        el('button', {
-          type: 'button',
+        button({
           class: 'btn small',
           text: T('cancel'),
           onclick: function () {
@@ -6737,69 +6738,108 @@ td.what .overlap{margin-left:8px}
         : false
     };
   }
+  function option(value, text) {
+    return el('option', { value: value, text: text });
+  }
+  // a sheet field that writes its own task field when it changes; a viewer who cannot write sees it disabled
+  function taskField(t, k, node, value, clean) {
+    node.value = value;
+    node.disabled = !writable();
+    node.addEventListener('change', function () {
+      var patch = {};
+      patch[k] = clean(node.value);
+      change(t, patch);
+    });
+    return node;
+  }
+  function orNull(v) {
+    return v || null;
+  }
+  function trimmedOrNull(v) {
+    return v.trim() || null;
+  }
   // a field being typed in keeps its draft across a re-render
   function sheetFields(t, kept) {
-    var f = {};
-    f.status = el('select', { id: 'fStatus', 'aria-label': T('f_status') });
-    STATUS.forEach(function (x) {
-      f.status.appendChild(el('option', { value: x, text: statusLabel(x) }));
-    });
-    f.status.value = knownStatus(t);
-    f.status.addEventListener('change', function () {
-      change(t, { status: f.status.value });
-    });
-    f.owner = el('select', { id: 'fOwner', 'aria-label': T('f_owner') });
-    f.owner.appendChild(el('option', { value: '', text: T('unassigned') }));
-    people.forEach(function (p) {
-      f.owner.appendChild(el('option', { value: p.id, text: p.name || p.id }));
-    });
-    if (t.owner && !person(t.owner)) f.owner.appendChild(el('option', { value: t.owner, text: t.owner }));
-    f.owner.value = t.owner || '';
-    f.owner.addEventListener('change', function () {
-      change(t, { owner: f.owner.value || null });
-    });
-    f.branch = el('input', { type: 'text', id: 'fBranch', placeholder: 'feature/…', 'aria-label': T('f_branch') });
-    f.branch.value = kept.activeId === 'fBranch' ? kept.values.fBranch : t.branch || '';
-    f.branch.addEventListener('change', function () {
-      change(t, { branch: f.branch.value.trim() || null });
-    });
-    f.pr = el('input', { type: 'url', id: 'fPr', placeholder: 'https://github.com/…/pull/N', 'aria-label': T('f_pr') });
-    f.pr.value = kept.activeId === 'fPr' ? kept.values.fPr : t.pr || '';
-    f.pr.addEventListener('change', function () {
-      change(t, { pr: f.pr.value.trim() || null });
-    });
-    f.start = el('input', { type: 'date', id: 'fStart', 'aria-label': T('f_start') });
-    f.start.value = startOf(t);
-    f.start.addEventListener('change', function () {
-      change(t, { start: f.start.value || null });
-    });
-    f.due = el('input', { type: 'date', id: 'fDue', 'aria-label': T('f_due') });
-    f.due.value = dueOf(t);
-    f.due.addEventListener('change', function () {
-      change(t, { due: f.due.value || null });
-    });
+    function typed(id, v) {
+      return kept.activeId === id ? kept.values[id] : v || '';
+    }
+    var f = {
+      status: taskField(
+        t,
+        'status',
+        el(
+          'select',
+          { id: 'fStatus', 'aria-label': T('f_status') },
+          STATUS.map(function (x) {
+            return option(x, statusLabel(x));
+          })
+        ),
+        knownStatus(t),
+        String
+      ),
+      owner: taskField(
+        t,
+        'owner',
+        el(
+          'select',
+          { id: 'fOwner', 'aria-label': T('f_owner') },
+          [option('', T('unassigned'))].concat(
+            people.map(function (p) {
+              return option(p.id, p.name || p.id);
+            }),
+            t.owner && !person(t.owner) ? [option(t.owner, t.owner)] : []
+          )
+        ),
+        t.owner || '',
+        orNull
+      ),
+      branch: taskField(
+        t,
+        'branch',
+        el('input', { type: 'text', id: 'fBranch', placeholder: 'feature/…', 'aria-label': T('f_branch') }),
+        typed('fBranch', t.branch),
+        trimmedOrNull
+      ),
+      pr: taskField(
+        t,
+        'pr',
+        el('input', { type: 'url', id: 'fPr', placeholder: 'https://github.com/…/pull/N', 'aria-label': T('f_pr') }),
+        typed('fPr', t.pr),
+        trimmedOrNull
+      ),
+      start: taskField(
+        t,
+        'start',
+        el('input', { type: 'date', id: 'fStart', 'aria-label': T('f_start') }),
+        startOf(t),
+        orNull
+      ),
+      due: taskField(t, 'due', el('input', { type: 'date', id: 'fDue', 'aria-label': T('f_due') }), dueOf(t), orNull),
+      repo: null
+    };
     // the repo a task belongs to: a label (or owner/name) from meta/config.repos
     var rs = repoList();
-    f.repo = null;
     if (rs.length || t.repo) {
-      f.repo = el('select', { id: 'fRepo', 'aria-label': T('f_repo') });
-      f.repo.appendChild(el('option', { value: '', text: T('repoNone') }));
-      rs.forEach(function (r) {
-        var v = r.label || r.repo;
-        f.repo.appendChild(el('option', { value: v, text: r.label ? r.label + ' · ' + r.repo : r.repo }));
-      });
       var listed = rs.some(function (r) {
         return (r.label || r.repo) === t.repo;
       });
-      if (t.repo && !listed) f.repo.appendChild(el('option', { value: t.repo, text: t.repo }));
-      f.repo.value = t.repo || '';
-      f.repo.addEventListener('change', function () {
-        change(t, { repo: f.repo.value || null });
-      });
+      f.repo = taskField(
+        t,
+        'repo',
+        el(
+          'select',
+          { id: 'fRepo', 'aria-label': T('f_repo') },
+          [option('', T('repoNone'))].concat(
+            rs.map(function (r) {
+              return option(r.label || r.repo, r.label ? r.label + ' · ' + r.repo : r.repo);
+            }),
+            t.repo && !listed ? [option(t.repo, t.repo)] : []
+          )
+        ),
+        t.repo || '',
+        orNull
+      );
     }
-    ['status', 'owner', 'branch', 'pr', 'start', 'due', 'repo'].forEach(function (k) {
-      if (f[k]) f[k].disabled = !writable();
-    });
     return f;
   }
   function fieldGrid(t, f) {
@@ -6826,7 +6866,7 @@ td.what .overlap{margin-left:8px}
   function sheetHead(t) {
     var waiting = unmet(t);
     return el('div', { class: 'block' }, [
-      el('div', { style: 'display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center' }, [
+      el('div', { class: 'sheet-tags' }, [
         el('span', { class: 'tag', text: t.feature || '' }),
         repoTag(t),
         statusChip(knownStatus(t)),
@@ -6837,9 +6877,9 @@ td.what .overlap{margin-left:8px}
         dateChip(t),
         agentMark(t)
       ]),
-      el('h2', { id: 'sheetTitle', text: t.title || T('untitled') }),
+      el('h2', { id: 'sheetTitle', text: titleOf(t) }),
       knownStatus(t) !== 'done' && waiting.length
-        ? el('p', { style: 'color:var(--warn);font-size:13.5px', text: T('depsPending', { k: waiting.join(', ') }) })
+        ? el('p', { class: 'deps-pending', text: T('depsPending', { k: waiting.join(', ') }) })
         : null,
       actions(t)
     ]);
@@ -6849,13 +6889,9 @@ td.what .overlap{margin-left:8px}
       'div',
       { class: 'deplist' },
       list.map(function (d) {
-        return el(
-          'button',
+        return button(
           {
-            type: 'button',
-            onclick: function () {
-              openSheet(d.id);
-            }
+            onclick: opens(d)
           },
           [el('span', { class: 'key', text: d.key }), statusChip(knownStatus(d))]
         );
@@ -6870,16 +6906,15 @@ td.what .overlap{margin-left:8px}
       })
       .sort(byKey);
     return [
-      el('div', { class: 'block' }, [
-        el('h3', { text: T('depsBlock') }),
+      sheetBlock(T('depsBlock'), '', [
         deps.length ? depButtons(deps.map(taskByKey).filter(Boolean)) : el('p', { class: 'muted', text: T('depsNone') })
       ]),
-      unlocks.length ? el('div', { class: 'block' }, [el('h3', { text: T('unlockBlock') }), depButtons(unlocks)]) : null
+      unlocks.length ? sheetBlock(T('unlockBlock'), '', [depButtons(unlocks)]) : null
     ];
   }
   function claimLine(t) {
     if (!t.claimedBy) return null;
-    return el('p', { class: 'muted', style: 'font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center' }, [
+    return el('p', { class: 'muted claim-line' }, [
       T('claimedBy'),
       personChip(t.claimedBy.who),
       t.claimedBy.agent ? el('span', { class: 'agent-mark', text: T('agent') }) : null,
@@ -6891,7 +6926,7 @@ td.what .overlap{margin-left:8px}
   function threadList() {
     var list = el('div', { class: 'msgs' });
     if (msgErr) list.appendChild(el('p', { class: 'err', text: T('threadFail') }));
-    else if (!msgs.length) list.appendChild(el('p', { class: 'empty', text: T('threadEmpty') }));
+    else if (!msgs.length) list.appendChild(emptyNote(T('threadEmpty')));
     msgs.forEach(function (m) {
       var ag = m.kind === 'agent',
         nw = !!m.at && m.at > openPrevSeen && !(m.author === me && !ag);
@@ -6905,7 +6940,7 @@ td.what .overlap{margin-left:8px}
               text: T('ty_' + (TYPES.indexOf(m.type) >= 0 ? m.type : 'note'))
             }),
             el('span', { text: stamp(m.at) }),
-            nw ? el('span', { style: 'color:var(--accent);font-weight:600', text: T('newMsg') }) : null
+            nw ? el('span', { class: 'new-mark', text: T('newMsg') }) : null
           ]),
           el('div', { class: 'text', text: m.text || '' })
         ])
@@ -6923,22 +6958,21 @@ td.what .overlap{margin-left:8px}
       ty.appendChild(el('option', { value: x, text: T('ty_' + x) }));
     });
     ty.value = values.msgType || 'note';
-    var send = el('button', { type: 'button', class: 'btn primary', text: T('post') });
+    var send = button({ class: 'btn primary', text: T('post') });
     send.addEventListener('click', function () {
       var v = ta.value.trim();
       if (!v) return;
       send.disabled = true;
       var at = now();
       markSeen(t.id, at);
-      db.doc('tasks/' + t.id + '/messages/' + at.replace(/:/g, '-') + '-' + me)
+      db.doc('tasks/' + t.id + '/messages/' + writtenId(at))
         .set({ at: at, author: me, kind: 'human', type: ty.value, text: v })
         .then(function () {
           ta.value = '';
           return db.doc('tasks/' + t.id).update({ lastMessageAt: at, lastMessageBy: me, updatedAt: at });
         })
         .catch(function (e) {
-          toast(T('postFail', { e: errText(e) }));
-          refused(e);
+          writeFailed(e, 'postFail');
         })
         .then(function () {
           send.disabled = false;
@@ -6953,18 +6987,13 @@ td.what .overlap{margin-left:8px}
     return el('div', { class: 'composer' }, [
       warnLine(),
       ta,
-      el('div', { class: 'form-row' }, [
-        ty,
-        send,
-        el('span', { class: 'muted', style: 'font-size:12px', text: T('sendHint') })
-      ])
+      el('div', { class: 'form-row' }, [ty, send, el('span', { class: 'muted send-hint', text: T('sendHint') })])
     ]);
   }
   function sheetNav(t) {
     var idx = order.indexOf(t.id);
     return el('div', { class: 'nav' }, [
-      el('button', {
-        type: 'button',
+      button({
         'aria-label': T('prev'),
         title: T('prev') + ' (k)',
         text: '↑',
@@ -6973,8 +7002,7 @@ td.what .overlap{margin-left:8px}
           moveCursor(-1);
         }
       }),
-      el('button', {
-        type: 'button',
+      button({
         'aria-label': T('next'),
         title: T('next') + ' (j)',
         text: '↓',
@@ -7017,28 +7045,17 @@ td.what .overlap{margin-left:8px}
         claimLine(t),
         prLinks(t).length ? el('div', { class: 'form-row' }, prEls(t)) : null,
         summaryBlock(t, kept.values),
-        acc
-          ? el('div', { class: 'block' }, [el('h3', { text: T('acceptance') }), el('div', { class: 'pre', text: acc })])
-          : null,
-        spec
-          ? el('div', { class: 'block' }, [el('h3', { text: T('spec') }), el('div', { class: 'pre', text: spec })])
-          : null,
+        acc ? sheetBlock(T('acceptance'), '', [el('div', { class: 'pre', text: acc })]) : null,
+        spec ? sheetBlock(T('spec'), '', [el('div', { class: 'pre', text: spec })]) : null,
         codeBlock(t, kept.values)
-      ].concat(depBlocks(t), [
-        el('div', { class: 'block' }, [el('h3', { text: T('thread', { n: msgs.length }) }), threadList()])
-      ])
+      ].concat(depBlocks(t), [sheetBlock(T('thread', { n: msgs.length }), '', [threadList()])])
     );
-    var sheet = el('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheetTitle' }, [
-      el('div', { class: 'bar' }, [
-        el('span', { class: 'key', text: t.key }),
-        sheetNav(t),
-        el('button', { type: 'button', class: 'x', 'aria-label': T('close'), text: '×', onclick: close })
-      ]),
-      body,
-      composerBlock(t, kept.values)
-    ]);
-    root.appendChild(el('div', { class: 'scrim', onclick: close }));
-    root.appendChild(sheet);
+    var sheet = showDialog(
+      'sheetTitle',
+      close,
+      [el('span', { class: 'key', text: t.key }), sheetNav(t)],
+      [body, composerBlock(t, kept.values)]
+    );
     // a fresh sheet starts at the top; a re-render stays where the reader was, or at the bottom if they were following the thread
     body.scrollTop = fresh ? 0 : kept.atBottom ? body.scrollHeight : kept.scroll;
     if (fresh) sheet.querySelector('.x').focus();
@@ -7172,18 +7189,7 @@ td.what .overlap{margin-left:8px}
         }
         renderAll();
         healWaiting();
-        if (!openId && location.hash.length > 1) {
-          var h = decodeURIComponent(location.hash.slice(1));
-          if (VIEWS.indexOf(h) >= 0) {
-            setView(h);
-            try {
-              history.replaceState(null, '', location.pathname + location.search);
-            } catch (e) {}
-          } else {
-            var t = taskByKey(h);
-            if (t) openSheet(t.id);
-          }
-        }
+        if (!openId && location.hash.length > 1) followHash(true);
       }
       db.collection('notices')
         .orderBy('at', 'desc')
@@ -7227,7 +7233,9 @@ td.what .overlap{margin-left:8px}
       renderRules();
     });
   }
-  window.addEventListener('hashchange', function () {
+  // #kanban or #graph opens a view, #KEY a task's sheet, and no hash closes the sheet. A link that opens the board on
+  // a view only says where to start, so the address lets go of it.
+  function followHash(atStart) {
     var h = decodeURIComponent(location.hash.slice(1));
     if (!h) {
       if (openId) close();
@@ -7235,10 +7243,17 @@ td.what .overlap{margin-left:8px}
     }
     if (VIEWS.indexOf(h) >= 0) {
       setView(h);
+      if (atStart)
+        try {
+          history.replaceState(null, '', location.pathname + location.search);
+        } catch (e) {}
       return;
     }
     var t = taskByKey(h);
     if (t && openId !== t.id) openSheet(t.id);
+  }
+  window.addEventListener('hashchange', function () {
+    followHash(false);
   });
   applyConfig({});
   if (window.claude && window.claude.use) start();
