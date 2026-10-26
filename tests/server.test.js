@@ -176,33 +176,6 @@ for (const backend of backends) {
       assert.equal(t1.data.deps.length, 0, 'update merges instead of replacing');
     });
 
-    test('the raw batch route drops an agent token\'s override; a page session keeps it, and board_batch records it', async () => {
-      const id = K('raw'), at = new Date().toISOString(), me = people.admin.person;
-      await store.apply(null, P, [{ op: 'set', path: `tasks/${id}`, data: { key: id, title: 'held', status: 'doing', owner: me, claimedBy: { who: me, at }, deps: [], waitingOn: [], updatedAt: at } }]);
-      try {
-        const write = { op: 'update', path: `tasks/${id}`, data: { title: 'retitled by a token' }, override: true };
-        const byToken = await api(`/api/p/${P}/batch`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.member}` }, body: { writes: [write] } });
-        assert.equal(byToken.status, 403, 'a token\'s override is dropped on the raw route, so the holder\'s rule applies');
-        assert.equal((await byToken.json()).code, 'not_yours');
-        assert.equal((await store.get(P, `tasks/${id}`)).data.title, 'held');
-        const cookie = (await api('/api/login', { method: 'POST', body: { token: tokens.member } })).headers.get('set-cookie').split(';')[0];
-        const bySession = await api(`/api/p/${P}/batch`, { method: 'POST', cookie, headers: { Origin: BASE }, body: { writes: [{ ...write, data: { title: 'retitled on the page' } }] } });
-        assert.equal(bySession.status, 200, `the page keeps its override: ${await bySession.text()}`);
-        assert.equal((await store.get(P, `tasks/${id}`)).data.title, 'retitled on the page');
-        const other = await connect(tokens.member);
-        try {
-          const r = await call(other, 'board_batch', { project: P, override: true, writes: [{ op: 'update', path: `tasks/${id}`, data: { title: 'retitled by board_batch' } }] });
-          assert.equal(r.error, false, JSON.stringify(r.value));
-        } finally {
-          await other.close();
-        }
-        const said = (await call(board, 'board_query', { project: P, collection: `tasks/${id}/messages`, order_by: [{ field: 'at', dir: 'desc' }], limit: 1 })).value.docs[0]?.data.text;
-        assert.match(said || '', /override/, 'the thread says the override happened');
-      } finally {
-        await store.apply(null, P, [{ op: 'delete', path: `tasks/${id}` }]);
-      }
-    });
-
     test('a task\'s fields stay on its own line, so a title cannot add lines that read like the board\'s', async () => {
       const X = `lines-${R}`, at = new Date().toISOString();
       await store.createProject(null, { id: X, title: 'Lines', lang: 'en' });
@@ -1491,6 +1464,34 @@ for (const backend of backends) {
     });
 
     if (backend.name === 'sqlite') {
+      // the raw document routes exist on SQLite only: on Supabase the page reads and writes the database itself
+      test('the raw batch route drops an agent token\'s override; a page session keeps it, and board_batch records it', async () => {
+        const id = K('raw'), at = new Date().toISOString(), me = people.admin.person;
+        await store.apply(null, P, [{ op: 'set', path: `tasks/${id}`, data: { key: id, title: 'held', status: 'doing', owner: me, claimedBy: { who: me, at }, deps: [], waitingOn: [], updatedAt: at } }]);
+        try {
+          const write = { op: 'update', path: `tasks/${id}`, data: { title: 'retitled by a token' }, override: true };
+          const byToken = await api(`/api/p/${P}/batch`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.member}` }, body: { writes: [write] } });
+          assert.equal(byToken.status, 403, 'a token\'s override is dropped on the raw route, so the holder\'s rule applies');
+          assert.equal((await byToken.json()).code, 'not_yours');
+          assert.equal((await store.get(P, `tasks/${id}`)).data.title, 'held');
+          const cookie = (await api('/api/login', { method: 'POST', body: { token: tokens.member } })).headers.get('set-cookie').split(';')[0];
+          const bySession = await api(`/api/p/${P}/batch`, { method: 'POST', cookie, headers: { Origin: BASE }, body: { writes: [{ ...write, data: { title: 'retitled on the page' } }] } });
+          assert.equal(bySession.status, 200, `the page keeps its override: ${await bySession.text()}`);
+          assert.equal((await store.get(P, `tasks/${id}`)).data.title, 'retitled on the page');
+          const other = await connect(tokens.member);
+          try {
+            const r = await call(other, 'board_batch', { project: P, override: true, writes: [{ op: 'update', path: `tasks/${id}`, data: { title: 'retitled by board_batch' } }] });
+            assert.equal(r.error, false, JSON.stringify(r.value));
+          } finally {
+            await other.close();
+          }
+          const said = (await call(board, 'board_query', { project: P, collection: `tasks/${id}/messages`, order_by: [{ field: 'at', dir: 'desc' }], limit: 1 })).value.docs[0]?.data.text;
+          assert.match(said || '', /override/, 'the thread says the override happened');
+        } finally {
+          await store.apply(null, P, [{ op: 'delete', path: `tasks/${id}` }]);
+        }
+      });
+
       test('the page signs in with a token or a one-time link, reads, writes and hears changes live', async () => {
         assert.equal((await api('/api/login', { method: 'POST', body: { token: 'abt_wrong-token-wrong-token-00' } })).status, 401);
         const login = await api('/api/login', { method: 'POST', body: { token: tokens.member } });
