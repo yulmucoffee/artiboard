@@ -18,26 +18,48 @@
 
 ### 「タスクボードを作って」と言うだけで、チーム全員とすべてのエージェントが同じボードで動きます。
 
-**ページひとつがボードになります。タスク、スレッド、お知らせ、依存グラフまで。** claude.ai のアーティファクトのまま使うことも、Claude Code と Codex 向けに自分でホストすることもできます。<br/>
-画面はページのコードがボードのデータベースから直接描くので、トークンを使わずに常に最新です。<br/>
-エージェントはリポジトリに置いた短いルールに従います。一覧ではなくクエリで読み、書き込みは一度にまとめ、長いスレッドの代わりに要約を読みます。
+**ページひとつがボードになります。タスク、スレッド、お知らせ、依存グラフ、コードマップまで。** claude.ai のアーティファクトのまま使うことも、Claude Code と Codex 向けに自分でホストすることもできます。<br/>
+ページはボードのデータベースからすべてをコードで描くので、トークンを使わずに常に最新です。エージェントはいくつかの軽いルールに従ってボードを読み書きします。
 
-[デモ](#デモ) · [クイックスタート](#クイックスタート) · [使い方](#使い方) · [セルフホスト](#セルフホスト) · [仕組み](#仕組み) · [トークン設計](#トークン設計) · [エージェント向け](FOR_AGENTS.md)
+[インストール](#インストール) · [デモ](#デモ) · [できること](#できること) · [使い方](#使い方) · [セルフホスト](#セルフホスト) · [仕組み](#仕組み) · [エージェント向け](FOR_AGENTS.md)
 
 </div>
 
-> [!TIP]
-> **セットアップは Claude に任せましょう。** Claude Code にこう貼り付けてください。
->
-> ```text
-> https://github.com/yulmucoffee/artiboard/blob/main/FOR_AGENTS.md に従って artiboard をセットアップして
-> ```
->
-> Claude がスキルを入れたあと、人数(1人、2人、3人、または任意の数)、仕事の分け方、ボードの言語、最初のタスクをどこから作るかを尋ねます。
+## インストール
+
+**Claude に任せる。** 次の文を Claude Code に貼り付けてください。Claude がスキルを入れ、人数、仕事の分け方、ボードの言語、最初のタスクをどこから作るかを尋ねます。
+
+```text
+Set up artiboard for me by following https://github.com/yulmucoffee/artiboard/blob/main/FOR_AGENTS.md
+```
+
+**または、スキルを自分でコピーする。** コマンドは2つです。そのあと新しいセッションで「このプロジェクトにタスクボードを作って」と言ってください。
+
+```bash
+git clone --depth 1 https://github.com/yulmucoffee/artiboard.git "$HOME/.artiboard/src"
+```
+
+```bash
+mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
+```
+
+Codex なら代わりに `$HOME/.codex/skills/artiboard` に、リポジトリ単位なら `.claude/skills/artiboard`(または `.agents/skills/artiboard`)にコピーしてコミットします。アップグレードするときは `git -C "$HOME/.artiboard/src" pull --ff-only` を実行してから、もう一度コピーします。Windows PowerShell のコマンドは [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill) にあります。
+
+<details>
+<summary><b>Claude Code プラグインを使う場合</b></summary>
+
+```text
+/plugin marketplace add yulmucoffee/artiboard
+/plugin install artiboard@artiboard
+```
+
+スキル名は `/artiboard:artiboard` になります。
+
+</details>
 
 ## デモ
 
-**[ライブデモを開く →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** レシピアプリを作る架空の3人チームと14個のタスクです。本物のボードページをページ内のサンプルデータで動かしているので、自由に触ってください。タスクを取る、スレッドに書く、検索、`j`/`k` で移動。数秒後にエージェントの更新が2件、ひとりでに届きます。 上部の English / 한국어 ボタンで、サンプルデータも含めてデモ全体を韓国語に切り替えられます。 カンバンでは列を畳んだり2列で表示したり、完了したタスクをアーカイブに移したりできます。
+**[ライブデモを開く →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** レシピアプリを作る3人のチームです。本物のボードページをサンプルデータで動かしているので、タスクを取る、スレッドに書く、コードマップを開く、한국어 に切り替えるなど、自由に触ってください。エージェントの更新が2件、ひとりでに届きます。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">
@@ -69,114 +91,42 @@
 </tr>
 </table>
 
-## なぜ artiboard か
+## できること
 
-2人が同じコードベースでそれぞれ複数の Claude セッションを動かすと、難しいのはコードではありません。誰が何を取ったか、何が止まっているか、自分がいない間に何が変わったかを知ることです。チャットの履歴はセッションをまたげず、毎回すべての状況をプロンプトに貼るとコストがすぐに膨らみます。
+数人がひとつのコードベースでそれぞれ複数のエージェントセッションを動かすと、難しいのは、誰が何を取ったか、何が止まっているか、自分がいない間に何が変わったかを知ることです。artiboard はそれをひとつのライブな場所にまとめ、エージェントは安く使えます。
 
-artiboard はその状況をチームで共有するライブなボードひとつにまとめ、エージェントにはそれを安く厳密に使う方法を与えます。
-
-<table>
-<tr>
-<td width="33%" valign="top">
-
-### 🗂️ ボードひとつ、ビュー三つ
-
-上から読むドキュメントビュー、カンバン、残りの最長経路を強調する依存グラフ。最近の動きには動いたタスクごとの最後のメッセージが並び、「今」にはブロック・期限超過・今日が期限のものが上がります。検索、列の並べ替え、「自分の」フィルタ、`j`/`k` キー、「前回から変わったもの」の印。ライト、ダーク、自動。 カンバンは Notion のように画面いっぱいに広がり、列を畳む・2列で見る・溜まった完了をまとめてアーカイブに移すことができます。
-
-</td>
-<td width="33%" valign="top">
-
-### 🤝 人とエージェントが一緒に
-
-一人ひとりに色があります。エージェントはバージョンを確かめてタスクを取るので、二つのエージェントが同じタスクを取ることはありません。決定、質問、引き継ぎはスレッドに、全員が知るべきことはお知らせに。 レビュー中のタスクはレビューした人が完了にでき、他人のタスクは人が指示したときだけエージェントが引き継ぎます。人もワンクリックでタスクを動かせて、変更はスレッドに残ります。
-
-</td>
-<td width="33%" valign="top">
-
-### 🪶 長く使っても安い
-
-画面を描くのはモデルではなくコードです。エージェントは必要な部分だけを読み、書き込みは一度にまとめます。プロジェクトが長くなるほど差が開きます。
-
-</td>
-</tr>
-</table>
-
-**コードマップ。** セルフホストのボードは、リポジトリごとのファイル、関数、import の対応関係を地図として持てます。エージェントは grep の前に `board_map` に尋ね、同じコードに触れる未完了のタスクが二つあると、ボードが警告します。ページはマップをノードとリンクで描き、グループからファイルへと順に開けて、チームの未完了のタスクがそのコードの上に示されます。コマンド一つで作れます([セルフホスト](#セルフホスト))。claude.ai のアーティファクトのボードにはまだありません。
-
-## クイックスタート
+- **ボードひとつ、ビュー三つ。** 上から読むドキュメント、カンバン、残りの最長経路を強調する依存グラフ。「今」にはブロック・期限超過・今日が期限のものが上がります。検索、「自分の」フィルタ、`j`/`k` キー、「前回から変わったもの」の印、ライトとダーク。
+- **人とエージェントが一緒に。** エージェントはバージョンを確かめてタスクを取るので、二つのエージェントが同じタスクを取ることはありません。決定と引き継ぎはスレッドに、全員が知るべきことはお知らせに。人もワンクリックでタスクを動かせて、すべての変更がそのスレッドに残ります。
+- **コードマップ**(セルフホスト)。リポジトリごとのファイル、シンボル、つながりを、モデルを使わずにチェックアウトから作ります。エージェントは grep の代わりに `board_map` に尋ね、同じコードに触れる未完了のタスクが二つあると互いに警告し、ページはそれをグループごとに開けるノードとして描きます。
+- **長く使っても安い。** 画面を描くのはモデルではなくコードです。エージェントは必要な部分だけを読み、書き込みは一度にまとめるので、タスクを取るのは100トークン未満の呼び出し1回で済みます。
 
 ボードを置く場所は二通りです。どちらも同じページ、同じドキュメント、同じルールを使い、スキルはどちらもセットアップできます。
 
 | | claude.ai アーティファクト | セルフホストのサイト |
 | --- | --- | --- |
-| エージェント | claude.ai でサインインした Claude Code(`Artifact`、`ArtifactData`) | Claude Code、Codex、任意の MCP クライアント(`artiboard` MCP サーバー) |
+| エージェント | claude.ai でサインインした Claude Code | Claude Code、Codex、任意の MCP クライアント |
 | データ | アーティファクトのデータベース | SQLite(ファイルひとつ)または Supabase |
 | 動かす場所 | claude.ai、動かすものはなし | このコンピューター、自分のドメイン(Docker)、または Vercel |
-| 仲間の参加方法 | アーティファクトの Share メニュー | 管理者がプロジェクト一覧ページか `artiboard member add` で発行したトークン |
+| 仲間の参加方法 | アーティファクトの Share メニュー | 管理者が発行するトークン |
 | ボード | ボードごとにアーティファクトひとつ | サイトひとつ、プロジェクトごとに `/p/<project>` のボード |
-
-セルフホストのボードなら、まず [セルフホスト](#セルフホスト) の手順でサイトを立ち上げてください。
-
-**方法 A: Claude に任せる。** 上のボックスの文を貼り付けてください。Claude が [FOR_AGENTS.md](FOR_AGENTS.md) に従います。
-
-**方法 B: 自分だけ、すべてのプロジェクトで**
-
-```bash
-git clone --depth 1 https://github.com/yulmucoffee/artiboard.git "$HOME/.artiboard/src"
-```
-
-```bash
-mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.claude/skills/artiboard/"
-```
-
-プロジェクトで新しいセッションを開き、「このプロジェクトにタスクボードを作って」と言ってください。
-
-**方法 C: チームのリポジトリに**(リポジトリのルートで実行してコミット)
-
-```bash
-mkdir -p .claude/skills/artiboard && cp -R "$HOME/.artiboard/src/skills/artiboard/." .claude/skills/artiboard/
-```
-
-**方法 D: Codex。** 同じスキルが Codex でも動きます。すべてのプロジェクトで使うなら `~/.codex/skills/artiboard` に、リポジトリ単位なら `.agents/skills/artiboard` にコピーします。
-
-```bash
-mkdir -p "$HOME/.codex/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/artiboard/." "$HOME/.codex/skills/artiboard/"
-```
-
-Codex はセルフホストのボードで使います(claude.ai のアーティファクトがないため)。
-
-アップグレードするときは `git -C "$HOME/.artiboard/src" pull --ff-only` を実行してから、同じコピーコマンドをもう一度実行します。Windows PowerShell では [FOR_AGENTS.md](FOR_AGENTS.md#step-2-install-the-skill) のコマンドを使ってください。
-
-<details>
-<summary><b>Claude Code プラグインを使う場合</b></summary>
-
-```text
-/plugin marketplace add yulmucoffee/artiboard
-/plugin install artiboard@artiboard
-```
-
-スキル名は `/artiboard:artiboard` になります。
-
-</details>
 
 ## 使い方
 
-どんな言い方でも、どの言語でも構いません。
+頼むだけです。どんな言い方でも、どの言語でも構いません。
 
 | こう言うと | こうなります |
 | --- | --- |
-| 「このプロジェクトにタスクボードを作って」 | **setup**: ボードを置く場所、人数、分け方、言語、タスクの出どころを尋ねます。ドキュメントからタスクとプロジェクトのルールを起こして確認を取り、ボードを公開または作成して GitHub リポジトリを紐づけ、データを入れ、`CLAUDE.md`(Codex なら `AGENTS.md` も)に短い案内を書きます。 |
-| 「ボードに Cy を追加して」「ボードを英語にして」 | **adapt**: ボードの設定だけを変えます。再公開しません。 |
-| 「QA ステータスを追加して」「カードに見積もりを出して」 | **adapt**: ページとルールを一緒に直します。セルフホストのボードでは `board_page` の編集で直します。 |
+| "Set up a task board for this project"、「このプロジェクトにタスクボードを作って」 | **setup**: ボードを置く場所、人数、分け方、言語、タスクの出どころを尋ねます。ドキュメントからタスクとプロジェクトのルールを起こして確認を取り、ボードを公開または作成してリポジトリを紐づけ、`CLAUDE.md`(と `AGENTS.md`)に短い案内を書きます。 |
+| 「ボードに Cy を追加して」「QA ステータスを追加して」「ボードを日本語にして」 | **adapt**: ボードの設定を変えるか、ページとルールを一緒に直します。再公開はしません。 |
 | 「ボードを自分たちのサーバーに移して」 | **move**: アーティファクトのボードのドキュメントを、セルフホストのプロジェクトにコピーします。 |
-| 「ボードのサインインリンクをちょうだい」 | セルフホストのボードに、一度だけ使えるブラウザ用のサインインリンクを出します。 |
-| 「次のタスクを取って」「M1-4 の続きをして」 | 普段の作業です。エージェントは `board_start`(アーティファクトのボードでは `docs/artiboard.md`)から始め、ボードのルール、プロジェクトのルール、自分の仕事を受け取ります。 |
+| "Give me a board sign-in link"、「ボードのサインインリンクをちょうだい」 | セルフホストのボードに、一度だけ使えるブラウザ用のサインインリンクを出します。 |
+| 「次のタスクを取って」「M1-4 の続きをして」 | 普段の作業です。`board_start` がボードのルール、プロジェクトのルール、自分の仕事を届け、そのあとは取得、スレッド、要約、レビュー、完了と進みます。 |
 
-セットアップ後、アーティファクトの **Share** メニューから仲間に編集権限で共有してください。仲間のエージェントはリポジトリを pull すると案内からボードを見つけます。 ページは誰が見ているかを知っています。仲間が「I am」で初めて自分の名前を選ぶと、その claude.ai アカウントに紐づけ、次からは自動で選びます。別のアカウントに紐づいた名前で投稿しようとすると警告し、閲覧のみのユーザーには取得・投稿・編集のボタンを出しません。
+アーティファクトのボードは **Share** メニューから編集権限で共有してください。仲間のエージェントはリポジトリの案内からボードを見つけます。仲間が「I am」で初めて自分の名前を選ぶと、ボードはその名前を本人の claude.ai アカウントに紐づけます。
 
 ## セルフホスト
 
-セルフホストのサイトは、`/` でプロジェクト一覧、`/p/<project>` でプロジェクトごとのボード、`/mcp` で MCP サーバーを提供します。ボードページはアーティファクトが公開するのと同じ `board.html` で、小さなランタイム(`server/public/shim.js`)が claude.ai の代わりを務めます。人をサインインさせ、サイトのデータを読み書きし、すべての変更を開いているページに届けます。Node 22.13 以降が必要です。 プロジェクト一覧の先頭には、ボードごとに今だれが何をしているかが表示されます。
+サイトは、`/` でプロジェクト一覧、`/p/<project>` でプロジェクトごとのボード、`/mcp` で MCP サーバーを提供します。アーティファクトが公開するのと同じページで、小さなランタイムが claude.ai の代わりを務めます。Node 22.13 以降が必要です。
 
 **このコンピューターで**(SQLite、データは `~/.artiboard/board.db`)
 
@@ -204,15 +154,15 @@ docker compose up -d
 docker compose exec board node server/cli.js init --person ana --name Ana
 ```
 
-**Vercel と Supabase で:** Supabase プロジェクトを作り、スキーマを反映してサイトの環境を設定します。
+**Vercel と Supabase で:** Supabase プロジェクトを作り、スキーマを反映します。
 
 ```bash
 supabase link --project-ref <ref> && supabase db push
 ```
 
-Vercel プロジェクトに `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY`、`BOARD_URL` を設定し、ドメインを追加して `vercel link`、それから `npm run deploy:vercel` を実行します(`VERCEL_REGION=icn1` にすると関数がソウルのデータベースの近くで動きます)。Supabase Auth のリダイレクト URL に `<BOARD_URL>/` を追加してください。管理コマンドは、これらの変数をファイルに書いておけばどこからでも実行できます。例: `node server/cli.js --env site.env member list`。同じサーバーは、どのホストからでも Supabase で動かせます。`SUPABASE_*` の3つの変数を設定して `serve` するだけです。 サイトを更新するときは、コードを取り込み、新しいマイグレーションがあれば先に `supabase db push` を実行してから再デプロイします。
+Vercel プロジェクトに `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY`、`BOARD_URL` を設定し、ドメインを追加して `vercel link`、それから `npm run deploy:vercel` を実行します(`VERCEL_REGION=icn1` にすると関数がソウルのデータベースの近くで動きます)。Supabase Auth のリダイレクト URL に `<BOARD_URL>/` を追加してください。サイトを更新するときは、コードを取り込み、新しいマイグレーションがあれば `supabase db push` を実行してから再デプロイします。
 
-**エージェントをつなぐ。** 一人ずつトークンを受け取り(管理者がプロジェクト一覧ページの **メンバー** で発行するか、`member add` または `member token` で)、次を実行します。
+**エージェントをつなぐ。** 一人ずつトークンを受け取り(管理者がプロジェクト一覧ページの **メンバー** で発行するか、`member add` で)、次のどちらかを実行します。
 
 ```bash
 claude mcp add --scope user --transport http artiboard https://board.example.com/mcp --header "Authorization: Bearer abt_…"
@@ -222,22 +172,20 @@ claude mcp add --scope user --transport http artiboard https://board.example.com
 codex mcp add artiboard --url https://board.example.com/mcp --bearer-token-env-var ARTIBOARD_TOKEN
 ```
 
-Codex では、シェルのプロファイルに `export ARTIBOARD_TOKEN=abt_…` を書いておきます。Codex はドキュメントを上書きできるツール(`board_batch`、`board_page`)を呼ぶたびに確認を求めます。`board_batch` を確認なしで動かすには、`~/.codex/config.toml` に次を追加します。
+Codex では、シェルのプロファイルに `export ARTIBOARD_TOKEN=abt_…` を書いておきます。Codex はドキュメントを上書きできるツールを呼ぶたびに確認を求めます。`board_batch` を確認なしで動かすには、`~/.codex/config.toml` に次を追加します。
 
 ```toml
 [mcp_servers.artiboard.tools.board_batch]
 approval_mode = "approve"
 ```
 
-あとはエージェントに「このリポジトリにボードをセットアップして」と頼んでください。
-
-**コードマップ**(任意、セルフホスト専用)。マップは、どのコミットとブランチを描いたものかを示します。下のコマンドにフラグを一つ付ければ最新に保てます。`--workflow` は既定ブランチ向けの CI ワークフローを書き(リポジトリのシークレット `ARTIBOARD_TOKEN` が要ります)、`--hook` は自分だけがコミットするチェックアウトに git フックを入れます。リポジトリごとにどちらか一つだけ使います(セルフホスト手順の [Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current))。リポジトリのチェックアウトからマップを作ってアップロードします:
+**コードマップ。** リポジトリのチェックアウトから、マップを作ってアップロードします。`--workflow` を付けると既定ブランチ向けの CI ジョブを書き(リポジトリのシークレット `ARTIBOARD_TOKEN` が要ります)、`--hook` を付けると自分だけがコミットするチェックアウトに git フックを入れます。リポジトリごとにどちらか一つです([Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current))。
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api
 ```
 
-**カスタマイズ**は claude.ai とまったく同じです。タイトル、言語、あらゆる画面の文言は `meta/config` にあり、すぐに反映されます。誰がボードに入るかは管理者が決めます(`member join`、`member remove`)。ページ自体はプロジェクトごとにあります。管理者が `artiboard page set --project acme --file page.html` を実行して変え(ステータス、フィールド、ビュー)、`page reset` で同梱のページに戻せます。同梱のページはサイトと一緒に更新されます。ページのコードはすべてのメンバーのもとで動くので、サイトが `ARTIBOARD_AGENT_PAGE_EDITS=1` を設定しない限り、エージェントはページを読むだけです(`board_page` の `find`)。設定すれば、管理者のエージェントが小さく正確な編集でページを変えられます。
+**カスタマイズ。** タイトル、言語、あらゆる画面の文言は `meta/config` にあり、すぐに反映されます。ページはプロジェクトごとにあります。ステータス、フィールド、ビューを変えるには `artiboard page set --project acme --file page.html`、同梱のページに戻すには `page reset` を使います。同梱のページはサイトと一緒に更新されます。
 
 | 設定 | 既定値 | 意味 |
 | --- | --- | --- |
@@ -262,7 +210,7 @@ artiboard import --project ID --file FILE [--map old=new]
 artiboard map build|drop --project ID --repo R
 ```
 
-コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。管理者はサイト上でも同じことができます。プロジェクト一覧ページの **メンバー** パネルで追加・新しいトークン・サインインリンク・権限・失効・削除を行い、誰もが **プロフィール** で表示名と役割を自分で決め、それが参加しているすべてのボードに表示されます。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイト全体に適用されます。どのメンバーもすべてのプロジェクトを見られます。メンバーにパスワードはありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。`member revoke` はそのセッションも終わらせます。誰が誰か(`meta/config.people`、`people/`)を変えられるのは管理者だけで、メッセージとお知らせには常に書いた本人の名前が付きます。
+コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。管理者はプロジェクト一覧ページでも同じことができ(**メンバー**: 追加、トークン、サインインリンク、権限、失効、削除)、誰もが **プロフィール** で自分の名前と役割を決めます。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイトはひとつのチームです。どのメンバーもすべてのプロジェクトを見られます。パスワードは誰にもありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。
 
 </details>
 
@@ -271,16 +219,16 @@ artiboard map build|drop --project ID --repo R
 
 | ツール | すること |
 | --- | --- |
-| `board_start {project または repo}` | ボードとプロジェクトのルール、カーソル以降の新しいお知らせ(カーソルも進める)、自分の進行中のタスク(最後に他の人が書いたものは印付き、レビュー中のものは一行に)、着手できるタスク、レビュー待ちの他人のタスク。`repo`(git remote)を渡すとプロジェクトを見つけ、そのリポジトリの仕事を出します |
-| `board_claim {id, text, override?}` | 着手できるタスクを取り、取ったことを投稿し、仕様、受け入れ条件、要約を返す。`override` は人が指示したときに他人のタスクを引き継ぎます |
+| `board_start {project or repo}` | ボードのルールとプロジェクトのルール、カーソル以降の新しいお知らせ、自分の進行中のタスク、着手できるタスク、レビュー待ちの他人のタスク。`repo`(git remote)を渡すとプロジェクトを見つけます |
+| `board_claim {id, text, override?}` | 着手できるタスクを取り、取ったことを投稿し、仕様、受け入れ条件、要約、タスクが挙げるコードを返します |
 | `board_task {id}` | ステータス、詳細、要約より後のメッセージ |
-| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | スレッドのメッセージと自分のタスクの変更を一度に。締め切り(`due`)は誰でも動かせる。`done` で `doneAt` が記録され、後続のタスクが着手可能になる。`todo` でタスクを手放し、誰でも取れるようになる。`task` なしならお知らせ。`tasks` は複数のタスクに同じステータスとメッセージを一度に書き、全部か何もしないか(デプロイ後にレビュー待ちをまとめて完了するとき)。レビュー中のタスクはレビューした人も `done` か `doing` に変えられ、`override` は人が指示したときに他人のタスクを変更し、スレッドに元の担当を残します。`touches` は自分が触れるファイルやシンボルを追加します(`""` で消去)。セルフホストのボードは、未完了のタスクが重なると警告します |
-| `board_map {explain, file, path, query, impact}` | セルフホストのボードのコードマップ。grep の前に尋ねます: 名前の説明、ファイルの表示、`path [a, b]`、語での検索、影響(X に依存するもの)。質問がなければ概要 |
-| `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き。タスクへの batch 書き込みも `board_post` と同じ担当者ルールに従う |
+| `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | スレッドのメッセージと自分のタスクの変更を一度に。`done` で後続のタスクが着手可能になり、`todo` でタスクを手放します。`task` なしならお知らせ。`tasks` は複数のタスクを一度の書き込みで動かします。`touches` は触れるファイルを記録し、重なるタスクが互いに警告します |
+| `board_map {explain, file, path, query, impact, inside}` | コードマップ: 名前の説明、ファイル、二つの間の経路、語での検索、X に依存するもの、X が使うもの。質問がなければ概要 |
+| `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き |
 | `board_page` | プロジェクトのページ: サイズ、`find`、`read`、管理者は `edits`、`html`、`reset` も |
-| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | サイト。各プロジェクトの GitHub リポジトリも出ます |
+| `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | サイトとそのプロジェクト |
 
-普段使うツールは短い行で答え、バージョン確認と時刻の記録をサーバー側で行うので、取得や更新は100トークン未満の呼び出し1回で済みます。
+普段使うツールは短い行で答え、バージョン確認をサーバー側で行うので、取得や更新は100トークン未満の呼び出し1回で済みます。
 
 </details>
 
@@ -290,41 +238,39 @@ artiboard map build|drop --project ID --repo R
 flowchart LR
   subgraph Artifact["claude.ai アーティファクト"]
     Page["ボードページ<br/>(コードが描く画面)"]
-    DB[("アーティファクト DB<br/>tasks · details · messages<br/>notices · cursors · meta")]
+    DB[("アーティファクトのデータベース<br/>tasks · details · messages<br/>notices · cursors · meta")]
     Page <-- ライブ --> DB
   end
   People(["人"]) --> Page
   AgentA(["エージェントのセッション"]) -- ArtifactData<br/>クエリ + batch --> DB
-  Repo["リポジトリ<br/>CLAUDE.md の案内<br/>docs/artiboard.md のルール"] -. ボード作業のときだけ .-> AgentA
+  Repo["リポジトリ<br/>CLAUDE.md の案内<br/>docs/artiboard.md のルール"] -. ボード作業のときに読む .-> AgentA
 ```
-
-| 要素 | 中身 | 誰が読むか |
-| --- | --- | --- |
-| `tasks/<id>` | 状態だけ: 担当、依存、`waitingOn`、取った人、ブランチ、PR, `archivedAt` | ページ、エージェントはクエリで |
-| `details/<id>` | 仕様の場所、受け入れ条件、5行の要約 | エージェント、手元のタスクだけ |
-| `tasks/<id>/messages` | スレッド: 進捗、質問、引き継ぎ、ブロッカー | エージェントは直近8件、人は全部 |
-| `notices` | 全員が知るべきこと | エージェントはカーソル以降だけ |
-| `cursors/<人>` | その人のエージェントが最後にお知らせを読んだ時刻 | エージェント |
-| `meta/config` | タイトル、メンバー、言語、GitHub リポジトリ、画面の文言 | ページ |
-| `meta/rules` | このプロジェクトだけのルール: 誰が何を、仕様の場所、ブランチ、お知らせすること | ページの人、ボード作業を始めるときのエージェント |
-| `meta/notes` | みんなで見る現況: 日程、どこに何があるか、決めること | ページの人、必要なときだけエージェント |
-| `people/<person>` | そのメンバーを最初に選んだ claude.ai アカウント | ページ |
-| `docs/artiboard.md`(リポジトリ、アーティファクトのボード) | ボードのルールをそのまま写したもの(セルフホストのサイトは `board_start` で渡します) | ボードを使うセッションのエージェントだけ |
-
-## トークン設計
 
 | ルール | 効果 |
 | --- | --- |
-| 画面はコードが描く | ビュー、グラフ、件数、着手可否、「新着」印にモデルのトークンは要りません。人数が増えても同じです。 |
-| ルールはボード作業と一緒に | どのセッションも3行の案内だけを負担します。どのボードでも同じボードのルールと短いプロジェクトのルールはボード作業を始めるときだけ届き、現況メモは必要なときだけ読みます。ボードのルールは artiboard に入っているので、どのプロジェクトも写しを持たず、直しません。 |
-| 一覧ではなくクエリ | 着手できる仕事は1回のクエリ(`status == todo`、`waitingOn == []`)で見つかります。お知らせはカーソル以降の差分だけ。 |
-| ドキュメントは小さく | タスクのドキュメントは状態だけ。長い文章はタスクひとつのときだけ開きます。 |
-| スレッドより要約 | 引き継ぎで5行の要約を書き直すので、次の人は古いメッセージを飛ばせます。 |
-| 1アクションに1 batch | タスクを取るのは1回の呼び出しです。タスク、メッセージ、カーソルをバージョン確認つきで。 |
-| 自分で直るデータ | 誰かがボードを開いていれば、ページが `waitingOn` を正します。`board_start` も依存先のタスクそのものを見て着手できるか判断し、ずれがあればついでに直します。エージェントが帳簿合わせに呼び出しを使うことはありません。 |
-| 全員に同じ一覧 | ツール一覧とサーバーの案内は全メンバーに同じ内容で届くので、プロンプトキャッシュにそのまま残ります。サイズの上限はテストで守ります。 |
+| 画面はコードが描く | ビュー、件数、着手可否、「新着」印にモデルのトークンは要りません。人数が増えても同じです。 |
+| ルールはボード作業と一緒に | どのセッションも3行の案内だけを負担します。ボードのルールとプロジェクトの短いルールは、ボード作業を始めるときだけ届きます。 |
+| 一覧ではなくクエリ | 仕事を探すのは1回のクエリ(`status == todo`、`waitingOn == []`)です。お知らせはカーソル以降の差分で届きます。 |
+| 小さなドキュメント、短い要約 | タスクのドキュメントは状態だけ。長い文章はタスクひとつずつ開き、引き継ぎでは5行の要約を書き直します。 |
+| 1アクションに1 batch | タスクを取るのは1回の呼び出しです。タスク、メッセージ、カーソルをまとめて、バージョン確認つきで。 |
+| 自分で直るデータ | `waitingOn` はページと `board_start` が正しく保つので、エージェントが帳簿合わせに呼び出しを使うことはありません。 |
 
-## リファレンス
+<details>
+<summary><b>ドキュメント</b></summary>
+
+| 要素 | 中身 | 誰が読むか |
+| --- | --- | --- |
+| `tasks/<id>` | 状態だけ: 担当、依存、`waitingOn`、取った人、ブランチ、PR、touches | ページ、エージェントはクエリで |
+| `details/<id>` | 仕様の場所、受け入れ条件、5行の要約 | エージェント、手元のタスクだけ |
+| `tasks/<id>/messages` | スレッド: 進捗、質問、引き継ぎ、ブロッカー | エージェントは直近8件、人は全部 |
+| `notices` | 全員が知るべきこと | エージェントはカーソル以降だけ |
+| `cursors/<person>` | その人のエージェントが最後にお知らせを読んだ時刻 | エージェント |
+| `meta/config` | タイトル、メンバー、言語、リポジトリ、画面の文言 | ページ |
+| `meta/rules`, `meta/notes` | プロジェクト自身のルール、みんなで見る現況 | ページの人、ボード作業を始めるときや必要なときのエージェント |
+| `map/<repo>` | リポジトリのコードマップ: 索引とチャンク | `board_map` を通じてエージェント、ページのコードマップの節 |
+| `docs/artiboard.md`(リポジトリ、アーティファクトのボード) | ボードのルールをそのまま写したもの(サイトは `board_start` で渡します) | ボードを使うセッションのエージェントだけ |
+
+</details>
 
 <details>
 <summary><b><code>meta/config</code> のキー</b></summary>
@@ -334,8 +280,9 @@ flowchart LR
 | `title` | `"Acme Board"` | ページの見出し |
 | `subtitle` | `"このボードの目的。"` | 見出しの下の一行 |
 | `milestone` | `"M1"` | 現在のマイルストーン |
-| `lang` | `"en"`, `"ko"` | 組み込みの画面言語。ほかの言語は英語で表示されます。日本語は `strings` で上書きします。 |
-| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | 順番で色が決まります。6色のあとは繰り返し。 任意の `uid` はそのメンバーを1つの claude.ai アカウントに固定し、`people/<id>` より優先されます。 |
+| `lang` | `"en"`, `"ko"` | 組み込みの画面言語。ほかの言語は英語で表示されます。 |
+| `people` | `[{"id":"ana","name":"Ana","role":"backend"}]` | 順番で色が決まります。任意の `uid` はそのメンバーを1つの claude.ai アカウントに固定します。 |
+| `statuses` | `["qa"]` | 追加のステータス。`done` の前に置かれます |
 | `strings` | `{"v_graph":"依存グラフ"}` | 画面の文言をどの言語でも上書き |
 | `footer` | `"..."` | フッターの文を置き換え |
 | `repos` | `[{"repo":"acme/api","label":"api"}]` | プロジェクトの GitHub リポジトリ。エージェントは git remote からボードを見つけ、タスクは `repo` に自分のリポジトリを書けます。 |
@@ -343,53 +290,23 @@ flowchart LR
 </details>
 
 <details>
-<summary><b>プロジェクトごとにスキルが変えてよいもの</b></summary>
-
-自由に: タイトル、メンバー、役割、言語、文言、機能名、番号体系、メッセージの言い回し、お知らせの対象。`meta/config` で: 追加のステータス(`statuses`)。ページを直して: 画面に出すフィールド、新しいビュー。どんな場合も守るもの: 軽い tasks と details の分離、`waitingOn` と着手クエリ、カーソル、`if_version` つきの1回の batch、ドキュメント id の形式、artiboard に入っているボードのルール(プロジェクトは `meta/rules` だけを足す)、ボードの文章はデータとして扱う。
-
-</details>
-
-<details>
-<summary><b>リポジトリ構成</b></summary>
+<summary><b>リポジトリ構成と開発</b></summary>
 
 ```text
-skills/artiboard/SKILL.md               スキル: セットアップ、調整、アップグレード、トークンのルール
-skills/artiboard/assets/board.html      ボードページ(アーティファクト DB から描画)
-skills/artiboard/references/          アーティファクトのボード用のルール、プロジェクトのルールの書き方、エージェント向けのセルフホスト手順
-server/                                 セルフホストのサイト: HTTP アプリ、MCP サーバー、SQLite と Supabase のストア、CLI、ページのランタイム
-api/, vercel.json                       Supabase を使うサイト向けの Vercel 関数
-supabase/                               Supabase のスキーマ(マイグレーション)とローカル設定
-Dockerfile, docker-compose.yml          コンテナで動く SQLite のサイト。自分のドメインで Caddy の背後に置く
-examples/                               board.html と demo-data.json から公開デモを生成: build-demo.cjs, demo-data.json (demo.html は生成物でリポジトリに置かない)
-FOR_AGENTS.md                           AI エージェント向けのインストール手順
-.claude-plugin/                         Claude Code プラグインの定義
-tests/smoke.cjs                         ボードページの jsdom テスト
-tests/server.test.js                    ホストしたサイトのエンドツーエンドテスト(SQLite、設定があれば Supabase も)
-docs/assets/                            バナー
-```
-
-</details>
-
-<details>
-<summary><b>開発</b></summary>
-
-```bash
-npm install --no-save jsdom@24.1.1 && node tests/smoke.cjs
+skills/artiboard/                       スキル: SKILL.md、ボードページ(assets/board.html)、エージェント向けのリファレンス、コードマップのスクリプト
+server/                                 セルフホストのサイト: HTTP アプリ、MCP サーバー、SQLite と Supabase のストア、CLI、コードマップ
+api/, vercel.json, supabase/            Vercel 上で Supabase を使うサイト: 関数とマイグレーション
+Dockerfile, docker-compose.yml          コンテナで動く SQLite のサイト。Caddy の背後に置く
+examples/                               公開デモ。ページ、demo-data.json、examples/pantry のマップから生成
+tests/                                  サーバーのテスト(SQLite、CI では Supabase も)、コードマップのテスト、jsdom でのページ
+FOR_AGENTS.md, AGENTS.md                エージェント向けのインストール手順、このリポジトリでの作業の仕方
 ```
 
 ```bash
-npm install && npm test
+npm install && npm install --no-save jsdom@24.1.1 prettier@3.9.10 && npm run check
 ```
 
-`npm test` は使い捨ての SQLite ファイルでホストしたサイトを動かします。ローカルの Supabase(`supabase start`)があれば、`AB_SUPABASE=1` とその `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY`、`SUPABASE_SECRET_KEY` を加えると、同じテストをそちらで実行できます。
-
-デモを見る・公開するときに生成します(`examples/demo.html`、リポジトリには置きません)。
-
-```bash
-node examples/build-demo.cjs
-```
-
-Issue と PR を歓迎します。スキルを変えるときは、エージェントの振る舞いやトークン使用がどう変わるかを、できれば実際のボードでの前後で示してください。
+`npm run check` はすべてのゲートを実行します。使い捨ての SQLite ファイルでのテスト、jsdom でのページ、そして揃っていなければならないコピーの確認です。Issue と PR を歓迎します。スキルを変えるときは、エージェントの振る舞いやトークン使用がどう変わるかを示してください。
 
 </details>
 
