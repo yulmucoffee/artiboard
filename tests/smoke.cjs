@@ -77,7 +77,8 @@ function boot({
   storage = {},
   race = null,
   bump = null,
-  versions = false
+  versions = false,
+  failRead = []
 } = {}) {
   const store = { ...seed(), ...docs },
     subs = [],
@@ -111,6 +112,7 @@ function boot({
       // one read, as a hosted site's runtime offers: the page reads a code map's chunks this way
       get: async () => {
         reads.push(p);
+        if (failRead.includes(p)) throw { code: 'unavailable' };
         return snapColl(p, o);
       },
       onSnapshot(cb) {
@@ -1062,6 +1064,8 @@ const meLane = (d) => {
         repo: 'acme/api',
         label: 'api',
         commit: '0123456789abcdef',
+        branch: 'main',
+        dirty: true,
         builtAt: T0,
         by: 'ben',
         root: '',
@@ -1099,7 +1103,8 @@ const meLane = (d) => {
           ['web/chart.tsx', 'shared/units.ts', 'imports', 'x'],
           ['shared/units.ts', 'shared/units.ts#toMeters', 'defines', 'x'],
           ['web/total.tsx', 'shared/units.ts', 'imports', 'x'],
-          ['web/total.tsx', 'shared/units.ts#toMeters', 'calls', 'x']
+          ['web/total.tsx', 'shared/units.ts#toMeters', 'calls', 'x'],
+          ['server/flow.js', 'shared/units.ts', 'imports', 'x']
         ]
       }
     }
@@ -1125,37 +1130,69 @@ const meLane = (d) => {
   codemap(b.d)?.querySelector('.fold').click();
   await tick();
   const mapText = () => b.d.getElementById('codemapBody')?.textContent || '';
+  const nodeIds = () => [...b.d.querySelectorAll('#codemapBody .cnode')].map((x) => x.dataset.id).join();
+  const crumb = () => b.d.querySelector('#codemapBody .crumb')?.textContent.replace(/−\+⤢$/, '') || '';
+  const node = (id) => b.d.querySelector('#codemapBody .cnode[data-id="' + id + '"]');
+  const click = (x) => x.dispatchEvent(new b.w.MouseEvent('click', { bubbles: true }));
   ok(
     b.listened.includes('map') &&
-      /shared · 3 files · units\.ts, units\.ts#toMeters, total\.tsx/.test(mapText()) &&
-      /server · 3 files · flow\.js/.test(mapText()) &&
-      /by Ben · 0123456/.test(mapText()) &&
-      /Most connected: shared\/units\.ts#toMeters/.test(mapText()),
-    "unfolded, it shows each repository's map: its groups of files, who built it, the most connected names"
+      nodeIds() === 'c:0,c:1' &&
+      /sharedserver/.test(b.d.querySelector('#codemapBody .cmap-pic .nodes')?.textContent) &&
+      /by Ben · main@0123456uncommitted changes/.test(mapText()) &&
+      /Most connectedshared\/units\.ts#toMeters/.test(mapText()) &&
+      crumb() === 'All groups',
+    "unfolded, it draws each repository's groups from the index, says who built it from which commit, and offers the most connected names"
   );
   ok(
-    [...b.d.querySelectorAll('#codemapBody .rule h3')].map((x) => x.textContent).join() === 'apiacme/api,bad' &&
-      /lost · 0 files · x\.ts/.test(mapText()) &&
+    [...b.d.querySelectorAll('#codemapBody .cmap-head h3')].map((x) => x.textContent).join() === 'apiacme/api,bad' &&
+      /Nothing to draw here\./.test(mapText()) &&
       !b.errors.length,
     'a malformed index shows what it can and stops nothing'
   );
-  search(b.d, 'toM');
-  search(b.d, 'toMeters');
-  await tick();
-  search(b.d, 'toMeters');
-  await tick();
   ok(
     b.reads.filter((p) => p === 'map/api/chunks').length === 1 &&
       !b.listened.some((p) => /chunks/.test(p)) &&
-      /toMeters/.test(b.d.querySelector('#codemapBody .maplines')?.textContent),
-    "a search reads the map's chunks once, without listening, and answers in lines"
-  );
-  ok(
-    flagged('tr.item') === 'M1-5,M1-6,M1-8' &&
+      flagged('tr.item') === 'M1-5,M1-6,M1-8' &&
       b.d.querySelector('tr.item[data-k="M1-8"] .overlap').title ===
         'overlaps with M1-5 (ana): web/chart.tsx → shared/units.ts\noverlaps with M1-6 (Ben): web/chart.tsx → shared/units.ts',
-    'with the chunks loaded, files one import apart overlap too'
+    'a map built before links were kept reads its chunks once, without listening; with them, files one import apart overlap too'
   );
+  click(node('c:0'));
+  const picked = /Open tasks touching thisM1-5ana/.test(b.d.querySelector('#codemapBody .cmap-detail')?.textContent);
+  click(node('c:0'));
+  await tick();
+  ok(
+    picked &&
+      crumb() === 'All groups›shared' &&
+      nodeIds() === 'shared/units.ts,web/total.tsx,web/chart.tsx,c:1' &&
+      node('shared/units.ts').classList.contains('touched') &&
+      [...b.d.querySelectorAll('#codemapBody .cmap-pic .e')].map((x) => x.getAttribute('class')).join() ===
+        'e imports,e imports,e links',
+    'one click on a group tells which open tasks touch it; a second opens it: its files, their imports, the group they reach, and the touched file ringed'
+  );
+  search(b.d, 'toM');
+  const hits = [...b.d.querySelectorAll('#codemapBody .cmap-hit')].map((x) => x.textContent).join();
+  b.d.querySelector('#codemapBody .cmap-hit')?.click();
+  await tick();
+  ok(
+    hits === 'toMetersfn · shared/units.ts:3' &&
+      crumb() === 'All groups›shared›units.ts›toMeters' &&
+      nodeIds() === 'shared/units.ts#toMeters,shared/units.ts,web/total.tsx' &&
+      /called by:\s+web\/total\.tsx \[x\]/.test(b.d.querySelector('#codemapBody .maplines')?.textContent) &&
+      b.reads.filter((p) => p === 'map/api/chunks').length === 1,
+    'a search offers the names it matches; picking one draws that symbol with its neighbors and explains it as board_map would'
+  );
+  b.d
+    .querySelector('#codemapBody .cmap-pic')
+    .dispatchEvent(new b.w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  await tick();
+  ok(
+    crumb() === 'All groups›shared›units.ts' && !!b.d.querySelector('.sheet') === false && !b.errors.length,
+    'Esc on the picture goes up one level and closes no sheet'
+  );
+  b.d.querySelector('#codemapBody .crumb button').click();
+  await tick();
+  ok(crumb() === 'All groups' && nodeIds() === 'c:0,c:1', 'the first crumb goes back to the groups');
   b.d.querySelector('tr.item[data-k="M1-5"]').click();
   await tick();
   ok(touched(b.d) === 'shared/units.ts,server/flow.js#start', "the sheet's Code block lists what the task touches");
@@ -1219,6 +1256,107 @@ const meLane = (d) => {
   ok(
     noCode && b.d.getElementById('codemapBody')?.textContent === 'No code map yet.',
     'a project without a map or touches shows no Code block, and the section says there is no map yet'
+  );
+
+  // a map built with links and no open work to place: the groups come from the index alone
+  b = boot({
+    docs: {
+      'map/web': {
+        repo: 'acme/web',
+        commit: 'fedcba9876543210',
+        builtAt: T0,
+        by: 'cy',
+        counts: { files: 4, symbols: 2, edges: 5, docs: 0 },
+        chunks: 1,
+        communities: [
+          { c: 0, name: 'web', n: 3, top: ['web/app.tsx'] },
+          { c: 1, name: 'shared', n: 1, top: ['shared/units.ts'] }
+        ],
+        god: ['shared/units.ts'],
+        links: [[0, 1, 3], [1, 7, 2], 'junk'],
+        langs: { ts: 4 },
+        version: 1
+      }
+    }
+  });
+  all.push(b);
+  await tick();
+  await heal();
+  codemap(b.d)?.querySelector('.fold').click();
+  await tick();
+  ok(
+    !b.reads.some((p) => /chunks/.test(p)) &&
+      [...b.d.querySelectorAll('#codemapBody .cnode')].map((x) => x.dataset.id).join() === 'c:0,c:1' &&
+      [...b.d.querySelectorAll('#codemapBody .cmap-pic .e')].map((x) => x.getAttribute('class')).join() === 'e links' &&
+      /by cy · @fedcba9/.test(b.d.getElementById('codemapBody').textContent) &&
+      !/uncommitted/.test(b.d.getElementById('codemapBody').textContent) &&
+      !b.errors.length,
+    'a map with links draws its groups from the index alone, reading no chunks; a link to a group it lacks is skipped; no branch shows just the commit'
+  );
+  ok(
+    b.d.querySelectorAll('#codemapBody .cnode[tabindex="0"]').length === 1 &&
+      b.d.querySelector('#codemapBody .cmap-pic').getAttribute('role') === 'group',
+    'one node is the tab stop, and the picture is a group of buttons, not an image'
+  );
+  b.d.querySelector('#codemapBody .cnode[tabindex="0"]').focus();
+  b.d
+    .querySelector('#codemapBody .cmap-pic')
+    .dispatchEvent(new b.w.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  ok(
+    b.d.activeElement &&
+      b.d.activeElement.getAttribute('data-id') === 'c:1' &&
+      b.d.activeElement.getAttribute('tabindex') === '0',
+    'an arrow key moves the keyboard to the next node and the tab stop with it'
+  );
+  b.store['map/web/chunks/0'] = {
+    nodes: [
+      { i: 'shared/units.ts', k: 'file', n: 'units.ts', f: 'shared/units.ts', l: 0, c: 1 },
+      { i: 'web/app.tsx', k: 'file', n: 'app.tsx', f: 'web/app.tsx', l: 0, c: 0 }
+    ],
+    edges: [['web/app.tsx', 'shared/units.ts', 'imports', 'x']]
+  };
+  b.d.querySelector('#codemapBody .cmap-detail .cmap-task').click();
+  await tick();
+  await tick();
+  ok(
+    b.reads.filter((p) => p === 'map/web/chunks').length === 1 &&
+      b.d.querySelector('#codemapBody .crumb').textContent.replace(/−\+⤢$/, '') === 'All groups›shared›units.ts' &&
+      b.d.activeElement === b.d.querySelector('#codemapBody .cmap-pic'),
+    'a most connected name read before the chunks loads them once and then goes there, with the keyboard on the picture'
+  );
+
+  // a read that fails: the section says so once and does not read again on its own
+  b = boot({
+    failRead: ['map/web/chunks'],
+    docs: {
+      'tasks/M1-1': { ...seed()['tasks/M1-1'], status: 'doing', owner: 'ana', touches: ['shared/units.ts'] },
+      'map/web': {
+        repo: 'acme/web',
+        builtAt: T0,
+        by: 'cy',
+        counts: { files: 2, symbols: 0, edges: 1, docs: 0 },
+        chunks: 1,
+        communities: [{ c: 0, name: 'web', n: 2, top: ['web/app.tsx'] }],
+        god: [],
+        links: [],
+        langs: { ts: 2 },
+        version: 1
+      }
+    }
+  });
+  all.push(b);
+  await tick();
+  await heal();
+  codemap(b.d)?.querySelector('.fold').click();
+  await tick();
+  await tick();
+  await tick();
+  ok(
+    b.reads.filter((p) => p === 'map/web/chunks').length === 1 &&
+      /Could not load the map/.test(b.d.getElementById('codemapBody').textContent) &&
+      b.d.querySelectorAll('#codemapBody .cnode').length === 1 &&
+      !b.errors.length,
+    'a chunk read that fails is reported once, the groups still draw, and nothing reads again until the map is rebuilt'
   );
 
   b = boot({

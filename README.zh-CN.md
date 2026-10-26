@@ -101,7 +101,7 @@ artiboard 把这些状态集中到团队共享的一块实时看板上，并给 
 </tr>
 </table>
 
-**代码地图。** 自托管看板可以为每个仓库保存文件、函数和 import 的地图。Agent 在 grep 之前先问 `board_map`，两个未完成的任务碰到同一段代码时，看板会发出警告。一条命令即可生成（[自托管](#自托管)）。claude.ai artifact 看板暂时还没有这项功能。
+**代码地图。** 自托管看板可以为每个仓库保存文件、函数和 import 的地图。Agent 在 grep 之前先问 `board_map`，两个未完成的任务碰到同一段代码时，看板会发出警告。页面把地图画成节点和连线，可以逐个分组、逐个文件地打开，团队未完成的任务也标在对应的代码上。一条命令即可生成（[自托管](#自托管)）。claude.ai artifact 看板暂时还没有这项功能。
 
 ## 快速开始
 
@@ -231,7 +231,7 @@ approval_mode = "approve"
 
 然后让 agent "为这个仓库设置看板"。
 
-**代码地图**（可选，仅自托管）。在仓库的检出目录中生成并上传地图，代码有大改动后请重新生成：
+**代码地图**（可选，仅自托管）。地图会注明它描述的是哪个提交和分支。可以用 CI 或 git 钩子让它保持最新，加上 `--if-changed` 时，只在检出自上次生成地图后有变化时才生成（见自托管指南的 [Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current)）。在仓库的检出目录中生成并上传地图：
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api

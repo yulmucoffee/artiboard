@@ -1,7 +1,7 @@
 // The everyday agent actions, each one tool call: start a session, read a task, claim, post.
 // They answer in short text lines, check versions on the server and stamp times with the server clock,
 // so an agent spends no tokens on reads before a write, on version numbers or on `date`.
-import { loadGraph } from './codemap/graph.js';
+import { GRAPH_LINKS, loadGraph, mapSource } from './codemap/graph.js';
 import { BOARD_RULES, BoardError, MAP_RULES, cleanRepos, now, repoName, reposOf, stampId, toBoardError } from './core.js';
 import { TASK_STATUSES, boardStatuses, holderOf, isReady, mayChange, statusEffects, statusOf, unmetDeps } from './tasks.js';
 import { VERSION } from './version.js';
@@ -91,9 +91,11 @@ const touchesOf = (d) => (Array.isArray(d.touches) ? d.touches : []);
 const touching = (t) => ({ key: t.data.key || t.id, holder: holderOf(t.data), touches: touchesOf(t.data) });
 // a few items and how many more, so a line stays short
 const few = (xs, n = 3) => xs.slice(0, n).join(', ') + (xs.length > n ? ` +${xs.length - n} more` : '');
-// a map's name: its repo's label on the board now, else the label it was built with, else owner/name
-const mapName = (m, repos) => repos.find((r) => repoName(r.repo) === repoName(m.data.repo))?.label || m.data.label || m.data.repo || m.id;
-const mapLine = (m, repos) => `${mapName(m, repos)} · ${m.data.counts?.symbols ?? 0} symbols · built ${short(m.data.builtAt).slice(0, 5)} by ${m.data.by || '?'}`;
+// a map's label: its repo's on the board now, else the one it was built with; its name falls back to owner/name
+const mapLabel = (m, repos) => repos.find((r) => repoName(r.repo) === repoName(m.data.repo))?.label || m.data.label;
+const mapName = (m, repos) => mapLabel(m, repos) || m.data.repo || m.id;
+const mapLine = (m, repos) => [`${mapName(m, repos)} · ${m.data.counts?.symbols ?? 0} symbols · built ${short(m.data.builtAt).slice(0, 5)} by ${m.data.by || '?'}`,
+  ...mapSource(m.data)].join(' · ');
 // the call is made by now: a map that cannot be read leaves its lines out rather than turning the answer into an error
 const quiet = (e) => { console.error(e); return []; };
 
@@ -118,8 +120,12 @@ const NODE = [['i', upTo(1000), 'an id'], ['k', (v) => ['file', 'sym', 'doc', 's
   ['d', upTo(200), 'a comment of at most 200 characters'], ['c', isCount, 'a community'], ['q', (v) => v === 't', "'t'"]];
 const OPTIONAL = new Set(['t', 's', 'd', 'c', 'q']);
 const EDGES = new Set(['imports', 'defines', 'calls', 'uses', 'extends', 'mentions', 'contains']);
+const isCommunity = (v) => Number.isInteger(v) && v >= 0 && v < 40;
 function mapProblem(index, chunks) {
   if (index.label !== undefined && !(upTo(40)(index.label) && !/[/#]/.test(index.label))) return 'index.label is not a name of at most 40 characters without / or #';
+  if (index.commit !== undefined && !upTo(64)(index.commit)) return 'index.commit is not a commit id of at most 64 characters';
+  if (index.branch !== undefined && !upTo(200)(index.branch)) return 'index.branch is not a branch name of at most 200 characters';
+  if (index.dirty !== undefined && index.dirty !== true) return 'index.dirty is not true: a checkout with no changes leaves it out';
   if (!isObject(index.counts)) return 'index.counts is not {files, symbols, edges, docs}';
   for (const [k, v] of Object.entries(index.counts)) if (!isCount(v)) return `index.counts.${k} is not a count`;
   if (index.langs !== undefined && !isObject(index.langs)) return 'index.langs is not {language: files}';
@@ -132,6 +138,13 @@ function mapProblem(index, chunks) {
   }
   if (!Array.isArray(index.god) || index.god.length > 40) return 'index.god is not a list of at most 40';
   for (const [i, g] of index.god.entries()) if (!upTo(300)(g)) return `index.god[${i}] is not an id`;
+  // a map built before the builder wrote links has none, and the page finds them in its chunks
+  if (index.links !== undefined && !(Array.isArray(index.links) && index.links.length <= GRAPH_LINKS)) return `index.links is not a list of at most ${GRAPH_LINKS}`;
+  for (const [i, l] of (index.links || []).entries()) {
+    if (!Array.isArray(l) || l.length !== 3 || !isCommunity(l[0]) || !isCommunity(l[1]) || l[0] >= l[1] || !(Number.isInteger(l[2]) && l[2] > 0)) {
+      return `index.links[${i}] is not [a, b, n]`;
+    }
+  }
   for (const [i, c] of chunks.entries()) {
     if (!isObject(c) || !Array.isArray(c.nodes) || !Array.isArray(c.edges)) return `chunks[${i}] is not {nodes, edges}`;
     for (const [j, n] of c.nodes.entries()) {
@@ -213,6 +226,20 @@ export function makeFlow(store) {
   async function mapsOf(project) {
     const [config, maps] = await read(project, [{ path: 'meta/config' }, MAPS]);
     return { maps, repos: reposOf(config?.data) };
+  }
+
+  // What the build script asks before it builds: which code each map describes and when it was built, without its
+  // chunks. An unknown project has no maps, as an unknown board address still gets a page.
+  async function mapsMeta(project) {
+    const { maps, repos } = await mapsOf(project).catch((e) => {
+      if (toBoardError(e).code !== 'not_found') throw e;
+      return { maps: [], repos: [] };
+    });
+    const meta = (m) => {
+      const { repo, commit, branch, dirty, builtAt, by, counts, chunks } = m.data;
+      return { repo, label: mapLabel(m, repos), commit, branch, dirty, builtAt, by, counts, chunks };
+    };
+    return { maps: maps.map(meta) };
   }
 
   // A map as a graph. The caller has just read its index; the chunks are read only when that index says the map was
@@ -657,5 +684,5 @@ export function makeFlow(store) {
     return `dropped the code map of ${mapName(m, repos)}`;
   }
 
-  return { start, task, claim, post, batch, projectFor, map, setMap, dropMap };
+  return { start, task, claim, post, batch, projectFor, map, mapsMeta, setMap, dropMap };
 }

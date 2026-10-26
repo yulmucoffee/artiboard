@@ -9,12 +9,12 @@ import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { buildGraph, mapRepo } from '../server/codemap/build.js';
-import { loadGraph } from '../server/codemap/graph.js';
+import { communityLinks, loadGraph } from '../server/codemap/graph.js';
 import { langFor } from '../server/codemap/lang/index.js';
 import { jsLang } from '../server/codemap/lang/js.js';
 import { htmlLang } from '../server/codemap/lang/html.js';
 import { markdownLang } from '../server/codemap/lang/markdown.js';
-import { headCommit, listFiles, readFiles } from '../server/codemap/scan.js';
+import { headState, listFiles, readFiles } from '../server/codemap/scan.js';
 
 const ROOT = fileURLToPath(new URL('./fixtures/codemap/', import.meta.url));
 // the shop's files; folders named after other languages sit beside them with their own tests
@@ -61,11 +61,43 @@ test('listFiles walks a plain folder and asks git in a work tree, skipping the s
     const kept = ['a.js', 'db.ts', 'domains.js', 'ids.js'];
     assert.deepEqual(await listFiles(dir), ['.gitignore', ...kept, 'ignored.log', 'late.js', 'src/b.ts'],
       'no git: a walk, which does not read .gitignore; files whose top comment says they are generated are left out');
-    assert.equal(await headCommit(dir), undefined, 'no git, no commit');
+    assert.deepEqual(await headState(dir), { commit: undefined, branch: undefined, dirty: undefined }, 'no git: no commit, branch or changes');
     execFileSync('git', ['init', '-q'], { cwd: dir, stdio: 'ignore' });
     assert.deepEqual(await listFiles(dir), ['.gitignore', ...kept, 'late.js', 'src/b.ts'], 'git lists untracked files too, and honors .gitignore');
     const read = await readFiles(dir, ['a.js', 'missing.js']);
     assert.deepEqual([...read], [['a.js', 'export const a = 1;\n']], 'a file that cannot be read is left out');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('headState: the commit checked out, its branch, and whether the checkout has changes the map would carry', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'codemap-head-'));
+  const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim();
+  const commit = () => git('-c', 'user.email=a@b', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'x');
+  const at = async () => { const m = await mapRepo(dir, { repo: 'acme/a', by: 'ana' }); return [m.index.commit, m.index.branch, m.index.dirty]; };
+  try {
+    writeFileSync(join(dir, 'a.js'), 'export const a = 1;\n');
+    writeFileSync(join(dir, '.gitignore'), 'ignored.log\n');
+    git('init', '-q');
+    assert.deepEqual(await headState(dir), { commit: undefined, branch: undefined, dirty: true }, 'before the first commit: no commit, and every file a change');
+    git('add', '.');
+    commit();
+    writeFileSync(join(dir, 'ignored.log'), 'x');
+    const sha = git('rev-parse', 'HEAD'), branch = git('rev-parse', '--abbrev-ref', 'HEAD');
+    assert.deepEqual(await headState(dir), { commit: sha, branch, dirty: false }, 'committed: an ignored file is no change');
+    assert.deepEqual(await at(), [sha, branch, undefined], 'the index names the commit and branch, and a clean checkout leaves dirty out');
+    writeFileSync(join(dir, 'b.js'), 'export const b = 2;\n');
+    assert.equal((await headState(dir)).dirty, true, 'an untracked file is a change: the map includes it');
+    git('config', 'status.showUntrackedFiles', 'no');
+    assert.equal((await headState(dir)).dirty, true, 'whatever the person\'s git config hides from their own status');
+    git('config', '--unset', 'status.showUntrackedFiles');
+    rmSync(join(dir, 'b.js'));
+    writeFileSync(join(dir, 'a.js'), 'export const a = 3;\n');
+    assert.equal((await headState(dir)).dirty, true, 'and so is an edit');
+    git('checkout', '-q', '--detach');
+    assert.deepEqual(await headState(dir), { commit: sha, branch: undefined, dirty: true }, 'a detached head is on no branch');
+    assert.deepEqual(await at(), [sha, undefined, true]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -320,6 +352,62 @@ test('JS: a name a parameter shadows is the parameter, not the file-level name',
     ['shadow.js#run', 'shadow.js#body', 'uses', 'x'],
   ], 'send\'s body and body() are its parameter; in pick, body is a key of the pattern and config a parameter; a default '
     + 'value is a use, and binds nothing; open\'s config is its own; in each and twice, the inner arrow\'s parameter');
+  const generic = 'const body = 1;\nexport function send<T>(res: T, body: string): T { return body ? res : res; }\n'
+    + 'export class Box {\n  put<K>(body: K) { return body; }\n}\n';
+  assert.deepEqual(allEdges(buildGraph(new Map([['generic.ts', generic]]), {})).filter((e) => e[2] === 'uses'), [],
+    'a generic function\'s and a generic method\'s parameters are theirs too');
+});
+
+test('TS: a call with type arguments is a call, and what it is passed is used; a comparison is not a call', () => {
+  const src = [
+    "import { query, type Row } from './db.js';", // 1
+    'const DEFAULT = 1;', // 2
+    'export function load<T extends Row>(id: string): T {', // 3
+    '  return query<T>(id);', // 4
+    '}', // 5
+    'export function run(db, n: number, limit: number) {', // 6
+    "  const one = load<Map<string, Row[]> | 'none'>(DEFAULT);", // 7
+    '  const many = db.query<Row>(DEFAULT);', // 8
+    '  const small = n < limit && limit > (n + 1);', // 9
+    '  return { one, many, small, api: { get<K>(key: K) { return key; } } };', // 10
+    '}', // 11
+  ].join('\n') + '\n';
+  assert.deepEqual(refs(jsLang.extract(src, 'x.ts')), ['query@4', 'load@7', 'DEFAULT@7 use', 'query@8 member', 'DEFAULT@8 use'],
+    '`n < limit && limit > (` compares; `get<K>(key) {` defines a method of the object');
+  assert.deepEqual(refs(jsLang.extract('export function A(n) {\n  return <Badge>{n}</Badge>;\n}\n', 'a.tsx')), ['Badge@2'],
+    'after return, `<Badge>` opens a tag, not type arguments');
+  assert.deepEqual(refs(jsLang.extract('const rows = sql<Row>`select 1`;\n', 'q.ts')), ['sql@1'], 'a tagged template with type arguments');
+  const db = 'export function query(id: string) { return id; }\nexport type Row = { id: string };\n';
+  const b = buildGraph(new Map([['x.ts', src], ['db.ts', db]]), {});
+  assert.deepEqual(allEdges(b).filter((e) => e[2] === 'calls' || e[2] === 'uses'), [
+    ['x.ts#load', 'db.ts#query', 'calls', 'x'],
+    ['x.ts#run', 'x.ts#DEFAULT', 'uses', 'x'],
+    ['x.ts#run', 'x.ts#load', 'calls', 'x'],
+  ]);
+});
+
+test('TS: names in a tuple type are types, not uses; an array after a ternary\'s colon, a key or an arrow still is a value', () => {
+  const src = [
+    "export type Unit = 'g' | 'ml';", // 1
+    'export type Quantity = { amount: number; unit: Unit };', // 2
+    "const METRIC: Partial<Record<Unit, [number, Unit]>> = { kg: [1000, 'g'] };", // 3
+    'let last: [Quantity, Unit] | null = null;', // 4
+    'export function split(text: string): [Quantity | null, string] {', // 5
+    '  return [last && last[0], text];', // 6
+    '}', // 7
+    'export const pair = (n: number): [Unit, number] => [METRIC, n];', // 8
+    'export function pick(on: boolean) {', // 9
+    "  return on ? split('') : [METRIC, { zero: [last] }];", // 10
+    '}', // 11
+  ].join('\n') + '\n';
+  const b = buildGraph(new Map([['units.ts', src]]), {});
+  assert.deepEqual(allEdges(b).filter((e) => e[2] === 'calls' || e[2] === 'uses'), [
+    ['units.ts#pair', 'units.ts#METRIC', 'uses', 'x'],
+    ['units.ts#pick', 'units.ts#METRIC', 'uses', 'x'],
+    ['units.ts#pick', 'units.ts#last', 'uses', 'x'],
+    ['units.ts#pick', 'units.ts#split', 'calls', 'x'],
+    ['units.ts#split', 'units.ts#last', 'uses', 'x'],
+  ], 'a tuple in type arguments, in a declaration\'s type and in a return type before `{` or `=>` names types, as an annotation does');
 });
 
 test('JS resolve: extension probing, index files, the .js for .ts swap; packages are not in the repo', () => {
@@ -661,6 +749,81 @@ test('build: signatures and comments in other languages: a Python # comment and 
   }, 'the colon off; the docstring when nothing is above; a docstring line above is code, not a comment');
 });
 
+test('build: a TypeScript signature runs to its body, past braces and arrows inside <…>, (…) and the return type', () => {
+  const src = [
+    'export async function findUser(db: Db, email: string): Promise<{ id: string; householdId: string }> {', // 1
+    '  return db.one(email);', // 2
+    '}', // 3
+    'export function startSync<T extends Synced>(listId: string, show: (items: T[]) => void): () => void {', // 4
+    '  return () => show([]);', // 5
+    '}', // 6
+    'export function makeHandler(db: Db): (request: Request) => Promise<Response> {', // 7
+    '  return async (request) => db.answer(request);', // 8
+    '}', // 9
+    'export function remind(items: (Item & { bestBefore?: string })[], today: Date): { at: Date; body: string }[] {', // 10
+    '  return [];', // 11
+    '}', // 12
+    'export const pick = <T,>(xs: T[]): Map<string, { n: number }> => new Map();', // 13
+    'export function lower(a = 1, b = a<2) {', // 14
+    '  return b;', // 15
+    '}', // 16
+    'export const later = (a: number): (() => void) => () => { return; };', // 17
+    'export const either = (a: A | B): (A | B) => a;', // 18
+    'export function spread(): (...args: unknown[]) => void {', // 19
+    '  return () => {};', // 20
+    '}', // 21
+    "export function origin(input: unknown): 'array' | 'other' {", // 22
+    "  return Array.isArray(input) ? 'array' : 'other';", // 23
+    '}', // 24
+  ].join('\n') + '\n';
+  const b = buildGraph(new Map([['sig.ts', src]]), {});
+  const sig = (name) => allNodes(b).find((n) => n.i === `sig.ts#${name}`).s;
+  const names = ['findUser', 'startSync', 'makeHandler', 'remind', 'pick', 'lower', 'later', 'either', 'spread', 'origin'];
+  assert.deepEqual(names.map(sig), [
+    'export async function findUser(db: Db, email: string): Promise<{ id: string; householdId: string }>',
+    'export function startSync<T extends Synced>(listId: string, show: (items: T[]) => void): () => void',
+    'export function makeHandler(db: Db): (request: Request) => Promise<Response>',
+    'export function remind(items: (Item & { bestBefore?: string })[], today: Date): { at: Date; body: string }[]',
+    'export const pick = <T,>(xs: T[]): Map<string, { n: number }>',
+    'export function lower(a = 1, b = a<2)',
+    'export const later = (a: number): (() => void)',
+    'export const either = (a: A | B): (A | B)',
+    'export function spread(): (...args: unknown[]) => void',
+    "export function origin(input: unknown): 'array' | 'other'",
+  ], 'a return type that is an object or a function is the signature\'s; an arrow function still stops at its own =>, also '
+    + 'after a return type in parentheses, a string is a whole type, and a comparison opens nothing');
+});
+
+test('build: a Rust signature keeps its lifetimes and stops at its body: the \' of a lifetime opens no string', () => {
+  const src = [
+    "fn longest<'a, 'b: 'a>(x: &'a str, y: &'b str) -> &'a str { let n = 1; x }", // 1
+    "impl<'a> Store<'a> {", // 2
+    "    pub fn get(&self, key: &'a str,", // 3
+    '        limit: usize) -> usize {', // 4
+    '        let token = "k";', // 5
+    '        limit', // 6
+    '    }', // 7
+    '}', // 8
+    "pub fn tagged(s: &str) -> Tag<'x'> {", // 9
+    '    let t = s.len();', // 10
+    '    Tag', // 11
+    '}', // 12
+    "pub fn first<'a>(items: &'a [Item]) -> Option<&'a Item> {", // 13
+    '    let secret = "k";', // 14
+    '    items.iter().next()', // 15
+    '}', // 16
+  ].join('\n') + '\n';
+  const b = buildGraph(new Map([['sig.rs', src]]), {});
+  const sig = (name) => allNodes(b).find((n) => n.i === `sig.rs#${name}`).s;
+  assert.deepEqual(['longest', 'Store.get', 'tagged', 'first'].map(sig), [
+    "fn longest<'a, 'b: 'a>(x: &'a str, y: &'b str) -> &'a str",
+    "pub fn get(&self, key: &'a str, limit: usize) -> usize",
+    "pub fn tagged(s: &str) -> Tag<'x'>",
+    "pub fn first<'a>(items: &'a [Item]) -> Option<&'a Item>",
+  ], 'no body line is uploaded with the map, whether the body opens on the signature\'s line or after parameters on two '
+    + 'lines; a char (\'x\') is still a string');
+});
+
 test('build: chunks keep under chunkBytes, nodes in id order, each edge with its from node', () => {
   const check = (b, limit) => {
     const ids = allNodes(b).map((n) => n.i);
@@ -715,6 +878,7 @@ test('build: the same files give the same map, in any order', () => {
 test('mapRepo scans, reads and builds, with the commit when there is one', async () => {
   const m = await mapRepo(ROOT, { repo: 'acme/shop', by: 'ana', commit: 'abc123', label: 'shop', root: 'web' });
   assert.equal(m.index.commit, 'abc123');
+  assert.equal(m.index.branch, undefined, 'a commit the caller names does not take the branch of the checkout it builds from');
   assert.equal(m.index.label, 'shop');
   assert.equal('root' in m.index, false, 'nothing reads a root, so the index does not carry one');
   const ids = new Set(m.chunks.flatMap((c) => c.nodes).map((n) => n.i));
@@ -944,6 +1108,40 @@ test('inside: what a symbol or file calls, uses and extends, by depth; the oppos
   assert.equal(G.inside('nope').missing, true);
 });
 
+test('links: how many code edges join each pair of communities, in the index and from the chunks alike', () => {
+  // read from the fixture: src (index.js) ↔ src (cart.ts) share 8 edges, cart ↔ api 7, index ↔ api 4
+  assert.deepEqual(built.index.links, [[0, 1, 8], [1, 2, 7], [0, 2, 4]]);
+  assert.deepEqual(G.groups(), { communities: built.index.communities, links: built.index.links });
+  const older = loadGraph({ ...built.index, links: undefined }, built.chunks);
+  assert.deepEqual(older.groups().links, built.index.links, 'a map built before links were kept gets them from its chunks');
+  const nodes = [{ i: 'a', c: 0 }, { i: 'b', c: 1 }, { i: 'b#f', c: 1 }, { i: 'c', c: 2 }, { i: 'loose' }];
+  assert.deepEqual(communityLinks(nodes, [['a', 'b', 'imports', 'x'], ['a', 'b#f', 'calls', 'i'], ['b', 'b#f', 'defines', 'x'], ['c', 'a', 'mentions', 'i'],
+    ['loose', 'a', 'imports', 'x'], ['b', 'c', 'uses', 'x'], ['c', 'b', 'extends', 'x'], 'not an edge']),
+  [[0, 1, 2], [1, 2, 2], [0, 2, 1]], 'defines and contains do not count, nor a node of no community; a < b whichever way the edge points');
+});
+
+test('the page-facing API: a name\'s nodes, one node with its edges and degree, a file\'s symbols by line, a community\'s files', () => {
+  assert.deepEqual(G.find('Cart'), ['src/cart.ts#Cart']);
+  assert.deepEqual(G.find('nothing-here'), []);
+  assert.equal(G.node('src/cart.ts#Cart').t, 'class');
+  assert.equal(G.node('nope'), null);
+  const { out, in: into } = G.edges('src/cart.ts#Cart');
+  assert.deepEqual(out.map((e) => `${e.type} ${e.to}`), ['extends src/store.ts#Store']);
+  assert.ok(into.some((e) => e.type === 'calls' && e.from === 'src/index.js#main'));
+  assert.equal(G.degree('src/cart.ts#Cart'), 4);
+  assert.deepEqual(G.inFile('src/cart.ts').slice(0, 4), ['src/cart.ts#Price', 'src/cart.ts#Currency', 'src/cart.ts#CartItem', 'src/cart.ts#Cart']);
+  assert.deepEqual(G.files(2), ['src/api/client.js', 'src/api/index.js', 'docs/guide.md'].sort(), 'files and docs of the community, by path');
+  assert.deepEqual(G.files(9), []);
+  assert.deepEqual(G.search('cart').slice(0, 3), ['src/cart.ts#Cart', 'src/cart.ts', 'src/cart.ts#Cart.add'], 'the name itself, then names starting with it, the most connected first');
+  assert.ok(G.search('cart').includes('src/api/client.js#fetchCart'), 'then names that hold it');
+  assert.ok(G.search('cart').indexOf('README.md#cart') > G.search('cart').indexOf('src/api/client.js#fetchCart'), 'doc sections after code');
+  assert.deepEqual(G.search('CART', 2), ['src/cart.ts#Cart', 'src/cart.ts'], 'in any case, at most limit');
+  assert.deepEqual(G.search('  '), []);
+  assert.deepEqual(G.search('util/'), ['src/util/format.js', 'src/util/parse.js'], 'a path part finds files');
+  const loose = loadGraph({}, [{ nodes: [{ i: 'a.js', k: 'file', n: 'a.js', f: 'a.js', l: 0 }, { i: 'b.js', k: 'file', n: 'b.js', f: 'b.js', l: 0, c: 0 }], edges: [] }]);
+  assert.deepEqual([loose.files(-1), loose.files(0)], [['a.js'], ['b.js']], 'a file of no community is under -1');
+});
+
 test('overview: counts, languages, communities and the most connected nodes', () => {
   const lines = G.overview().lines;
   assert.deepEqual(lines.slice(0, 6), [
@@ -959,6 +1157,11 @@ test('overview: counts, languages, communities and the most connected nodes', ()
   assert.equal(lines[lines.length - 1], '  … 10 more');
   assert.deepEqual(loadGraph(built.index, []).overview({ limit: 1 }).lines.slice(-3), ['most connected:', '  src/index.js', '  … 19 more'],
     'the index alone is enough for an overview');
+  const first = (at) => loadGraph({ ...built.index, ...at }, []).overview().lines[0];
+  assert.equal(first({ commit: '3f2a1c7e9b8d', branch: 'main' }), `${lines[0]} · main@3f2a1c7`, 'the first line says which code the map describes');
+  assert.equal(first({ commit: '3f2a1c7e9b8d' }), `${lines[0]} · @3f2a1c7`, 'a detached head names only the commit');
+  assert.equal(first({ commit: '3f2a1c7e9b8d', branch: 'main', dirty: true }), `${lines[0]} · main@3f2a1c7 · uncommitted changes`,
+    'and says when the checkout had changes no commit holds');
 });
 
 test('overlaps: a shared file or name, or one file importing the other; a person\'s own tasks never overlap', () => {

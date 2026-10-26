@@ -101,7 +101,7 @@ artiboard는 그 상황을 팀이 함께 보는 실시간 판 하나에 모으�
 </tr>
 </table>
 
-**코드 맵.** 직접 호스팅한 보드는 저장소마다 파일, 함수, import 관계를 담은 맵을 가질 수 있어요. 에이전트는 grep 하기 전에 `board_map`에 물어보고, 같은 코드를 건드리는 열린 태스크가 두 개면 보드가 경고해요. 명령 하나로 만들어요([직접 호스팅](#직접-호스팅)). claude.ai 아티팩트 보드에는 아직 없어요.
+**코드 맵.** 직접 호스팅한 보드는 저장소마다 파일, 함수, import 관계를 담은 맵을 가질 수 있어요. 에이전트는 grep 하기 전에 `board_map`에 물어보고, 같은 코드를 건드리는 열린 태스크가 두 개면 보드가 경고해요. 페이지는 맵을 노드와 연결선으로 그리고, 묶음에서 파일로 차례로 열어 볼 수 있으며, 팀의 열린 태스크를 그 코드 위에 표시해요. 명령 하나로 만들어요([직접 호스팅](#직접-호스팅)). claude.ai 아티팩트 보드에는 아직 없어요.
 
 ## 빠른 시작
 
@@ -231,7 +231,7 @@ approval_mode = "approve"
 
 그런 다음 에이전트에게 "이 저장소에 보드 세팅해줘"라고 하면 됩니다.
 
-**코드 맵**(선택, 직접 호스팅 전용). 저장소 체크아웃에서 맵을 만들어 올려요. 코드가 크게 바뀌면 다시 만드세요:
+**코드 맵**(선택, 직접 호스팅 전용). 맵은 어느 커밋과 브랜치를 그렸는지 알려 줘요. CI나 git 훅으로 최신으로 유지할 수 있고, `--if-changed`를 붙이면 마지막 맵 이후 체크아웃이 바뀌었을 때만 만들어요(직접 호스팅 안내의 [Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current)). 저장소 체크아웃에서 맵을 만들어 올려요:
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api

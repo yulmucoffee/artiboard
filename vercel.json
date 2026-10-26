@@ -67,6 +67,15 @@
       ]
     },
     {
+      "source": "/codemap.mjs",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
       "source": "/changelog.json",
       "headers": [
         {

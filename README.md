@@ -101,7 +101,7 @@ Views are drawn by code, never by a model. Agents read only the slice they need 
 </tr>
 </table>
 
-**Code map.** A self-hosted board can keep a map of each repository's files, functions and imports. Agents ask `board_map` before they grep, and the board warns when two open tasks touch the same code. Build it with one command ([Self-host](#self-host)). Artifact boards do not have one yet.
+**Code map.** A self-hosted board can keep a map of each repository's files, functions and imports. Agents ask `board_map` before they grep, and the board warns when two open tasks touch the same code. The page draws it as nodes and links you open group by group and file by file, with the team's open tasks placed on the code. Build it with one command ([Self-host](#self-host)). Artifact boards do not have one yet.
 
 ## Quick start
 
@@ -231,7 +231,7 @@ approval_mode = "approve"
 
 Then ask the agent to "set up the board for this repo".
 
-**Code map** (optional, self-hosted). From the repository's checkout, build and upload its map. Rebuild it after big changes:
+**Code map** (optional, self-hosted). A map says which commit and branch it describes. Keep it current from CI or a git hook; with `--if-changed` it builds only when the checkout has changed since the last map ([Keeping the map current](skills/artiboard/references/hosted.md#keeping-the-map-current)). From the repository's checkout, build and upload its map:
 
 ```bash
 node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.example.com --project acme --repo acme/api

@@ -1,8 +1,8 @@
 // Builds a code map from a checkout's files: nodes for files, symbols and doc sections, the edges between them, and
 // communities of files that belong together. No model calls and no clock but builtAt: the same files give the same map.
-import { mapDegrees } from './graph.js';
+import { communityLinks, mapDegrees } from './graph.js';
 import { langFor } from './lang/index.js';
-import { headCommit, listFiles, readFiles } from './scan.js';
+import { headState, listFiles, readFiles } from './scan.js';
 
 const BUILD_CHUNK_BYTES = 200000;
 const BUILD_COMMUNITIES = 40, BUILD_GOD = 20, BUILD_TOP = 5, BUILD_SMALL = 3;
@@ -108,14 +108,24 @@ const BUILD_BODIES = new Set(['fn', 'class', 'method', 'module']);
 // kinds whose value is cut off: a constant may hold a key, and the map is uploaded
 const BUILD_VALUES = new Set(['const', 'var', 'static']);
 
+const BUILD_OPENER = { ')': '(', ']': '[', '}': '{' };
+// what may follow the `(` of a parameter list, as TypeScript itself tells a function type from a type in parentheses:
+// `)`, `...`, a destructuring `{` or `[`, a name and then `:`, `,`, `?`, `=` or `)`, or the end of the line
+const BUILD_PARAMS = /^\s*($|[)[{]|\.\.\.|[\w$]+\s*[:,?=)])/;
+
 // The declaration as written, on one line of at most 120 characters: for a function, class or method its line (and
-// the next ones while its brackets are open) up to the body (`{`, `=>`, Python's `:`), a string default longer than 20
-// characters shown as "…"; for a constant or variable its line up to the `=`, never its value; for the rest the line
-// less a trailing `{`, `(`, `[`, `=` or `;`. A line comment ends it.
+// the next ones while its brackets are open) up to the body (`{` or `=>` outside brackets, Python's `:`), a string
+// default longer than 20 characters shown as "…"; for a constant or variable its line up to the `=`, never its value;
+// for the rest the line less a trailing `{`, `(`, `[`, `=` or `;`. A line comment ends it. Type arguments right after
+// a name (`Promise<{ id: string }>`) nest as brackets do. Where a type is expected, after a `:` or `|`, a `{` opens an
+// object type, not the body, and a `(` that starts as parameters do opens a function type, whose `=>` is the type's
+// (`): (r: Request) => Response {`); any other `(` holds a type (`): (() => void) => {`). A Rust lifetime (`'a`,
+// `'static`) is a name: read as a quote, it would carry the signature on into the body.
 function buildSig(lines, line, kind, lang) {
   const body = BUILD_BODIES.has(kind), value = BUILD_VALUES.has(kind), py = lang.id === 'python';
-  const hash = py || lang.id === 'ruby', dashes = lang.id === 'sql';
-  let out = '', depth = 0, quote = '', opened = 0;
+  const hash = py || lang.id === 'ruby', dashes = lang.id === 'sql', rust = lang.id === 'rust';
+  const open = [];
+  let out = '', quote = '', opened = 0, typeNext = false, fnType = false, typeArrow = false;
   const done = () => buildCut(out.replace(/\s+/g, ' ').trim().replace(/[\s{([=;,]+$/, ''), 120);
   for (let k = line - 1; k < Math.min(lines.length, line + 7); k++) {
     const raw = lines[k];
@@ -126,21 +136,34 @@ function buildSig(lines, line, kind, lang) {
         if (c === '\\') out += raw[++i] || '';
         else if (c === quote) {
           if (body && out.length - opened - 2 > 20) out = `${out.slice(0, opened)}${quote}…${quote}`;
+          // a string is a whole type (`'a' | 'b' {`): the `{` after it opens the body
           quote = '';
+          typeNext = typeArrow = false;
         }
         continue;
       }
-      if (c === '"' || c === "'" || c === '`') { quote = c; opened = out.length; out += c; continue; }
-      if (value && !depth && c === '=' && !'=>'.includes(raw[i + 1] || ' ') && !'=!<>'.includes(raw[i - 1] || ' ')) return done();
+      const lifetime = rust && c === "'" && /\w/.test(raw[i + 1] || '') && raw[i + 2] !== "'";
+      if (!lifetime && (c === '"' || c === "'" || c === '`')) { quote = c; opened = out.length; out += c; continue; }
+      if (value && !open.length && c === '=' && !'=>'.includes(raw[i + 1] || ' ') && !'=!<>'.includes(raw[i - 1] || ' ')) return done();
       if (spaced && (c === '/' && raw[i + 1] === '/' || hash && c === '#' || dashes && c === '-' && raw[i + 1] === '-')) return done();
-      if (c === '(' || c === '[' || c === '{') {
-        if (c === '{' && body && !depth) return done();
-        depth++;
-      } else if (c === ')' || c === ']' || c === '}') depth = Math.max(0, depth - 1);
-      else if (body && !depth && (c === '=' && raw[i + 1] === '>' || py && c === ':')) return done();
+      // `a < b` and `a<b)` compare; `=>` and `->` are arrows
+      if (c === '<' && /[\w$]/.test(raw[i - 1] || '')) open.push(c);
+      else if (c === '>' && open[open.length - 1] === '<' && raw[i - 1] !== '=' && raw[i - 1] !== '-') open.pop();
+      else if (c === '(' || c === '[' || c === '{') {
+        if (c === '{' && body && !open.length && !typeNext) return done();
+        if (!open.length) fnType = c === '(' && typeNext && BUILD_PARAMS.test(raw.slice(i + 1));
+        open.push(c);
+      } else if (c === ')' || c === ']' || c === '}') {
+        const at = open.lastIndexOf(BUILD_OPENER[c]);
+        open.length = at >= 0 ? at : Math.max(0, open.length - 1);
+      } else if (body && !open.length && (c === '=' && raw[i + 1] === '>' && !typeArrow || py && c === ':')) return done();
       out += c;
+      if (!/\s/.test(c)) {
+        typeArrow = fnType && c === ')' && !open.length;
+        typeNext = c === ':' || c === '|' || c === '>' && raw[i - 1] === '=';
+      }
     }
-    if (!body || !depth) break;
+    if (!body || !open.length) break;
     out += ' ';
   }
   return done();
@@ -513,8 +536,8 @@ function buildChunks(nodes, edges, limit) {
   return chunks;
 }
 
-// files: Map of repo-relative path to text (a file with no language may map to ''); opts: { repo, by, commit?, label?,
-// chunkBytes?, langFor? } (langFor picks a file's language; tests hand it a made-up one)
+// files: Map of repo-relative path to text (a file with no language may map to ''); opts: { repo, by, commit?, branch?,
+// dirty?, label?, chunkBytes?, langFor? } (langFor picks a file's language; tests hand it a made-up one)
 export function buildGraph(files, opts = {}) {
   const paths = [...files.keys()].sort(buildCmp);
   const b = {
@@ -550,23 +573,26 @@ export function buildGraph(files, opts = {}) {
     repo: opts.repo,
     ...(opts.label ? { label: opts.label } : {}),
     ...(opts.commit ? { commit: opts.commit } : {}),
+    ...(opts.branch ? { branch: opts.branch } : {}),
+    ...(opts.dirty === true ? { dirty: true } : {}),
     builtAt: new Date().toISOString(),
     by: opts.by,
     counts: { files: kinds('file'), symbols: kinds('sym'), edges: edges.length, docs: kinds('doc') },
     chunks: chunks.length,
     communities: communities.slice(0, BUILD_COMMUNITIES).map(({ c, name, n, top }) => ({ c, name, n, top })),
     god,
+    links: communityLinks(nodes, edges),
     langs,
     version: 1,
   };
   return { index, chunks };
 }
 
-// the commit comes from git unless given, so a map says which code it describes
+// A map says which code it describes: the commit, branch and changes git reports, unless the caller names a commit;
+// git's branch and changes would then describe some other code.
 export async function mapRepo(root, opts = {}) {
   const paths = await listFiles(root);
   const texts = await readFiles(root, paths.filter((p) => langFor(p)));
   const files = new Map(paths.map((p) => [p, texts.get(p) || '']));
-  const commit = opts.commit || await headCommit(root);
-  return buildGraph(files, { ...opts, ...(commit ? { commit } : {}) });
+  return buildGraph(files, opts.commit ? opts : { ...opts, ...await headState(root) });
 }

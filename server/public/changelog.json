@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.17.0",
+      "date": "2026-10-25",
+      "prs": [
+        43
+      ],
+      "lines": {
+        "en": [
+          "The Code map section is now a picture of each repository's groups and links. Open a group, a file or a symbol, search by name, and see where open tasks sit on the code. The demo has a real one.",
+          "A map says which commit and branch it describes, and whether the checkout had uncommitted changes: on the page, in board_start and in board_map. The map also reads TypeScript more exactly.",
+          "Keep a map current from CI or a git hook: --if-changed builds only when the checkout has changed since the map, and each site serves its own uploader at <site>/codemap.mjs."
+        ],
+        "ko": [
+          "‘코드 맵’ 섹션이 저장소별 묶음과 연결을 그림으로 보여 줘요. 묶음, 파일, 심볼을 차례로 열고 이름으로 찾을 수 있고, 열린 태스크가 코드의 어디에 있는지도 보여요. 데모에도 실제 맵이 들어 있어요.",
+          "맵이 어느 커밋과 브랜치를 그렸는지, 커밋하지 않은 변경이 있었는지 페이지와 board_start, board_map에서 알려 줘요. TypeScript도 더 정확하게 읽어요.",
+          "CI나 git 훅으로 맵을 최신으로 유지할 수 있어요. --if-changed는 체크아웃이 맵 이후로 바뀌었을 때만 맵을 만들고, 업로더는 사이트의 <사이트>/codemap.mjs에서 그 사이트 버전으로 받을 수 있어요."
+        ]
+      }
+    },
+    {
       "version": "1.16.0",
       "date": "2026-10-25",
       "prs": [

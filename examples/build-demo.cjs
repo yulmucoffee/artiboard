@@ -1,19 +1,19 @@
 // Builds examples/demo.html, the file published as the public demo: the real board page running on an in-page
 // sample database. It is built for publishing, not kept in git (a copy per page change made every two page PRs clash).
-// No artifact capabilities are needed, so the demo can be shared publicly.
+// No artifact capabilities are needed, so the demo can be shared publicly. The sample app's code map is built here,
+// by the project's own map builder, from the small source tree in examples/pantry.
 // Run: node examples/build-demo.cjs
 const fs=require('fs'),path=require('path');
 const root=path.join(__dirname,'..');
 let page=fs.readFileSync(path.join(root,'skills/artiboard/assets/board.html'),'utf8');
-const data=fs.readFileSync(path.join(__dirname,'demo-data.json'),'utf8');
-const shim=`<script>
+const shim=(data)=>`<script>
 // Demo database: same calls as the artifact db, kept in memory. "@-90" means 90 minutes ago, "@d+3" the day three days from today.
 (function(RAW){
   var now=Date.now();
   try{Object.keys(localStorage).forEach(function(k){if(k.indexOf('ab-')===0)localStorage.removeItem(k)})}catch(e){}
   function day(n){var x=new Date(now+n*864e5);return x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2)+'-'+('0'+x.getDate()).slice(-2)}
   function fix(v){if(typeof v==='string'&&/^@d[+-]\\d+$/.test(v))return day(Number(v.slice(2)));
-    if(typeof v==='string'&&v.charAt(0)==='@')return new Date(now+Number(v.slice(1))*60000).toISOString();
+    if(typeof v==='string'&&/^@-?\d+$/.test(v))return new Date(now+Number(v.slice(1))*60000).toISOString();
     if(Array.isArray(v))return v.map(fix);if(v&&typeof v==='object'){var o={};for(var k in v)o[k]=fix(v[k]);return o}return v}
   var store={};for(var p in RAW.docs)store[p]=fix(RAW.docs[p]);
   var subs=[];
@@ -39,6 +39,7 @@ const shim=`<script>
   window.DEMO={use:function(n){return Promise.resolve(n==='db'?{collection:coll,doc:doc}:n==='user'?user:null)}};
   // English / 한국어 switch (demo only): RAW.ko maps each sample string to Korean. Switching rewrites every
   // string in the store and meta/config.lang, so the page re-renders in that language like a real board would.
+  // The code map is not rewritten: it is the sample code's own text, the same in both languages.
   var KO=RAW.ko||{},EN={},lang='en';for(var e in KO)EN[KO[e]]=e;
   function tr(v,dict){if(typeof v==='string')return Object.prototype.hasOwnProperty.call(dict,v)?dict[v]:v;
     if(Array.isArray(v))return v.map(function(x){return tr(x,dict)});if(v&&typeof v==='object'){var o={};for(var k in v)o[k]=tr(v[k],dict);return o}return v}
@@ -47,7 +48,7 @@ const shim=`<script>
     b.setAttribute('data-lang',x[0]);b.addEventListener('click',function(){setLang(x[0])});bar.appendChild(b)});
   var meta=document.querySelector('.meta');if(meta)meta.appendChild(bar);
   function setLang(l){
-    if(l!==lang){var dict=l==='ko'?KO:EN;for(var p in store)store[p]=tr(store[p],dict);lang=l;
+    if(l!==lang){var dict=l==='ko'?KO:EN;for(var p in store)if(p.indexOf('map/')!==0)store[p]=tr(store[p],dict);lang=l;
       store['meta/config']=Object.assign({},store['meta/config'],{lang:l});notify()}
     try{localStorage.setItem('demo-lang',l)}catch(e){}
     [].forEach.call(bar.children,function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-lang')===lang))});
@@ -56,7 +57,7 @@ const shim=`<script>
   setLang(want==='ko'||want==='en'?want:/^ko\\b/i.test(navigator.language||'')?'ko':'en');
   (RAW.events||[]).forEach(function(ev){setTimeout(function(){ev.writes.forEach(function(w){var d=fix(w.data);if(lang==='ko')d=tr(d,KO);
     store[w.path]=w.op==='update'?Object.assign({},store[w.path],d):d});notify()},ev.after*1000)});
-})(${data.trim()});
+})(${data});
 </script>
 `;
 function swap(a,b){if(!page.includes(a))throw new Error('board.html changed; update build-demo.cjs: '+a);page=page.replace(a,b)}
@@ -66,9 +67,18 @@ const uses=page.match(/\bclaude\s*\.use\('(db|user)'\)/g)||[];
 if(uses.length!==2||!/'db'/.test(uses.join())||!/'user'/.test(uses.join()))throw new Error('board.html changed; update build-demo.cjs: claude.use calls: '+(uses.join(' ')||'none'));
 page=page.replace(/\bclaude(\s*)\.use\('(db|user)'\)/g,"DEMO$1.use('$2')");
 swap('if (window.claude && window.claude.use) start();','if (window.DEMO) start();');
-const i=page.lastIndexOf('<script>');
-page=page.slice(0,i)+shim+page.slice(i);
-const out=path.join(__dirname,'demo.html');
-// --check: say whether the page still builds into a demo (every swap above found its text), without writing it
-if(process.argv.includes('--check'))console.log('the demo builds:',page.length,'bytes');
-else{fs.writeFileSync(out,page);console.log('wrote examples/demo.html',page.length,'bytes')}
+async function main(){
+  const data=JSON.parse(fs.readFileSync(path.join(__dirname,'demo-data.json'),'utf8'));
+  const {mapRepo}=await import('../server/codemap/build.js');
+  const {index,chunks}=await mapRepo(path.join(__dirname,'pantry'),{repo:'pocket-pantry/app',label:'app',by:'ben',
+    commit:'4f2a9c1d8e7b6a5f3c2d1e0f9a8b7c6d5e4f3a2b',branch:'main'});
+  index.builtAt='@-1500';
+  data.docs['map/app']=index;chunks.forEach((chunk,n)=>{data.docs['map/app/chunks/'+n]=chunk});
+  const i=page.lastIndexOf('<script>');
+  page=page.slice(0,i)+shim(JSON.stringify(data))+page.slice(i);
+  const out=path.join(__dirname,'demo.html');
+  // --check: say whether the page still builds into a demo (every swap above found its text), without writing it
+  if(process.argv.includes('--check'))console.log('the demo builds:',page.length,'bytes');
+  else{fs.writeFileSync(out,page);console.log('wrote examples/demo.html',page.length,'bytes')}
+}
+main().catch((e)=>{console.error(e);process.exit(1)});

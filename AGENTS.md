@@ -16,6 +16,7 @@ artiboard is read by agents on every session they spend on a board, so it has th
 | `server/public/shim.js` | The page's runtime on a self-hosted site (reads, writes, live updates). |
 | `skills/artiboard/assets/board.html` | The page. It carries a copy of `server/tasks.js` between marker lines. Its script keeps the shape `scripts/page-shape.mjs` writes (prettier, width 120), and names say what a thing is: no one-letter helpers beyond `T`, `$` and `el`. |
 | `skills/artiboard/` | The skill people install: `SKILL.md`, the agents' protocol, the hosted guide. |
+| `examples/` | The public demo. `build-demo.cjs` builds it from the page, `demo-data.json` and a map of `examples/pantry/`, a small sample app the map builder reads. |
 | `scripts/` | Levers: `check.mjs` (every gate), `inline-rules.mjs`, `page-shape.mjs`, `stamp-version.mjs`, `readme-shape.mjs`, `unused.mjs`, `release-check.mjs` (CI: the bump, the PR in the changelog, squash merges only), `bench.mjs`, `supabase-env.sh`. |
 
 ## How we work

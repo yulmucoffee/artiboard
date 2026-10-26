@@ -11,14 +11,46 @@ A self-hosted project can keep a code map of each repository it names: files, fu
 Build it from the repository's root:
 
 ```bash
-node <skill directory>/scripts/codemap.mjs --site <board url> --project <id> --repo owner/name [--root .] [--label api] [--token abt_…]
+node <skill directory>/scripts/codemap.mjs --site <board url> --project <id> --repo owner/name [--root .] [--label api] [--token abt_…] [--if-changed]
 ```
 
-The skill directory is usually `~/.claude/skills/artiboard` or `.claude/skills/artiboard` (Claude Code), or `~/.codex/skills/artiboard` (Codex). The token also comes from `ARTIBOARD_TOKEN`, the same token the MCP server uses. `--label` names the map when `meta/config.repos` gives the repository no label. A map is kept under its repository, so a label added later renames it rather than starting a second map. Rebuild after large changes: the map says when it was built and by whom. A site admin can build on the server instead, with `artiboard map build --project <id> --repo owner/name --root <checkout>`. The upload is gzipped, which fits most repositories; some hosts cap request sizes (about 4.5 MB on a common serverless host).
+The skill directory is usually `~/.claude/skills/artiboard` or `.claude/skills/artiboard` (Claude Code), or `~/.codex/skills/artiboard` (Codex). The token also comes from `ARTIBOARD_TOKEN`, the same token the MCP server uses. `--label` names the map when `meta/config.repos` gives the repository no label. A map is kept under its repository, so a label added later renames it rather than starting a second map. The map says when it was built, by whom and from which commit. A site admin can build on the server instead, with `artiboard map build --project <id> --repo owner/name --root <checkout>`. The upload is gzipped, which fits most repositories; some hosts cap request sizes (about 4.5 MB on a common serverless host).
+
+### Keeping the map current
+
+A map says which commit and branch it describes, and whether the checkout had uncommitted changes. The page shows it, and `board_start`'s `code map:` line and `board_map`'s overview end with it: `· main@3f2a1c7`, then `· uncommitted changes` when there were any. `--if-changed` asks the site first and builds only when its map describes another commit, or when the map or the checkout had uncommitted changes; a clean checkout at the commit the map describes sends nothing.
+
+Pick one way to keep it current. When the board describes the shared default branch, the usual case, let CI rebuild on each push. A site serves the uploader of its own version at `<board url>/codemap.mjs`; save it outside the checkout, or the map counts it as an uncommitted change. Store a member's token (a viewer's cannot write maps) as the repository secret `ARTIBOARD_TOKEN`:
+
+```yaml
+# .github/workflows/codemap.yml (name your default branch)
+on: { push: { branches: [main] } }
+jobs:
+  codemap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - env: { ARTIBOARD_TOKEN: ${{ secrets.ARTIBOARD_TOKEN }} }
+        run: |
+          curl -fsSL <board url>/codemap.mjs -o "$RUNNER_TEMP/codemap.mjs"
+          node "$RUNNER_TEMP/codemap.mjs" --site <board url> --project <id> --repo ${{ github.repository }}
+```
+
+For a checkout only you commit to, a `post-commit` hook rebuilds in the background after each commit, with the token from `ARTIBOARD_TOKEN`. It sits out a rebase, which commits many times in a row, and the uploader itself skips a build whose commit moved on while it read. Save it as `.git/hooks/post-commit`, make it executable, and read `.git/codemap.log` when the map lags:
+
+```bash
+#!/bin/sh
+[ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] && exit 0
+node <skill directory>/scripts/codemap.mjs --site <board url> --project <id> --repo owner/name --if-changed >> "$(git rev-parse --git-dir)/codemap.log" 2>&1 &
+```
+
+What people get: the page's Code map section draws each map as nodes and links. The groups of files come first, joined by thicker lines where more imports and calls cross between them; one click on a node says what it is and which open tasks touch it, a second opens it (a group's files and the groups they reach, a file's symbols with the files it imports and that import it, a symbol with what calls it and what it calls). A search box finds a name and jumps there. Nodes that open tasks touch are ringed in the holder's color with the task's key, and the detail text is what `board_map` prints, so people and agents read the same map.
 
 What agents get:
 
-- `board_start` prints `code map: <repo> · N symbols · built MM-DD by <who>` for each map.
+- `board_start` prints `code map: <repo> · N symbols · built MM-DD by <who> · <branch>@<commit>` for each map.
 - `board_claim` and `board_task` add a `code:` section: the files and symbols the task's spec names, with how many symbols each defines and how many files depend on it. An `overlap` line follows when another open task touches the same code, such as `overlap M1-4 ↔ M1-6 (ben): shared/units.ts`.
 
 `board_map` answers one question at a time, in short lines. It knows names and structure, not text: grep for a string or a flag it does not know, and open a symbol's lines when its role matters.
@@ -37,7 +69,7 @@ Limits:
 
 - Extraction is deterministic and line-based, not a compiler. Calls match by name, so a common name can point at the wrong definition; such edges are marked `[i]`.
 - Languages: JavaScript and TypeScript, Python, Go, Rust, Java, Kotlin, C#, Swift, Ruby, PHP, C/C++, SQL and Markdown.
-- A stale map misleads. Rebuild after large changes.
+- A stale map misleads. Keep it current with CI or a git hook, as [Keeping the map current](#keeping-the-map-current) shows.
 - A map holds at most 60 chunks, about 25,000 symbols. For a larger repository, map the part that matters with `--root <subdirectory>`; a project with several repositories keeps one map for each.
 - A map with no files is refused, so a wrong `--root` never replaces a good map.
 - An admin can drop a map with `artiboard map drop --project <id> --repo <label>`.

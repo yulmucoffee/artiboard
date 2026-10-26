@@ -4,7 +4,7 @@
 // (`supabase start` gives a local one); it adds a smoke-<random> project and members, and removes them afterwards.
 // Run: npm test
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { createServer, request } from 'node:http';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -876,6 +876,16 @@ for (const backend of backends) {
       await says({ repo: SHOP_REPO, index: { ...index, counts: { ...index.counts, symbols: 'many' } }, chunks }, /^index\.counts\.symbols /, 'counts are integers');
       await says({ repo: SHOP_REPO, index: { ...index, langs: { js: -1 } }, chunks }, /^index\.langs\.js /, 'and so are langs');
       await says({ repo: SHOP_REPO, index: { ...index, label: 'a/b' }, chunks }, /^index\.label /, 'a label names no path');
+      await says({ repo: SHOP_REPO, index: { ...index, commit: 7 }, chunks }, /^index\.commit /, 'a commit is a string');
+      await says({ repo: SHOP_REPO, index: { ...index, commit: 'a'.repeat(65) }, chunks }, /^index\.commit /, 'of at most 64 characters');
+      await says({ repo: SHOP_REPO, index: { ...index, branch: 'b'.repeat(201) }, chunks }, /^index\.branch /, 'a branch is a name of at most 200');
+      await says({ repo: SHOP_REPO, index: { ...index, dirty: false }, chunks }, /^index\.dirty /, 'a clean checkout leaves dirty out');
+      await says({ repo: SHOP_REPO, index: { ...index, links: {} }, chunks }, /^index\.links /, 'links are a list');
+      await says({ repo: SHOP_REPO, index: { ...index, links: Array.from({ length: 201 }, () => [0, 1, 1]) }, chunks }, /^index\.links /, 'of at most 200');
+      await says({ repo: SHOP_REPO, index: { ...index, links: [[0, 1, 2], [3, 3, 1]] }, chunks }, /^index\.links\[1\] is not \[a, b, n\]/, 'between two communities, the lower first');
+      await says({ repo: SHOP_REPO, index: { ...index, links: [[0, 40, 1]] }, chunks }, /^index\.links\[0\] /, 'that a map can have');
+      await says({ repo: SHOP_REPO, index: { ...index, links: [[0, 1, 0]] }, chunks }, /^index\.links\[0\] /, 'joined by at least one edge');
+      await says({ repo: SHOP_REPO, index: { ...index, links: [[0, 1]] }, chunks }, /^index\.links\[0\] /, 'and saying how many');
       await says({ repo: SHOP_REPO, index, chunks: one({ nodes: [{ ...node, n: 5 }] }) }, /^chunks\[0\]\.nodes\[0\]\.n /, 'a node\'s name is a string');
       await says({ repo: SHOP_REPO, index, chunks: one({ nodes: [{ ...node, k: 'thing' }] }) }, /^chunks\[0\]\.nodes\[0\]\.k /, 'of a known kind');
       await says({ repo: SHOP_REPO, index, chunks: one({ nodes: [{ ...node, s: 'x'.repeat(161) }] }) }, /^chunks\[0\]\.nodes\[0\]\.s /, 'with a short signature');
@@ -902,6 +912,79 @@ for (const backend of backends) {
       assert.equal(bomb.status, 400);
       assert.equal((await bomb.json()).message, 'request too large or not gzip', 'what inflates past the limit is refused before it is read');
       assert.equal((await up(tokens.member, { repo: SHOP_REPO, index, chunks })).status, 200);
+    });
+
+    test('any signed-in reader gets which code each map describes, without its chunks', async () => {
+      const { index, chunks } = buildGraph(SHOP, { repo: SHOP_REPO, by: 'x' }), member = { Authorization: `Bearer ${tokens.member}` };
+      const up = (extra) => api(`/api/p/${M}/map`, { method: 'POST', headers: member, body: { repo: SHOP_REPO, index: { ...index, ...extra }, chunks } });
+      const meta = async (token, path = `/api/p/${M}/map`) => {
+        const r = await api(path, { headers: { Authorization: `Bearer ${token}` } });
+        assert.equal(r.status, 200, path);
+        return (await r.json()).maps;
+      };
+      assert.equal((await up({ commit: '3f2a1c7e9b8d', branch: 'main', dirty: true })).status, 200);
+      const stored = (await store.get(M, `map/${SHOP_KEY}`)).data;
+      assert.deepEqual(await meta(tokens.viewer), [{ repo: SHOP_REPO, label: 'shop', commit: '3f2a1c7e9b8d', branch: 'main', dirty: true,
+        builtAt: stored.builtAt, by: people.member.person, counts: index.counts, chunks: chunks.length }], 'a viewer reads it too');
+      assert.equal((await up({})).status, 200);
+      assert.deepEqual(Object.keys((await meta(tokens.member))[0]).sort(), ['builtAt', 'by', 'chunks', 'counts', 'label', 'repo'],
+        'a map built outside git leaves commit, branch and dirty out');
+      assert.equal((await meta(tokens.member, `/api/map?project=${M}`)).length, 1, 'the form Vercel rewrites the route to');
+      assert.deepEqual(await meta(tokens.member, `/api/p/nope-${R}/map`), [], 'an unknown project has no maps');
+      assert.equal((await api(`/api/p/${M}/map`)).status, 401, 'signed out, nothing');
+      const put = await api(`/api/p/${M}/map`, { method: 'PUT', headers: member });
+      assert.deepEqual([put.status, put.headers.get('allow')], [405, 'GET, POST']);
+    });
+
+    test('a site serves the uploader of its own version', async () => {
+      const r = await api('/codemap.mjs');
+      assert.equal(r.status, 200);
+      assert.match(r.headers.get('content-type'), /^text\/javascript/);
+      const script = await r.text();
+      assert.ok(script.startsWith('#!/usr/bin/env node\n'));
+      assert.equal(script, readFileSync(new URL('../skills/artiboard/scripts/codemap.mjs', import.meta.url), 'utf8'), 'the one the skill carries');
+    });
+
+    test('the uploader builds only when the site\'s map is behind the checkout, and says which code the map describes', async () => {
+      const id = `up-${R}`, root = mkdtempSync(join(tmpdir(), 'artiboard-repo-'));
+      const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+      const commit = () => git('-c', 'user.email=a@b', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'x');
+      const head = () => `${git('rev-parse', '--abbrev-ref', 'HEAD')}@${git('rev-parse', 'HEAD').slice(0, 7)}`;
+      const literal = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // not execFileSync: the script talks to this process's own server, which must keep answering
+      const upload = async () => (await runCli(process.execPath, [fileURLToPath(new URL('../skills/artiboard/scripts/codemap.mjs', import.meta.url)),
+        '--site', BASE, '--project', id, '--repo', SHOP_REPO, '--root', root, '--token', tokens.member, '--if-changed'])).stdout.trim().split('\n')[0];
+      const stored = async () => (await store.get(id, `map/${SHOP_KEY}`)).data;
+      await store.createProject(null, { id, title: 'Uploader', lang: 'en', repos: [{ repo: SHOP_REPO, label: 'shop' }] });
+      try {
+        writeFileSync(join(root, 'units.js'), 'export function toCents(amount) {\n  return Math.round(amount * 100);\n}\n');
+        git('init', '-q');
+        git('add', '.');
+        commit();
+        const at = head();
+        assert.match(await upload(), new RegExp(`^${literal(`${SHOP_REPO} → ${BASE}/p/${id}`)}: 1 files, .* · ${literal(at)}$`), 'the first run builds');
+        const built = (await stored()).builtAt;
+        assert.equal(await upload(), `up to date: ${SHOP_REPO} at ${at} on ${BASE}/p/${id}`, 'the same commit again builds nothing');
+        assert.equal((await stored()).builtAt, built, 'and sends nothing');
+
+        writeFileSync(join(root, 'cart.js'), "import { toCents } from './units.js';\n\nexport const total = (x) => toCents(x);\n");
+        assert.match(await upload(), new RegExp(`: 2 files, .* · ${literal(at)} · uncommitted changes$`), 'an untracked file is a change the site has not seen');
+        assert.equal((await stored()).dirty, true);
+        const meta = await (await api(`/api/p/${id}/map`, { headers: { Authorization: `Bearer ${tokens.viewer}` } })).json();
+        assert.deepEqual([meta.maps[0].commit.slice(0, 7), meta.maps[0].dirty], [at.split('@')[1], true]);
+        const start = (await call(board, 'board_start', { project: id, ready: 0, rules: false, peek: true })).value;
+        assert.match(start, new RegExp(`^code map: shop · \\d+ symbols · built \\d\\d-\\d\\d by ${people.member.person} · ${literal(at)} · uncommitted changes$`, 'm'));
+        assert.match(await upload(), / · uncommitted changes$/, 'a checkout with changes always builds');
+
+        git('add', '.');
+        commit();
+        assert.match(await upload(), new RegExp(` · ${literal(head())}$`), 'committed, it builds once more');
+        assert.equal((await stored()).dirty, undefined);
+        assert.match(await upload(), /^up to date: /);
+      } finally {
+        await store.dropProject(id).catch(() => {});
+        rmSync(root, { recursive: true, force: true });
+      }
     });
 
     test('a host that reads the body before the site does hands it over as bytes, text or JSON, and a map still arrives', async () => {
@@ -943,7 +1026,17 @@ for (const backend of backends) {
 
     test('the start names each code map; a project without one prints nothing extra, and board_map says so in one line', async () => {
       const s = (await call(board, 'board_start', { project: M, ready: 0, rules: false, peek: true })).value;
-      assert.match(s, new RegExp(`^repos: ${SHOP_REPO} \\(shop\\)\\ncode map: shop · \\d+ symbols · built \\d\\d-\\d\\d by ${people.member.person}$`, 'm'));
+      assert.match(s, new RegExp(`^repos: ${SHOP_REPO} \\(shop\\)\\ncode map: shop · \\d+ symbols · built \\d\\d-\\d\\d by ${people.member.person}$`, 'm'),
+        'a map built outside git names no commit');
+      const { index, chunks } = buildGraph(SHOP, { repo: SHOP_REPO, by: 'x' });
+      const dirty = await api(`/api/p/${M}/map`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.member}` },
+        body: { repo: SHOP_REPO, index: { ...index, commit: '3f2a1c7e9b8d', branch: 'main', dirty: true }, chunks } });
+      assert.equal(dirty.status, 200);
+      assert.match((await call(board, 'board_start', { project: M, ready: 0, rules: false, peek: true })).value,
+        new RegExp(`^code map: shop · \\d+ symbols · built \\d\\d-\\d\\d by ${people.member.person} · main@3f2a1c7 · uncommitted changes$`, 'm'),
+        'a map says which branch and commit it describes, and that the checkout had changes');
+      assert.match((await call(board, 'board_map', { project: M })).value.split('\n')[0], / · built \d\d-\d\d by \S+ · main@3f2a1c7 · uncommitted changes$/,
+        'and so does its overview');
       const plain = (await call(board, 'board_start', { project: P, ready: 50, peek: true })).value;
       assert.doesNotMatch(plain, /^code map/m);
       assert.doesNotMatch(plain, /board_map/, 'nor a rule about a map it does not have');
@@ -977,6 +1070,8 @@ for (const backend of backends) {
     test('board_map answers from the map: overview, explain, file, query, path and impact', async () => {
       const ask = async (args) => (await call(board, 'board_map', { project: M, ...args })).value;
       assert.match(await ask({}), /shared\/units\.js/, 'the overview names the most connected code');
+      assert.match((await ask({})).split('\n')[0], new RegExp(`^${SHOP_REPO} · \\d+ files · \\d+ symbols · \\d+ edges · \\d+ docs · built \\d\\d-\\d\\d by ${people.admin.person}$`),
+        'its first line counts the map; a map built outside git names no commit');
       const toCents = await ask({ explain: 'toCents' });
       assert.match(toCents, /^toCents · \S+ · shared\/units\.js:1 · /m);
       assert.match(toCents, /^called by:$/m);
