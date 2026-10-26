@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.18.3",
+      "date": "2026-10-26",
+      "prs": [
+        49
+      ],
+      "lines": {
+        "en": [
+          "The README is shorter: install in two commands (or one prompt), what you get in four points, and the reference folded away."
+        ],
+        "ko": [
+          "README가 짧아졌어요. 설치는 명령 두 개(또는 프롬프트 하나), 무엇을 얻는지는 네 줄로 보이고, 참고 자료는 접어 두었어요."
+        ]
+      }
+    },
+    {
       "version": "1.18.2",
       "date": "2026-10-26",
       "prs": [

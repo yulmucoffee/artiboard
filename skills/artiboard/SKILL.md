@@ -6,7 +6,7 @@ argument-hint: "[setup|adapt|upgrade|move]"
 
 # artiboard
 
-This is artiboard 1.18.2. A self-hosted site names its own version on the first line of `board_start` and in `board_whoami`; when the site is newer, tell your person to update this skill before setting up or changing a board (`git -C "$HOME/.artiboard/src" pull --ff-only`, then copy `skills/artiboard` again, as in FOR_AGENTS.md).
+This is artiboard 1.18.3. A self-hosted site names its own version on the first line of `board_start` and in `board_whoami`; when the site is newer, tell your person to update this skill before setting up or changing a board (`git -C "$HOME/.artiboard/src" pull --ff-only`, then copy `skills/artiboard` again, as in FOR_AGENTS.md).
 
 One page is the board. Its code draws every view (document, kanban, dependency graph) straight from the board's database, so the board stays live without republishing and without spending model tokens.
 
