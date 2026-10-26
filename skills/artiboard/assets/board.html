@@ -6061,10 +6061,8 @@ td.what .overlap{margin-left:8px}
     wrap.textContent = '';
     order = [];
     wrap.setAttribute('aria-label', T('v_graph'));
-    var crit = $('crit');
-    crit.textContent = '';
-    var gl = $('glegend');
-    gl.textContent = '';
+    $('crit').textContent = '';
+    $('glegend').textContent = '';
     if (!loaded) {
       wrap.appendChild(emptyNote(loadingText()));
       return;
@@ -6079,6 +6077,43 @@ td.what .overlap{margin-left:8px}
     m.chain.forEach(function (id) {
       critSet[id] = 1;
     });
+    graphCaption(m);
+    var n = m.cols.length,
+      maxRows = 0;
+    m.cols.forEach(function (c) {
+      maxRows = Math.max(maxRows, c.length);
+    });
+    var Wd = GRAPH.PAD * 2 + n * GRAPH.W + (n - 1) * GRAPH.GX,
+      Ht = GRAPH.TOP + maxRows * (GRAPH.H + GRAPH.GY) - GRAPH.GY + GRAPH.PAD;
+    var g = el('div', { class: 'graph', style: 'width:' + Wd + 'px;height:' + Ht + 'px;zoom:' + graphZoom });
+    g.appendChild(graphLinks(m, critSet, Wd, Ht));
+    m.cols.forEach(function (c, ci) {
+      g.appendChild(
+        el('div', { class: 'gcol', style: 'left:' + (GRAPH.PAD + ci * (GRAPH.W + GRAPH.GX)) + 'px;top:12px' }, [
+          T('step', { n: ci + 1 }) + (ci === 0 ? T('stepRoot') : ''),
+          el('span', { text: ' · ' + T('doneOf', { d: countStatus(c, 'done'), n: c.length }) })
+        ])
+      );
+      c.forEach(function (t) {
+        var hit = match(t);
+        if (hit) order.push(t.id);
+        g.appendChild(graphNode(m, t, critSet, hit));
+      });
+    });
+    wrap.appendChild(g);
+    lineage(cursor && view === 'graph' ? cursor : null);
+  }
+  // a card's place: its column is its level, its row its place within the level
+  function cardX(m, t) {
+    return GRAPH.PAD + m.lvl[t.id] * (GRAPH.W + GRAPH.GX);
+  }
+  function cardY(m, t) {
+    return GRAPH.TOP + m.row[t.id] * (GRAPH.H + GRAPH.GY);
+  }
+  // above the picture: the longest chain still to go (or why there is none), then what the lines and colors mean
+  function graphCaption(m) {
+    var crit = $('crit'),
+      gl = $('glegend');
     if (m.chain.length) {
       crit.appendChild(el('b', { text: T('critLabel', { n: m.chain.length }) }));
       crit.appendChild(
@@ -6112,21 +6147,9 @@ td.what .overlap{margin-left:8px}
         el('span', { class: personClass(p.id).trim() }, [el('i', { style: 'background:var(--pb)' }), p.name || p.id])
       );
     });
-
-    var n = m.cols.length,
-      maxRows = 0;
-    m.cols.forEach(function (c) {
-      maxRows = Math.max(maxRows, c.length);
-    });
-    var Wd = GRAPH.PAD * 2 + n * GRAPH.W + (n - 1) * GRAPH.GX,
-      Ht = GRAPH.TOP + maxRows * (GRAPH.H + GRAPH.GY) - GRAPH.GY + GRAPH.PAD;
-    var g = el('div', { class: 'graph', style: 'width:' + Wd + 'px;height:' + Ht + 'px;zoom:' + graphZoom });
-    function cardX(t) {
-      return GRAPH.PAD + m.lvl[t.id] * (GRAPH.W + GRAPH.GX);
-    }
-    function cardY(t) {
-      return GRAPH.TOP + m.row[t.id] * (GRAPH.H + GRAPH.GY);
-    }
+  }
+  // one curve from each dependency to the task waiting on it, marked as on the longest chain, met or still pending
+  function graphLinks(m, critSet, Wd, Ht) {
     var svg = svgEl('svg', { width: Wd, height: Ht, viewBox: '0 0 ' + Wd + ' ' + Ht, 'aria-hidden': 'true' });
     var defs = svgEl('defs');
     ['line', 'met', 'crit', 'hi'].forEach(function (k) {
@@ -6153,10 +6176,10 @@ td.what .overlap{margin-left:8px}
         (t.deps || []).forEach(function (k) {
           var d = graphTask(k);
           if (!d) return;
-          var x1 = cardX(d) + GRAPH.W,
-            y1 = cardY(d) + GRAPH.H / 2,
-            x2 = cardX(t) - 2,
-            y2 = cardY(t) + GRAPH.H / 2,
+          var x1 = cardX(m, d) + GRAPH.W,
+            y1 = cardY(m, d) + GRAPH.H / 2,
+            x2 = cardX(m, t) - 2,
+            y2 = cardY(m, t) + GRAPH.H / 2,
             cx = Math.max(24, (x2 - x1) / 2);
           var isCrit = critSet[d.id] && critSet[t.id] && m.chain.indexOf(t.id) === m.chain.indexOf(d.id) + 1;
           var kind = isCrit ? 'crit' : knownStatus(d) === 'done' ? 'met' : 'line';
@@ -6172,69 +6195,54 @@ td.what .overlap{margin-left:8px}
         });
       });
     });
-    g.appendChild(svg);
-    m.cols.forEach(function (c, ci) {
-      var dn = countStatus(c, 'done');
-      g.appendChild(
-        el('div', { class: 'gcol', style: 'left:' + (GRAPH.PAD + ci * (GRAPH.W + GRAPH.GX)) + 'px;top:12px' }, [
-          T('step', { n: ci + 1 }) + (ci === 0 ? T('stepRoot') : ''),
-          el('span', { text: ' · ' + T('doneOf', { d: dn, n: c.length }) })
-        ])
-      );
-      c.forEach(function (t) {
-        var hit = match(t);
-        if (hit) order.push(t.id);
-        var u = unmet(t),
-          r3 =
-            knownStatus(t) === 'done'
-              ? statusLabel('done')
-              : ready(t)
-                ? T('readyTag')
-                : u.length
-                  ? T('waitingDeps', { k: u.join(', ') })
-                  : personName(t.owner) + ' · ' + statusLabel(knownStatus(t));
-        g.appendChild(
-          button(
-            {
-              'data-k': t.id,
-              'aria-current': String(openId === t.id),
-              class:
-                'node' +
-                personClass(t.owner) +
-                ' ' +
-                knownStatus(t) +
-                (critSet[t.id] ? ' oncrit' : '') +
-                (filtering() && !hit ? ' nomatch' : ''),
-              style: 'left:' + cardX(t) + 'px;top:' + cardY(t) + 'px;width:' + GRAPH.W + 'px;height:' + GRAPH.H + 'px',
-              'aria-label':
-                t.key + ' ' + (t.title || '') + ', ' + statusLabel(knownStatus(t)) + ', ' + personName(t.owner),
-              onclick: opens(t),
-              onmouseenter: function () {
-                lineage(t.id);
-              },
-              onmouseleave: function () {
-                lineage(cursor && view === 'graph' ? cursor : null);
-              },
-              onfocus: function () {
-                lineage(t.id);
-              }
-            },
-            [
-              el('div', { class: 'r1' }, [
-                el('span', { class: 'key', text: t.key }),
-                statusChip(knownStatus(t)),
-                agentMark(t),
-                newDot(isNew(t))
-              ]),
-              el('div', { class: 'tt', text: titleOf(t) }),
-              el('div', { class: 'r3' + (ready(t) ? ' ready' : ''), text: r3 })
-            ]
-          )
-        );
-      });
-    });
-    wrap.appendChild(g);
-    lineage(cursor && view === 'graph' ? cursor : null);
+    return svg;
+  }
+  // a task on the graph: key, status and title, then what it waits on or who has it; hovering keeps only its line
+  function graphNode(m, t, critSet, hit) {
+    var u = unmet(t),
+      r3 =
+        knownStatus(t) === 'done'
+          ? statusLabel('done')
+          : ready(t)
+            ? T('readyTag')
+            : u.length
+              ? T('waitingDeps', { k: u.join(', ') })
+              : personName(t.owner) + ' · ' + statusLabel(knownStatus(t));
+    return button(
+      {
+        'data-k': t.id,
+        'aria-current': String(openId === t.id),
+        class:
+          'node' +
+          personClass(t.owner) +
+          ' ' +
+          knownStatus(t) +
+          (critSet[t.id] ? ' oncrit' : '') +
+          (filtering() && !hit ? ' nomatch' : ''),
+        style: 'left:' + cardX(m, t) + 'px;top:' + cardY(m, t) + 'px;width:' + GRAPH.W + 'px;height:' + GRAPH.H + 'px',
+        'aria-label': t.key + ' ' + (t.title || '') + ', ' + statusLabel(knownStatus(t)) + ', ' + personName(t.owner),
+        onclick: opens(t),
+        onmouseenter: function () {
+          lineage(t.id);
+        },
+        onmouseleave: function () {
+          lineage(cursor && view === 'graph' ? cursor : null);
+        },
+        onfocus: function () {
+          lineage(t.id);
+        }
+      },
+      [
+        el('div', { class: 'r1' }, [
+          el('span', { class: 'key', text: t.key }),
+          statusChip(knownStatus(t)),
+          agentMark(t),
+          newDot(isNew(t))
+        ]),
+        el('div', { class: 'tt', text: titleOf(t) }),
+        el('div', { class: 'r3' + (ready(t) ? ' ready' : ''), text: r3 })
+      ]
+    );
   }
   function lineage(id) {
     var g = document.querySelector('.graph');
