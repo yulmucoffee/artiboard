@@ -1,7 +1,7 @@
 // The everyday agent actions, each one tool call: start a session, read a task, claim, post.
 // They answer in short text lines, check versions on the server and stamp times with the server clock,
 // so an agent spends no tokens on reads before a write, on version numbers or on `date`.
-import { loadGraph, mapSource } from './codemap/graph.js';
+import { GRAPH_LINKS, loadGraph, mapSource } from './codemap/graph.js';
 import { BOARD_RULES, BoardError, MAP_RULES, cleanRepos, now, repoName, reposOf, stampId, toBoardError } from './core.js';
 import { TASK_STATUSES, boardStatuses, holderOf, isReady, mayChange, statusEffects, statusOf, unmetDeps } from './tasks.js';
 import { VERSION } from './version.js';
@@ -139,7 +139,7 @@ function mapProblem(index, chunks) {
   if (!Array.isArray(index.god) || index.god.length > 40) return 'index.god is not a list of at most 40';
   for (const [i, g] of index.god.entries()) if (!upTo(300)(g)) return `index.god[${i}] is not an id`;
   // a map built before the builder wrote links has none, and the page finds them in its chunks
-  if (index.links !== undefined && !(Array.isArray(index.links) && index.links.length <= 200)) return 'index.links is not a list of at most 200';
+  if (index.links !== undefined && !(Array.isArray(index.links) && index.links.length <= GRAPH_LINKS)) return `index.links is not a list of at most ${GRAPH_LINKS}`;
   for (const [i, l] of (index.links || []).entries()) {
     if (!Array.isArray(l) || l.length !== 3 || !isCommunity(l[0]) || !isCommunity(l[1]) || l[0] >= l[1] || !(Number.isInteger(l[2]) && l[2] > 0)) {
       return `index.links[${i}] is not [a, b, n]`;

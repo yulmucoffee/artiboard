@@ -4437,7 +4437,7 @@ async function readFiles(root, paths) {
 async function headState(root) {
   const git = (args) => scanGit(root, args).then((out) => out.trim(), () => undefined);
   const [commit, branch, status] = await Promise.all([git(['rev-parse', 'HEAD']), git(['rev-parse', '--abbrev-ref', 'HEAD']),
-    git(['--no-optional-locks', 'status', '--porcelain', '--', '.'])]);
+    git(['--no-optional-locks', 'status', '--porcelain', '--untracked-files=normal', '--', '.'])]);
   return { commit: commit || undefined, branch: branch && branch !== 'HEAD' ? branch : undefined, dirty: status === undefined ? undefined : status !== '' };
 }
 
@@ -4550,16 +4550,21 @@ const BUILD_BODIES = new Set(['fn', 'class', 'method', 'module']);
 const BUILD_VALUES = new Set(['const', 'var', 'static']);
 
 const BUILD_OPENER = { ')': '(', ']': '[', '}': '{' };
+// what may follow the `(` of a parameter list, as TypeScript itself tells a function type from a type in parentheses:
+// `)`, `...`, a destructuring `{` or `[`, a name and then `:`, `,`, `?`, `=` or `)`, or the end of the line
+const BUILD_PARAMS = /^\s*($|[)[{]|\.\.\.|[\w$]+\s*[:,?=)])/;
 
 // The declaration as written, on one line of at most 120 characters: for a function, class or method its line (and
 // the next ones while its brackets are open) up to the body (`{` or `=>` outside brackets, Python's `:`), a string
 // default longer than 20 characters shown as "…"; for a constant or variable its line up to the `=`, never its value;
 // for the rest the line less a trailing `{`, `(`, `[`, `=` or `;`. A line comment ends it. Type arguments right after
 // a name (`Promise<{ id: string }>`) nest as brackets do. Where a type is expected, after a `:` or `|`, a `{` opens an
-// object type, not the body, and a `(` opens a function type, whose `=>` is the type's (`): (r: Request) => Response {`).
+// object type, not the body, and a `(` that starts as parameters do opens a function type, whose `=>` is the type's
+// (`): (r: Request) => Response {`); any other `(` holds a type (`): (() => void) => {`). A Rust lifetime (`'a`,
+// `'static`) is a name: read as a quote, it would carry the signature on into the body.
 function buildSig(lines, line, kind, lang) {
   const body = BUILD_BODIES.has(kind), value = BUILD_VALUES.has(kind), py = lang.id === 'python';
-  const hash = py || lang.id === 'ruby', dashes = lang.id === 'sql';
+  const hash = py || lang.id === 'ruby', dashes = lang.id === 'sql', rust = lang.id === 'rust';
   const open = [];
   let out = '', quote = '', opened = 0, typeNext = false, fnType = false, typeArrow = false;
   const done = () => buildCut(out.replace(/\s+/g, ' ').trim().replace(/[\s{([=;,]+$/, ''), 120);
@@ -4572,11 +4577,14 @@ function buildSig(lines, line, kind, lang) {
         if (c === '\\') out += raw[++i] || '';
         else if (c === quote) {
           if (body && out.length - opened - 2 > 20) out = `${out.slice(0, opened)}${quote}…${quote}`;
+          // a string is a whole type (`'a' | 'b' {`): the `{` after it opens the body
           quote = '';
+          typeNext = typeArrow = false;
         }
         continue;
       }
-      if (c === '"' || c === "'" || c === '`') { quote = c; opened = out.length; out += c; continue; }
+      const lifetime = rust && c === "'" && /\w/.test(raw[i + 1] || '') && raw[i + 2] !== "'";
+      if (!lifetime && (c === '"' || c === "'" || c === '`')) { quote = c; opened = out.length; out += c; continue; }
       if (value && !open.length && c === '=' && !'=>'.includes(raw[i + 1] || ' ') && !'=!<>'.includes(raw[i - 1] || ' ')) return done();
       if (spaced && (c === '/' && raw[i + 1] === '/' || hash && c === '#' || dashes && c === '-' && raw[i + 1] === '-')) return done();
       // `a < b` and `a<b)` compare; `=>` and `->` are arrows
@@ -4584,7 +4592,7 @@ function buildSig(lines, line, kind, lang) {
       else if (c === '>' && open[open.length - 1] === '<' && raw[i - 1] !== '=' && raw[i - 1] !== '-') open.pop();
       else if (c === '(' || c === '[' || c === '{') {
         if (c === '{' && body && !open.length && !typeNext) return done();
-        if (!open.length) fnType = c === '(' && typeNext;
+        if (!open.length) fnType = c === '(' && typeNext && BUILD_PARAMS.test(raw.slice(i + 1));
         open.push(c);
       } else if (c === ')' || c === ']' || c === '}') {
         const at = open.lastIndexOf(BUILD_OPENER[c]);
@@ -5036,6 +5044,8 @@ async function mapRepo(root, opts = {}) {
 // declaration line (a constant's without its value) and the comment above it. No bodies. --if-changed asks the site
 // first and builds nothing when its map already describes this commit and neither it nor the checkout had changes no
 // commit holds, so CI or a git hook can run it on every commit.
+// a repository as the server names it: owner/name, from a URL too, in any case
+const repoKey = (r) => String(r || '').replace(/^https?:\/\/[^/]+\//i, '').replace(/\.git$/i, '').toLowerCase();
 async function codemapMain(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i++) if (argv[i].startsWith('--')) args[argv[i].slice(2)] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
@@ -5051,7 +5061,7 @@ async function codemapMain(argv) {
   if (head.commit && !head.dirty) {
     const res = await fetch(url, { headers: auth });
     const maps = res.ok ? (await res.json().catch(() => ({}))).maps || [] : [];
-    const have = maps.find((m) => String(m.repo).toLowerCase() === repo.toLowerCase());
+    const have = maps.find((m) => repoKey(m.repo) === repoKey(repo));
     if (have && have.commit === head.commit && !have.dirty) {
       console.log(`up to date: ${repo} at ${mapSource(head)[0]} on ${site}/p/${project}`);
       return;
@@ -5059,6 +5069,9 @@ async function codemapMain(argv) {
   }
   const started = Date.now();
   const { index, chunks } = await mapRepo(root, { repo, label: args.label && args.label !== true ? args.label : undefined, ...head });
+  // a rebase or a cherry-pick runs a hook once per commit: a map whose files were read while HEAD moved on would say
+  // one commit and hold another's files, so it is not sent; the hook for the last commit sends the right one
+  if (head.commit && (await headState(root)).commit !== head.commit) { console.log(`skipped: HEAD moved while ${repo} was read`); return; }
   // gzipped bytes as an octet stream: a map's JSON is large and hosts cap request bodies, and a host that parses
   // JSON bodies itself would choke on compressed JSON; the server inflates what starts with the gzip magic bytes
   const res = await fetch(url, {

@@ -18,7 +18,7 @@ The skill directory is usually `~/.claude/skills/artiboard` or `.claude/skills/a
 
 ### Keeping the map current
 
-A map says which commit and branch it describes, and whether the checkout had uncommitted changes. The page shows it, and `board_start`'s `code map:` line and `board_map`'s overview end with it: `· main@3f2a1c7`, then `· uncommitted changes` when there were any. `--if-changed` builds only when the site's map is behind the checkout: it asks the site first, and a clean checkout at the commit the map describes sends nothing.
+A map says which commit and branch it describes, and whether the checkout had uncommitted changes. The page shows it, and `board_start`'s `code map:` line and `board_map`'s overview end with it: `· main@3f2a1c7`, then `· uncommitted changes` when there were any. `--if-changed` asks the site first and builds only when its map describes another commit, or when the map or the checkout had uncommitted changes; a clean checkout at the commit the map describes sends nothing.
 
 Pick one way to keep it current. When the board describes the shared default branch, the usual case, let CI rebuild on each push. A site serves the uploader of its own version at `<board url>/codemap.mjs`; save it outside the checkout, or the map counts it as an uncommitted change. Store a member's token (a viewer's cannot write maps) as the repository secret `ARTIBOARD_TOKEN`:
 
@@ -32,15 +32,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: |
+      - env: { ARTIBOARD_TOKEN: ${{ secrets.ARTIBOARD_TOKEN }} }
+        run: |
           curl -fsSL <board url>/codemap.mjs -o "$RUNNER_TEMP/codemap.mjs"
-          node "$RUNNER_TEMP/codemap.mjs" --site <board url> --project <id> --repo ${{ github.repository }} --token ${{ secrets.ARTIBOARD_TOKEN }}
+          node "$RUNNER_TEMP/codemap.mjs" --site <board url> --project <id> --repo ${{ github.repository }}
 ```
 
-For a checkout only you commit to, a `post-commit` hook rebuilds in the background after each commit, with the token from `ARTIBOARD_TOKEN`. Save it as `.git/hooks/post-commit`, make it executable, and read `.git/codemap.log` when the map lags:
+For a checkout only you commit to, a `post-commit` hook rebuilds in the background after each commit, with the token from `ARTIBOARD_TOKEN`. It sits out a rebase, which commits many times in a row, and the uploader itself skips a build whose commit moved on while it read. Save it as `.git/hooks/post-commit`, make it executable, and read `.git/codemap.log` when the map lags:
 
 ```bash
 #!/bin/sh
+[ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] && exit 0
 node <skill directory>/scripts/codemap.mjs --site <board url> --project <id> --repo owner/name --if-changed >> "$(git rev-parse --git-dir)/codemap.log" 2>&1 &
 ```
 

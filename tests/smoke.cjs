@@ -77,7 +77,8 @@ function boot({
   storage = {},
   race = null,
   bump = null,
-  versions = false
+  versions = false,
+  failRead = []
 } = {}) {
   const store = { ...seed(), ...docs },
     subs = [],
@@ -111,6 +112,7 @@ function boot({
       // one read, as a hosted site's runtime offers: the page reads a code map's chunks this way
       get: async () => {
         reads.push(p);
+        if (failRead.includes(p)) throw { code: 'unavailable' };
         return snapColl(p, o);
       },
       onSnapshot(cb) {
@@ -1290,6 +1292,71 @@ const meLane = (d) => {
       !/uncommitted/.test(b.d.getElementById('codemapBody').textContent) &&
       !b.errors.length,
     'a map with links draws its groups from the index alone, reading no chunks; a link to a group it lacks is skipped; no branch shows just the commit'
+  );
+  ok(
+    b.d.querySelectorAll('#codemapBody .cnode[tabindex="0"]').length === 1 &&
+      b.d.querySelector('#codemapBody .cmap-pic').getAttribute('role') === 'group',
+    'one node is the tab stop, and the picture is a group of buttons, not an image'
+  );
+  b.d.querySelector('#codemapBody .cnode[tabindex="0"]').focus();
+  b.d
+    .querySelector('#codemapBody .cmap-pic')
+    .dispatchEvent(new b.w.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  ok(
+    b.d.activeElement &&
+      b.d.activeElement.getAttribute('data-id') === 'c:1' &&
+      b.d.activeElement.getAttribute('tabindex') === '0',
+    'an arrow key moves the keyboard to the next node and the tab stop with it'
+  );
+  b.store['map/web/chunks/0'] = {
+    nodes: [
+      { i: 'shared/units.ts', k: 'file', n: 'units.ts', f: 'shared/units.ts', l: 0, c: 1 },
+      { i: 'web/app.tsx', k: 'file', n: 'app.tsx', f: 'web/app.tsx', l: 0, c: 0 }
+    ],
+    edges: [['web/app.tsx', 'shared/units.ts', 'imports', 'x']]
+  };
+  b.d.querySelector('#codemapBody .cmap-detail .cmap-task').click();
+  await tick();
+  await tick();
+  ok(
+    b.reads.filter((p) => p === 'map/web/chunks').length === 1 &&
+      b.d.querySelector('#codemapBody .crumb').textContent.replace(/−\+⤢$/, '') === 'All groups›shared›units.ts' &&
+      b.d.activeElement === b.d.querySelector('#codemapBody .cmap-pic'),
+    'a most connected name read before the chunks loads them once and then goes there, with the keyboard on the picture'
+  );
+
+  // a read that fails: the section says so once and does not read again on its own
+  b = boot({
+    failRead: ['map/web/chunks'],
+    docs: {
+      'tasks/M1-1': { ...seed()['tasks/M1-1'], status: 'doing', owner: 'ana', touches: ['shared/units.ts'] },
+      'map/web': {
+        repo: 'acme/web',
+        builtAt: T0,
+        by: 'cy',
+        counts: { files: 2, symbols: 0, edges: 1, docs: 0 },
+        chunks: 1,
+        communities: [{ c: 0, name: 'web', n: 2, top: ['web/app.tsx'] }],
+        god: [],
+        links: [],
+        langs: { ts: 2 },
+        version: 1
+      }
+    }
+  });
+  all.push(b);
+  await tick();
+  await heal();
+  codemap(b.d)?.querySelector('.fold').click();
+  await tick();
+  await tick();
+  await tick();
+  ok(
+    b.reads.filter((p) => p === 'map/web/chunks').length === 1 &&
+      /Could not load the map/.test(b.d.getElementById('codemapBody').textContent) &&
+      b.d.querySelectorAll('#codemapBody .cnode').length === 1 &&
+      !b.errors.length,
+    'a chunk read that fails is reported once, the groups still draw, and nothing reads again until the map is rebuilt'
   );
 
   b = boot({

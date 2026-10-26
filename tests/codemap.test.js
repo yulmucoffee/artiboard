@@ -89,6 +89,9 @@ test('headState: the commit checked out, its branch, and whether the checkout ha
     assert.deepEqual(await at(), [sha, branch, undefined], 'the index names the commit and branch, and a clean checkout leaves dirty out');
     writeFileSync(join(dir, 'b.js'), 'export const b = 2;\n');
     assert.equal((await headState(dir)).dirty, true, 'an untracked file is a change: the map includes it');
+    git('config', 'status.showUntrackedFiles', 'no');
+    assert.equal((await headState(dir)).dirty, true, 'whatever the person\'s git config hides from their own status');
+    git('config', '--unset', 'status.showUntrackedFiles');
     rmSync(join(dir, 'b.js'));
     writeFileSync(join(dir, 'a.js'), 'export const a = 3;\n');
     assert.equal((await headState(dir)).dirty, true, 'and so is an edit');
@@ -764,18 +767,61 @@ test('build: a TypeScript signature runs to its body, past braces and arrows ins
     'export function lower(a = 1, b = a<2) {', // 14
     '  return b;', // 15
     '}', // 16
+    'export const later = (a: number): (() => void) => () => { return; };', // 17
+    'export const either = (a: A | B): (A | B) => a;', // 18
+    'export function spread(): (...args: unknown[]) => void {', // 19
+    '  return () => {};', // 20
+    '}', // 21
+    "export function origin(input: unknown): 'array' | 'other' {", // 22
+    "  return Array.isArray(input) ? 'array' : 'other';", // 23
+    '}', // 24
   ].join('\n') + '\n';
   const b = buildGraph(new Map([['sig.ts', src]]), {});
   const sig = (name) => allNodes(b).find((n) => n.i === `sig.ts#${name}`).s;
-  assert.deepEqual(['findUser', 'startSync', 'makeHandler', 'remind', 'pick', 'lower'].map(sig), [
+  const names = ['findUser', 'startSync', 'makeHandler', 'remind', 'pick', 'lower', 'later', 'either', 'spread', 'origin'];
+  assert.deepEqual(names.map(sig), [
     'export async function findUser(db: Db, email: string): Promise<{ id: string; householdId: string }>',
     'export function startSync<T extends Synced>(listId: string, show: (items: T[]) => void): () => void',
     'export function makeHandler(db: Db): (request: Request) => Promise<Response>',
     'export function remind(items: (Item & { bestBefore?: string })[], today: Date): { at: Date; body: string }[]',
     'export const pick = <T,>(xs: T[]): Map<string, { n: number }>',
     'export function lower(a = 1, b = a<2)',
-  ], 'a return type that is an object or a function is the signature\'s; an arrow function still stops at its own =>, and a '
-    + 'comparison opens nothing');
+    'export const later = (a: number): (() => void)',
+    'export const either = (a: A | B): (A | B)',
+    'export function spread(): (...args: unknown[]) => void',
+    "export function origin(input: unknown): 'array' | 'other'",
+  ], 'a return type that is an object or a function is the signature\'s; an arrow function still stops at its own =>, also '
+    + 'after a return type in parentheses, a string is a whole type, and a comparison opens nothing');
+});
+
+test('build: a Rust signature keeps its lifetimes and stops at its body: the \' of a lifetime opens no string', () => {
+  const src = [
+    "fn longest<'a, 'b: 'a>(x: &'a str, y: &'b str) -> &'a str { let n = 1; x }", // 1
+    "impl<'a> Store<'a> {", // 2
+    "    pub fn get(&self, key: &'a str,", // 3
+    '        limit: usize) -> usize {', // 4
+    '        let token = "k";', // 5
+    '        limit', // 6
+    '    }', // 7
+    '}', // 8
+    "pub fn tagged(s: &str) -> Tag<'x'> {", // 9
+    '    let t = s.len();', // 10
+    '    Tag', // 11
+    '}', // 12
+    "pub fn first<'a>(items: &'a [Item]) -> Option<&'a Item> {", // 13
+    '    let secret = "k";', // 14
+    '    items.iter().next()', // 15
+    '}', // 16
+  ].join('\n') + '\n';
+  const b = buildGraph(new Map([['sig.rs', src]]), {});
+  const sig = (name) => allNodes(b).find((n) => n.i === `sig.rs#${name}`).s;
+  assert.deepEqual(['longest', 'Store.get', 'tagged', 'first'].map(sig), [
+    "fn longest<'a, 'b: 'a>(x: &'a str, y: &'b str) -> &'a str",
+    "pub fn get(&self, key: &'a str, limit: usize) -> usize",
+    "pub fn tagged(s: &str) -> Tag<'x'>",
+    "pub fn first<'a>(items: &'a [Item]) -> Option<&'a Item>",
+  ], 'no body line is uploaded with the map, whether the body opens on the signature\'s line or after parameters on two '
+    + 'lines; a char (\'x\') is still a string');
 });
 
 test('build: chunks keep under chunkBytes, nodes in id order, each edge with its from node', () => {

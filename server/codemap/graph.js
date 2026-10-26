@@ -430,7 +430,7 @@ function graphContext(g, task, { limit = 8 } = {}) {
 // How communities connect: how many code edges (imports, calls, uses, extends, mentions) join files of one to files of
 // another, as [a, b, n] with a < b, strongest first, at most GRAPH_LINKS. The builder writes them into the index so the
 // page draws the groups from that one small document; a map built before they existed gets them from its chunks.
-const GRAPH_LINKS = 200;
+export const GRAPH_LINKS = 200;
 export function communityLinks(nodes, edges) {
   const com = new Map();
   for (const n of nodes) if (n && typeof n.i === 'string' && Number.isInteger(n.c)) com.set(n.i, n.c);

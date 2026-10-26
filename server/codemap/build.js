@@ -109,16 +109,21 @@ const BUILD_BODIES = new Set(['fn', 'class', 'method', 'module']);
 const BUILD_VALUES = new Set(['const', 'var', 'static']);
 
 const BUILD_OPENER = { ')': '(', ']': '[', '}': '{' };
+// what may follow the `(` of a parameter list, as TypeScript itself tells a function type from a type in parentheses:
+// `)`, `...`, a destructuring `{` or `[`, a name and then `:`, `,`, `?`, `=` or `)`, or the end of the line
+const BUILD_PARAMS = /^\s*($|[)[{]|\.\.\.|[\w$]+\s*[:,?=)])/;
 
 // The declaration as written, on one line of at most 120 characters: for a function, class or method its line (and
 // the next ones while its brackets are open) up to the body (`{` or `=>` outside brackets, Python's `:`), a string
 // default longer than 20 characters shown as "…"; for a constant or variable its line up to the `=`, never its value;
 // for the rest the line less a trailing `{`, `(`, `[`, `=` or `;`. A line comment ends it. Type arguments right after
 // a name (`Promise<{ id: string }>`) nest as brackets do. Where a type is expected, after a `:` or `|`, a `{` opens an
-// object type, not the body, and a `(` opens a function type, whose `=>` is the type's (`): (r: Request) => Response {`).
+// object type, not the body, and a `(` that starts as parameters do opens a function type, whose `=>` is the type's
+// (`): (r: Request) => Response {`); any other `(` holds a type (`): (() => void) => {`). A Rust lifetime (`'a`,
+// `'static`) is a name: read as a quote, it would carry the signature on into the body.
 function buildSig(lines, line, kind, lang) {
   const body = BUILD_BODIES.has(kind), value = BUILD_VALUES.has(kind), py = lang.id === 'python';
-  const hash = py || lang.id === 'ruby', dashes = lang.id === 'sql';
+  const hash = py || lang.id === 'ruby', dashes = lang.id === 'sql', rust = lang.id === 'rust';
   const open = [];
   let out = '', quote = '', opened = 0, typeNext = false, fnType = false, typeArrow = false;
   const done = () => buildCut(out.replace(/\s+/g, ' ').trim().replace(/[\s{([=;,]+$/, ''), 120);
@@ -131,11 +136,14 @@ function buildSig(lines, line, kind, lang) {
         if (c === '\\') out += raw[++i] || '';
         else if (c === quote) {
           if (body && out.length - opened - 2 > 20) out = `${out.slice(0, opened)}${quote}…${quote}`;
+          // a string is a whole type (`'a' | 'b' {`): the `{` after it opens the body
           quote = '';
+          typeNext = typeArrow = false;
         }
         continue;
       }
-      if (c === '"' || c === "'" || c === '`') { quote = c; opened = out.length; out += c; continue; }
+      const lifetime = rust && c === "'" && /\w/.test(raw[i + 1] || '') && raw[i + 2] !== "'";
+      if (!lifetime && (c === '"' || c === "'" || c === '`')) { quote = c; opened = out.length; out += c; continue; }
       if (value && !open.length && c === '=' && !'=>'.includes(raw[i + 1] || ' ') && !'=!<>'.includes(raw[i - 1] || ' ')) return done();
       if (spaced && (c === '/' && raw[i + 1] === '/' || hash && c === '#' || dashes && c === '-' && raw[i + 1] === '-')) return done();
       // `a < b` and `a<b)` compare; `=>` and `->` are arrows
@@ -143,7 +151,7 @@ function buildSig(lines, line, kind, lang) {
       else if (c === '>' && open[open.length - 1] === '<' && raw[i - 1] !== '=' && raw[i - 1] !== '-') open.pop();
       else if (c === '(' || c === '[' || c === '{') {
         if (c === '{' && body && !open.length && !typeNext) return done();
-        if (!open.length) fnType = c === '(' && typeNext;
+        if (!open.length) fnType = c === '(' && typeNext && BUILD_PARAMS.test(raw.slice(i + 1));
         open.push(c);
       } else if (c === ')' || c === ']' || c === '}') {
         const at = open.lastIndexOf(BUILD_OPENER[c]);

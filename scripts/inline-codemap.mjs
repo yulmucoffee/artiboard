@@ -42,6 +42,8 @@ const main = `
 // declaration line (a constant's without its value) and the comment above it. No bodies. --if-changed asks the site
 // first and builds nothing when its map already describes this commit and neither it nor the checkout had changes no
 // commit holds, so CI or a git hook can run it on every commit.
+// a repository as the server names it: owner/name, from a URL too, in any case
+const repoKey = (r) => String(r || '').replace(/^https?:\\/\\/[^/]+\\//i, '').replace(/\\.git$/i, '').toLowerCase();
 async function codemapMain(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i++) if (argv[i].startsWith('--')) args[argv[i].slice(2)] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
@@ -57,7 +59,7 @@ async function codemapMain(argv) {
   if (head.commit && !head.dirty) {
     const res = await fetch(url, { headers: auth });
     const maps = res.ok ? (await res.json().catch(() => ({}))).maps || [] : [];
-    const have = maps.find((m) => String(m.repo).toLowerCase() === repo.toLowerCase());
+    const have = maps.find((m) => repoKey(m.repo) === repoKey(repo));
     if (have && have.commit === head.commit && !have.dirty) {
       console.log(\`up to date: \${repo} at \${mapSource(head)[0]} on \${site}/p/\${project}\`);
       return;
@@ -65,6 +67,9 @@ async function codemapMain(argv) {
   }
   const started = Date.now();
   const { index, chunks } = await mapRepo(root, { repo, label: args.label && args.label !== true ? args.label : undefined, ...head });
+  // a rebase or a cherry-pick runs a hook once per commit: a map whose files were read while HEAD moved on would say
+  // one commit and hold another's files, so it is not sent; the hook for the last commit sends the right one
+  if (head.commit && (await headState(root)).commit !== head.commit) { console.log(\`skipped: HEAD moved while \${repo} was read\`); return; }
   // gzipped bytes as an octet stream: a map's JSON is large and hosts cap request bodies, and a host that parses
   // JSON bodies itself would choke on compressed JSON; the server inflates what starts with the gzip magic bytes
   const res = await fetch(url, {

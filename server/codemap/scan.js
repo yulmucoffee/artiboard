@@ -92,6 +92,6 @@ export async function readFiles(root, paths) {
 export async function headState(root) {
   const git = (args) => scanGit(root, args).then((out) => out.trim(), () => undefined);
   const [commit, branch, status] = await Promise.all([git(['rev-parse', 'HEAD']), git(['rev-parse', '--abbrev-ref', 'HEAD']),
-    git(['--no-optional-locks', 'status', '--porcelain', '--', '.'])]);
+    git(['--no-optional-locks', 'status', '--porcelain', '--untracked-files=normal', '--', '.'])]);
   return { commit: commit || undefined, branch: branch && branch !== 'HEAD' ? branch : undefined, dirty: status === undefined ? undefined : status !== '' };
 }

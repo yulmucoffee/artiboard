@@ -13,7 +13,7 @@ const shim=(data)=>`<script>
   try{Object.keys(localStorage).forEach(function(k){if(k.indexOf('ab-')===0)localStorage.removeItem(k)})}catch(e){}
   function day(n){var x=new Date(now+n*864e5);return x.getFullYear()+'-'+('0'+(x.getMonth()+1)).slice(-2)+'-'+('0'+x.getDate()).slice(-2)}
   function fix(v){if(typeof v==='string'&&/^@d[+-]\\d+$/.test(v))return day(Number(v.slice(2)));
-    if(typeof v==='string'&&v.charAt(0)==='@')return new Date(now+Number(v.slice(1))*60000).toISOString();
+    if(typeof v==='string'&&/^@-?\d+$/.test(v))return new Date(now+Number(v.slice(1))*60000).toISOString();
     if(Array.isArray(v))return v.map(fix);if(v&&typeof v==='object'){var o={};for(var k in v)o[k]=fix(v[k]);return o}return v}
   var store={};for(var p in RAW.docs)store[p]=fix(RAW.docs[p]);
   var subs=[];

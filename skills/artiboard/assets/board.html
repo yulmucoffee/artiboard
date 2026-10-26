@@ -494,6 +494,7 @@ td.what .overlap{margin-left:8px}
 .cmap-legend svg .shape{fill:var(--muted)} .cmap-legend svg .shape.doc{fill:none;stroke:var(--muted);stroke-width:1.5}
 .cmap-legend svg .e{stroke:var(--muted);stroke-width:1.5} .cmap-legend svg .e.calls{stroke-dasharray:4 3} .cmap-legend svg .e.uses{stroke-dasharray:1.5 3} .cmap-legend svg .e.defines{stroke:var(--edge)}
 .cmap-legend .cmap-hint{flex-basis:100%;color:var(--muted)}
+.cmap-legend .cmap-fail{flex-basis:100%;color:var(--danger)}
 .cmap-detail{display:flex;flex-direction:column;gap:8px;min-width:0;font-size:13px}
 .cmap-detail .cmap-title{font-weight:600;color:var(--ink);overflow-wrap:anywhere}
 .cmap-detail .muted{font-size:12.5px;overflow-wrap:anywhere}
@@ -1076,7 +1077,7 @@ td.what .overlap{margin-left:8px}
         '체크아웃에서 모델 없이 만든 파일, 심볼, 그 사이의 연결이에요. 에이전트는 코드를 뒤지기 전에 여기에 물어요. 이름을 입력하면 무엇과 이어지는지 보여요.',
       codemapNone: '아직 코드 지도가 없어요.',
       codemapCounts: '파일 {f} · 심볼 {s} · 연결 {e} · 문서 {d}',
-      codemapBuilt: '{t}에 {p}(이)가 만듦',
+      codemapBuilt: '{p}(이)가 {t} 만듦',
       codemapGod: '가장 많이 이어진 것',
       codemapSearch: '이름 찾기: 파일, 함수, 클래스',
       codemapFail: '코드 지도를 불러오지 못했어요 ({e})',
@@ -4012,7 +4013,7 @@ td.what .overlap{margin-left:8px}
 
   // The project's code maps, one index document per repository (map/<repoKey>), read once something needs them: the
   // code map section opens, or a task's sheet does, whose Code block shows wherever a map exists. A map's chunks are
-  // read the first time someone searches it.
+  // read when a picture needs them: a group, a file or a search; a small map at once when open work is to be placed.
   var maps = null,
     mapsWatched = false,
     mapCards = {};
@@ -4072,10 +4073,32 @@ td.what .overlap{margin-left:8px}
       });
       return;
     }
+    var active = document.activeElement,
+      hadCard = active && body.contains(active) ? active.closest('.cmap') : null,
+      had = hadCard && {
+        at: [].indexOf.call(body.querySelectorAll('.cmap'), hadCard),
+        id: active.getAttribute('data-id')
+      };
     body.textContent = '';
     if (!maps) body.appendChild(el('p', { class: 'empty', text: failed || T('loading') }));
     else if (!maps.length) body.appendChild(noMapYet());
-    else body.appendChild(el('div', { class: 'cmaps' }, maps.map(mapCard)));
+    else {
+      body.appendChild(el('div', { class: 'cmaps' }, maps.map(mapCard)));
+      maps.forEach(function (map) {
+        paintMap(map, mapCards[map.key]);
+      });
+      // a repaint on someone's write must not throw a person off the node they are on
+      var again = had && body.querySelectorAll('.cmap')[had.at];
+      if (again) {
+        var back = had.id
+          ? [].filter.call(again.querySelectorAll('.cnode'), function (n) {
+              return n.getAttribute('data-id') === had.id;
+            })[0]
+          : null;
+        if (back) back.focus();
+        else if (!had.id && again.querySelector('.cmap-pic')) again.querySelector('.cmap-pic').focus();
+      }
+    }
   }
   // the command that builds a map of this project on this site; nothing on a board that is not a site
   function buildCommand(repo) {
@@ -4087,7 +4110,7 @@ td.what .overlap{margin-left:8px}
           m[1] +
           ' --repo ' +
           repo +
-          ' --if-changed'
+          ''
       : '';
   }
   function noMapYet() {
@@ -4104,10 +4127,9 @@ td.what .overlap{margin-left:8px}
   // The map as a picture: nodes and the links between them, one level at a time. The groups come from the index
   // alone; opening a group, a file or a symbol reads the map's chunks once. The same graph module answers here and in
   // board_map, so what a person sees is what an agent is told.
-  var CMAP = { MAX_NODES: 150, FILE_SYMS: 48, PORTS: 10, HOP2: 30, HUB: 25, STEPS: 240, PAD: 26, SIDE: 316 };
+  var CMAP = { MAX_NODES: 150, FILE_SYMS: 48, PORTS: 10, HOP2: 30, HUB: 25, EAGER_CHUNKS: 4, STEPS: 240, PAD: 26 };
   // which kind of edge a file-to-file line takes when several join the same two files
   var CMAP_RANK = { imports: 5, extends: 4, calls: 3, uses: 2, mentions: 1, defines: 0, contains: 0, links: 0 };
-  var CMAP_ARROWS = { imports: 1, calls: 1, extends: 1, uses: 1 };
   var CMAP_TYPES = { class: 1, type: 1, interface: 1, struct: 1, enum: 1, trait: 1, table: 1, protocol: 1, record: 1 };
 
   // one repository's map: who built it from which commit, a search, the picture with its crumbs, and what is selected
@@ -4127,11 +4149,14 @@ td.what .overlap{margin-left:8px}
         showCmd: false
       });
     // a rebuilt map is read again when something needs it; the picture starts over at the groups
-    if (card.graph && card.builtAt !== index.builtAt) {
+    if (card.builtAt !== index.builtAt) {
       card.graph = null;
+      card.error = '';
       card.layout = null;
       card.trail = [{ kind: 'groups' }];
       card.selected = null;
+      card.pending = null;
+      card.builtAt = index.builtAt;
     }
     card.input = el('input', {
       type: 'text',
@@ -4170,16 +4195,17 @@ td.what .overlap{margin-left:8px}
       el('div', { class: 'cmap-body' }, [el('div', { class: 'cmap-pane' }, [card.svgWrap, card.legend]), card.detail])
     ]);
     // the chunks are read when the picture needs them: an older map without links, or open work to place on it
-    if (!card.graph && !card.loading && db && (!Array.isArray(index.links) || openTouched().length)) loadMap(map, card);
+    var eager =
+      !Array.isArray(index.links) || (openTouched().length > 0 && mapCount(index.chunks) <= CMAP.EAGER_CHUNKS);
+    if (!card.graph && !card.loading && !card.error && db && eager) loadMap(map, card);
     showFound(map, card);
-    paintMap(map, card);
     return card.box;
   }
   function mapHead(map, card) {
     var index = map.index,
       counts = index.counts && typeof index.counts === 'object' ? index.counts : {},
       sha = mapText(index.commit).slice(0, 7),
-      at = sha ? mapText(index.branch) + '@' + sha : '',
+      at = sha ? mapSource({ commit: index.commit, branch: mapText(index.branch) })[0] : '',
       built = [
         mapText(index.builtAt) ? T('codemapBuilt', { t: ago(index.builtAt), p: personName(mapText(index.by)) }) : '',
         at
@@ -4248,6 +4274,11 @@ td.what .overlap{margin-left:8px}
         findOverlaps();
         renderAll();
         if (card.box) showFound(map, card);
+        if (card.graph && card.pending) {
+          var to = card.pending;
+          card.pending = null;
+          goTo(map, card, to);
+        }
       });
   }
   function searchMap(map, card) {
@@ -4345,6 +4376,11 @@ td.what .overlap{margin-left:8px}
     card.selected = null;
     card.view = null;
     paintMap(map, card);
+    focusPicture(card);
+  }
+  function focusPicture(card) {
+    if (card.svg && card.svg.isConnected) card.svg.focus();
+    else card.wantFocus = true;
   }
   function drill(map, card, id) {
     var level = levelOf(card);
@@ -4359,6 +4395,7 @@ td.what .overlap{margin-left:8px}
     card.selected = null;
     card.view = null;
     paintMap(map, card);
+    focusPicture(card);
   }
   function goUp(map, card, depth) {
     if (card.trail.length <= 1) return;
@@ -4366,6 +4403,7 @@ td.what .overlap{margin-left:8px}
     card.selected = null;
     card.view = null;
     paintMap(map, card);
+    focusPicture(card);
   }
 
   // ---- scenes: the nodes and edges one level shows ----
@@ -4466,14 +4504,14 @@ td.what .overlap{margin-left:8px}
         es.out.forEach(function (e) {
           var to = graph.node(e.to),
             tf = (to && to.f) || e.to;
-          if (tf === k.id || e.type === 'defines' || e.type === 'contains') return;
+          if (tf === k.id || GRAPH_STRUCTURE[e.type]) return;
           if (inside[tf]) bag.add(k.id, tf, e.type);
           else if (to && to.c !== c) ports[groupKey(to)] = (ports[groupKey(to)] || 0) + 1;
         });
         es.in.forEach(function (e) {
           var from = graph.node(e.from),
             ff = (from && from.f) || e.from;
-          if (ff === k.id || inside[ff] || e.type === 'defines' || e.type === 'contains') return;
+          if (ff === k.id || inside[ff] || GRAPH_STRUCTURE[e.type]) return;
           if (from && from.c !== c) ports[groupKey(from)] = (ports[groupKey(from)] || 0) + 1;
         });
       });
@@ -4486,7 +4524,7 @@ td.what .overlap{margin-left:8px}
       .slice(0, CMAP.PORTS)
       .forEach(function (pid) {
         var g = communityOf(index, +pid.slice(2));
-        if (!g) return;
+        if (!g || pid === 'c:' + c) return;
         var port = sceneNode(pid, mapText(g.name), 'group', g.c, 0.15);
         port.port = true;
         nodes.push(port);
@@ -4594,14 +4632,26 @@ td.what .overlap{margin-left:8px}
     take(id);
     list[0].center = true;
     var hop = [],
-      es = graph.edges(id);
-    es.out.forEach(function (e) {
-      take(e.to);
-      hop.push(e.to);
-    });
-    es.in.forEach(function (e) {
-      take(e.from);
-      hop.push(e.from);
+      es = graph.edges(id),
+      around = es.out
+        .map(function (e) {
+          return e.to;
+        })
+        .concat(
+          es.in.map(function (e) {
+            return e.from;
+          })
+        )
+        .filter(function (nid, i, all) {
+          return all.indexOf(nid) === i && graph.node(nid);
+        })
+        .sort(function (x, y) {
+          return graph.degree(y) - graph.degree(x) || (x < y ? -1 : 1);
+        }),
+      hidden = Math.max(0, around.length - (CMAP.MAX_NODES - 1));
+    around.slice(0, CMAP.MAX_NODES - 1).forEach(function (nid) {
+      take(nid);
+      hop.push(nid);
     });
     var near = list.length;
     if (near < CMAP.HOP2) {
@@ -4610,7 +4660,7 @@ td.what .overlap{margin-left:8px}
         if (!n || n.k !== 'sym' || graph.degree(nid) > CMAP.HUB) return;
         var more = graph.edges(nid);
         more.out.concat(more.in).forEach(function (e) {
-          if (CMAP_ARROWS[e.type] && list.length < near + CMAP.HOP2) take(e.from === nid ? e.to : e.from, true);
+          if (GRAPH_DEPENDS[e.type] && list.length < near + CMAP.HOP2) take(e.from === nid ? e.to : e.from, true);
         });
       });
     }
@@ -4625,7 +4675,7 @@ td.what .overlap{margin-left:8px}
         if (seen[e.to] && !(n.faded && seen[e.to] === 2)) bag.add(n.id, e.to, e.type);
       });
     });
-    return { nodes: list, edges: bag.list(), hidden: 0 };
+    return { nodes: list, edges: bag.list(), hidden: hidden };
   }
   function sceneOf(map, card, level) {
     var graph = card.graph;
@@ -4818,16 +4868,16 @@ td.what .overlap{margin-left:8px}
   function paintMap(map, card) {
     var level = levelOf(card),
       scene = sceneOf(map, card, level),
-      body = $('codemapBody'),
-      bodyW = (body && body.clientWidth) || 960,
-      W = Math.max(320, bodyW - 38 - (bodyW >= 900 ? CMAP.SIDE : 0)),
-      H = W < 560 ? 320 : 440;
+      W = Math.max(300, card.svgWrap.clientWidth - 2 || 600),
+      H = window.innerWidth <= 560 ? 320 : 440;
     card.scene = scene;
     paintCrumb(map, card);
     card.svgWrap.textContent = '';
     if (!scene && !card.graph && !card.loading && !card.error && db) loadMap(map, card);
-    if (!scene) card.svgWrap.appendChild(el('p', { class: 'empty', text: card.error || T('loading') }));
-    else if (!scene.nodes.length) card.svgWrap.appendChild(el('p', { class: 'empty', text: T('codemapEmpty') }));
+    if (!scene) {
+      card.svg = null;
+      card.svgWrap.appendChild(el('p', { class: 'empty', text: card.error || T('loading') }));
+    } else if (!scene.nodes.length) card.svgWrap.appendChild(el('p', { class: 'empty', text: T('codemapEmpty') }));
     else {
       markTasks(scene, card.graph);
       var key = levelKey(level) + '|' + card.builtAt + '|' + W + '|' + scene.nodes.length;
@@ -4844,6 +4894,10 @@ td.what .overlap{margin-left:8px}
       )
         card.selected = null;
       card.svgWrap.appendChild(drawScene(map, card, scene, card.layout));
+      if (card.wantFocus) {
+        card.wantFocus = false;
+        card.svg.focus();
+      }
     }
     paintLegend(card, scene);
     paintDetail(map, card);
@@ -4926,9 +4980,6 @@ td.what .overlap{margin-left:8px}
   function labelText(n) {
     return n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label;
   }
-  // Which names get written: every node's when there is room, else the center, the selected one, the touched ones
-  // and the largest first, each only where it runs into no node or name already placed. A hidden name is still the
-  // node's title.
   // where a node's name is drawn: under a group's circle, beside anything else; about 6 px a character
   function labelBox(n, lay) {
     var p = lay.pos[n.id],
@@ -4990,7 +5041,7 @@ td.what .overlap{margin-left:8px}
     var svg = svgEl('svg', {
       class: 'cmap-pic',
       viewBox: v.x + ' ' + v.y + ' ' + v.w + ' ' + v.h,
-      role: 'img',
+      role: 'group',
       tabindex: '0',
       'aria-label': T('codemapPicture', { n: scene.nodes.length, e: scene.edges.length })
     });
@@ -5026,7 +5077,7 @@ td.what .overlap{margin-left:8px}
         dy = b[1] - a[1],
         d = Math.sqrt(dx * dx + dy * dy) || 1,
         ra = lay.r[e.a] + 1,
-        rb = lay.r[e.b] + (CMAP_ARROWS[e.type] ? 4 : 1),
+        rb = lay.r[e.b] + (GRAPH_DEPENDS[e.type] ? 4 : 1),
         line = svgEl('line', {
           class: 'e ' + e.type,
           x1: a[0] + (dx / d) * ra,
@@ -5035,14 +5086,16 @@ td.what .overlap{margin-left:8px}
           y2: b[1] - (dy / d) * rb,
           'stroke-width': (1 + (2.5 * Math.log(1 + (e.w || 1))) / Math.log(1 + maxW)).toFixed(2)
         });
-      if (CMAP_ARROWS[e.type]) line.setAttribute('marker-end', 'url(#' + markerId + ')');
+      if (GRAPH_DEPENDS[e.type]) line.setAttribute('marker-end', 'url(#' + markerId + ')');
       line.appendChild(
         svgEl('title', {}, [document.createTextNode(e.a + ' —' + e.type + (e.w > 1 ? ' ×' + e.w : '') + '→ ' + e.b)])
       );
-      edgeEls.push({ el: line, a: e.a, b: e.b, arrow: !!CMAP_ARROWS[e.type] });
+      edgeEls.push({ el: line, a: e.a, b: e.b, arrow: !!GRAPH_DEPENDS[e.type] });
       gEdges.appendChild(line);
     });
-    var labeled = labelRoom(scene, lay, card.selected);
+    var labeled = labelRoom(scene, lay, card.selected),
+      stop = card.selected || levelCenter(levelOf(card)) || scene.nodes[0].id,
+      order = [];
     scene.nodes.forEach(function (n) {
       var p = lay.pos[n.id],
         r = lay.r[n.id],
@@ -5061,7 +5114,7 @@ td.what .overlap{margin-left:8px}
           (card.selected === n.id ? ' sel' : '') +
           (n.tasks.length ? ' touched' : ''),
         transform: 'translate(' + p[0].toFixed(1) + ' ' + p[1].toFixed(1) + ')',
-        tabindex: '0',
+        tabindex: n.id === stop ? '0' : '-1',
         role: 'button',
         'data-id': n.id,
         'aria-label': n.label + ' · ' + kind
@@ -5148,6 +5201,7 @@ td.what .overlap{margin-left:8px}
         }
       });
       nodeEls[n.id] = g;
+      order.push(g);
       gNodes.appendChild(g);
     });
     svg.appendChild(gEdges);
@@ -5158,7 +5212,6 @@ td.what .overlap{margin-left:8px}
       if (e.button !== 0) return;
       drag = { x: e.clientX, y: e.clientY, view: viewOf(card), moved: false };
       card.dragged = false;
-      if (svg.setPointerCapture) svg.setPointerCapture(e.pointerId);
     });
     svg.addEventListener('pointermove', function (e) {
       if (!drag) return;
@@ -5168,6 +5221,7 @@ td.what .overlap{margin-left:8px}
         dx = (e.clientX - drag.x) / scale,
         dy = (e.clientY - drag.y) / scale;
       if (!drag.moved && Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 4) return;
+      if (!drag.moved && svg.setPointerCapture) svg.setPointerCapture(e.pointerId);
       drag.moved = true;
       card.dragged = true;
       card.view = { x: v.x - dx, y: v.y - dy, w: v.w, h: v.h };
@@ -5204,8 +5258,17 @@ td.what .overlap{margin-left:8px}
       if (e.key === 'Escape' && card.trail.length > 1) {
         e.stopPropagation();
         goUp(map, card, card.trail.length - 1);
-        if (card.svg) card.svg.focus();
+        return;
       }
+      var step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (!step || !order.length) return;
+      e.preventDefault();
+      var at = order.indexOf(document.activeElement),
+        next = order[(at + step + order.length) % order.length];
+      order.forEach(function (g) {
+        g.setAttribute('tabindex', g === next ? '0' : '-1');
+      });
+      next.focus();
     });
     return svg;
   }
@@ -5222,6 +5285,8 @@ td.what .overlap{margin-left:8px}
   function paintLegend(card, scene) {
     var out = card.legend;
     out.textContent = '';
+    // a read that failed is said under the picture the index still draws
+    if (card.error) out.appendChild(el('span', { class: 'cmap-fail', text: card.error }));
     if (!scene || !scene.nodes.length) return;
     var kinds = {},
       types = {};
@@ -5310,6 +5375,10 @@ td.what .overlap{margin-left:8px}
                 text: gid,
                 onclick: function () {
                   if (graph) goTo(map, card, gid);
+                  else {
+                    card.pending = gid;
+                    if (!card.loading && db) loadMap(map, card);
+                  }
                 }
               });
             })
