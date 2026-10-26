@@ -4,7 +4,7 @@
     {
       "version": "1.19.0",
       "date": "2026-10-26",
-      "prs": [],
+      "prs": [49],
       "lines": {
         "en": [
           "The kanban scrolls with the page both ways, so a wheel or a swipe over a column moves the page instead of getting stuck in a box.",
