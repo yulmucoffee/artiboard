@@ -1550,6 +1550,13 @@ const meLane = (d) => {
       b.d.activeElement.getAttribute('tabindex') === '0',
     'an arrow key moves the keyboard to the next node and the tab stop with it'
   );
+  b.d.activeElement.dispatchEvent(new b.w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  ok(
+    [...b.d.querySelectorAll('#codemapBody .cnode.sel')].map((x) => x.dataset.id).join() === 'c:1',
+    'Enter on a node selects it, as a click does'
+  );
+  b.d.querySelector('#codemapBody .cmap-pic').dispatchEvent(new b.w.MouseEvent('click', { bubbles: true }));
+  ok(!b.d.querySelector('#codemapBody .cnode.sel'), 'a click on the background lets go of it');
   b.store['map/web/chunks/0'] = {
     nodes: [
       { i: 'shared/units.ts', k: 'file', n: 'units.ts', f: 'shared/units.ts', l: 0, c: 1 },

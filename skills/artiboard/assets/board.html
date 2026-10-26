@@ -5201,50 +5201,12 @@ td.what .overlap{margin-left:8px}
       'aria-label': T('codemapPicture', { n: scene.nodes.length, e: scene.edges.length })
     });
     card.svg = svg;
-    var defs = svgEl('defs');
-    ['', 'hi'].forEach(function (k) {
-      defs.appendChild(
-        svgEl(
-          'marker',
-          {
-            id: markerId + (k ? '-hi' : ''),
-            class: k,
-            viewBox: '0 0 8 8',
-            refX: '7',
-            refY: '4',
-            markerWidth: '7',
-            markerHeight: '7',
-            markerUnits: 'userSpaceOnUse',
-            orient: 'auto'
-          },
-          [svgEl('path', { d: 'M0 0.5L7 4L0 7.5Z' })]
-        )
-      );
-    });
-    svg.appendChild(defs);
+    svg.appendChild(sceneMarkers(markerId));
     var gEdges = svgEl('g', { class: 'edges' }),
       gNodes = svgEl('g', { class: 'nodes' });
     scene.edges.forEach(function (e) {
-      var a = lay.pos[e.a],
-        b = lay.pos[e.b];
-      if (!a || !b) return;
-      var dx = b[0] - a[0],
-        dy = b[1] - a[1],
-        d = Math.sqrt(dx * dx + dy * dy) || 1,
-        ra = lay.r[e.a] + 1,
-        rb = lay.r[e.b] + (GRAPH_DEPENDS[e.type] ? 4 : 1),
-        line = svgEl('line', {
-          class: 'e ' + e.type,
-          x1: a[0] + (dx / d) * ra,
-          y1: a[1] + (dy / d) * ra,
-          x2: b[0] - (dx / d) * rb,
-          y2: b[1] - (dy / d) * rb,
-          'stroke-width': (1 + (2.5 * Math.log(1 + (e.w || 1))) / Math.log(1 + maxW)).toFixed(2)
-        });
-      if (GRAPH_DEPENDS[e.type]) line.setAttribute('marker-end', 'url(#' + markerId + ')');
-      line.appendChild(
-        svgEl('title', {}, [document.createTextNode(e.a + ' —' + e.type + (e.w > 1 ? ' ×' + e.w : '') + '→ ' + e.b)])
-      );
+      var line = sceneEdge(e, lay, markerId, maxW);
+      if (!line) return;
       edgeEls.push({ el: line, a: e.a, b: e.b, arrow: !!GRAPH_DEPENDS[e.type] });
       gEdges.appendChild(line);
     });
@@ -5329,30 +5291,24 @@ td.what .overlap{margin-left:8px}
       g.addEventListener('blur', function () {
         light(false);
       });
-      g.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (card.dragged) return;
+      // the first choice selects the node and tells about it, the second opens it
+      function choose() {
         if (card.selected === n.id) drill(map, card, n.id);
         else {
           card.selected = n.id;
-          Object.keys(nodeEls).forEach(function (id) {
-            nodeEls[id].classList.toggle('sel', id === n.id);
-          });
+          markSelected(nodeEls, n.id);
           paintDetail(map, card);
         }
+      }
+      g.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!card.dragged) choose();
       });
       g.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           e.stopPropagation();
-          if (card.selected === n.id) drill(map, card, n.id);
-          else {
-            card.selected = n.id;
-            Object.keys(nodeEls).forEach(function (id) {
-              nodeEls[id].classList.toggle('sel', id === n.id);
-            });
-            paintDetail(map, card);
-          }
+          choose();
         }
       });
       nodeEls[n.id] = g;
@@ -5361,7 +5317,64 @@ td.what .overlap{margin-left:8px}
     });
     svg.appendChild(gEdges);
     svg.appendChild(gNodes);
-    // drag pans, ⌘/Ctrl + wheel (a trackpad pinch too) zooms, a click on the background clears the selection
+    panAndZoom(map, card, svg, nodeEls);
+    sceneKeys(map, card, svg, order);
+    return svg;
+  }
+  function markSelected(nodeEls, selected) {
+    Object.keys(nodeEls).forEach(function (id) {
+      nodeEls[id].classList.toggle('sel', id === selected);
+    });
+  }
+  function sceneMarkers(markerId) {
+    var defs = svgEl('defs');
+    ['', 'hi'].forEach(function (k) {
+      defs.appendChild(
+        svgEl(
+          'marker',
+          {
+            id: markerId + (k ? '-hi' : ''),
+            class: k,
+            viewBox: '0 0 8 8',
+            refX: '7',
+            refY: '4',
+            markerWidth: '7',
+            markerHeight: '7',
+            markerUnits: 'userSpaceOnUse',
+            orient: 'auto'
+          },
+          [svgEl('path', { d: 'M0 0.5L7 4L0 7.5Z' })]
+        )
+      );
+    });
+    return defs;
+  }
+  // a line from rim to rim, as thick as how many edges it stands for; one that depends on its end carries an arrow
+  function sceneEdge(e, lay, markerId, maxW) {
+    var a = lay.pos[e.a],
+      b = lay.pos[e.b];
+    if (!a || !b) return null;
+    var dx = b[0] - a[0],
+      dy = b[1] - a[1],
+      d = Math.sqrt(dx * dx + dy * dy) || 1,
+      ra = lay.r[e.a] + 1,
+      rb = lay.r[e.b] + (GRAPH_DEPENDS[e.type] ? 4 : 1),
+      line = svgEl('line', {
+        class: 'e ' + e.type,
+        x1: a[0] + (dx / d) * ra,
+        y1: a[1] + (dy / d) * ra,
+        x2: b[0] - (dx / d) * rb,
+        y2: b[1] - (dy / d) * rb,
+        'stroke-width': (1 + (2.5 * Math.log(1 + (e.w || 1))) / Math.log(1 + maxW)).toFixed(2)
+      });
+    if (GRAPH_DEPENDS[e.type]) line.setAttribute('marker-end', 'url(#' + markerId + ')');
+    line.appendChild(
+      svgEl('title', {}, [document.createTextNode(e.a + ' —' + e.type + (e.w > 1 ? ' ×' + e.w : '') + '→ ' + e.b)])
+    );
+    return line;
+  }
+  // drag pans, ⌘/Ctrl + wheel (a trackpad pinch too) zooms, a click on the background clears the selection
+  function panAndZoom(map, card, svg, nodeEls) {
     var drag = null;
     svg.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
@@ -5393,9 +5406,7 @@ td.what .overlap{margin-left:8px}
     svg.addEventListener('click', function () {
       if (card.dragged || !card.selected) return;
       card.selected = null;
-      Object.keys(nodeEls).forEach(function (id) {
-        nodeEls[id].classList.remove('sel');
-      });
+      markSelected(nodeEls, null);
       paintDetail(map, card);
     });
     svg.addEventListener(
@@ -5409,6 +5420,9 @@ td.what .overlap{margin-left:8px}
       },
       { passive: false }
     );
+  }
+  // Esc or Backspace goes up a level; the arrow keys walk the nodes, moving the one tab stop along
+  function sceneKeys(map, card, svg, stops) {
     svg.addEventListener('keydown', function (e) {
       if ((e.key === 'Escape' || e.key === 'Backspace') && card.trail.length > 1) {
         // a browser that still goes back a page on Backspace would leave the board
@@ -5418,16 +5432,15 @@ td.what .overlap{margin-left:8px}
         return;
       }
       var step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-      if (!step || !order.length) return;
+      if (!step || !stops.length) return;
       e.preventDefault();
-      var at = order.indexOf(document.activeElement),
-        next = order[(at + step + order.length) % order.length];
-      order.forEach(function (g) {
+      var at = stops.indexOf(document.activeElement),
+        next = stops[(at + step + stops.length) % stops.length];
+      stops.forEach(function (g) {
         g.setAttribute('tabindex', g === next ? '0' : '-1');
       });
       next.focus();
     });
-    return svg;
   }
   function legendGlyph(kind) {
     var s = svgEl('svg', { width: '14', height: '14', viewBox: '-7 -7 14 14', 'aria-hidden': 'true' });
