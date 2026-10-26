@@ -819,6 +819,10 @@ const meLane = (d) => {
     col('To do').classList.contains('two') && JSON.parse(b.w.localStorage.getItem('ab-kcol')).todo.two,
     'a column takes two card columns, remembered'
   );
+  ok(
+    !col('Done').querySelector('.colbtn[aria-pressed]') && !col('Done').classList.contains('two'),
+    'the done column has no two-column switch'
+  );
 
   console.log('# a long done column');
   const doneDocs = {};
@@ -833,7 +837,7 @@ const meLane = (d) => {
       doneAt: `2026-01-${String(i % 28 || 28).padStart(2, '0')}T09:00:00.000Z`,
       updatedAt: T0
     };
-  b = boot({ docs: doneDocs, storage: { 'ab-view': 'kanban' } });
+  b = boot({ docs: doneDocs, storage: { 'ab-view': 'kanban', 'ab-kcol': JSON.stringify({ done: { two: true } }) } });
   all.push(b);
   await tick();
   const doneCol = () =>
@@ -844,6 +848,7 @@ const meLane = (d) => {
     doneTotal > 30 &&
       doneCol().querySelectorAll('.card.line').length === 10 &&
       !doneCol().querySelector('.card:not(.line)') &&
+      !doneCol().classList.contains('two') &&
       /^\d\d-\d\d$/.test(doneCol().querySelector('.card.line .when').textContent) &&
       b.d.querySelector('.col .card:not(.line) .top'),
     'done work shows as one-line cards, the latest ten first; open work keeps its two-line cards'
