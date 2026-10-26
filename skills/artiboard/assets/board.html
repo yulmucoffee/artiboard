@@ -3460,67 +3460,12 @@ td.what .overlap{margin-left:8px}
       var openList = openAll.filter(match).sort(function (a, b) {
         return ORDER[knownStatus(a)] - ORDER[knownStatus(b)] || byDue(a, b);
       });
-      var ul = el('ul', { class: 'todo' }),
-        all = filtering() || laneExpanded[p.id];
-      (all ? openList : openList.slice(0, LANE_MAX)).forEach(function (t) {
-        var u = unmet(t),
-          bits = [t.feature, t.repo];
-        if (u.length) bits.push(T('waitingDeps', { k: u.join(', ') }));
-        if (t.branch) bits.push(t.branch);
-        ul.appendChild(
-          el('li', {}, [
-            el('span', { class: 't' }, [
-              statusChip(knownStatus(t)),
-              el('span', { class: 'key', text: t.key }),
-              button({
-                class: 'link',
-                text: titleOf(t),
-                onclick: opens(t)
-              }),
-              dateChip(t),
-              agentMark(t),
-              newDot(isNew(t))
-            ]),
-            el('span', { class: 'd', text: bits.filter(Boolean).join(' · ') })
-          ])
-        );
-      });
-      // done work stays folded under the lane, newest first, with the day it was finished
+      var all = filtering() || laneExpanded[p.id];
       var doneList = mine
         .filter(function (t) {
           return knownStatus(t) === 'done' && match(t);
         })
         .sort(byDone);
-      var foot = doneList.length
-        ? el(
-            'details',
-            {
-              class: 'done-list',
-              open: doneOpen[p.id] ? '' : null,
-              ontoggle: function (e) {
-                doneOpen[p.id] = e.currentTarget.open;
-              }
-            },
-            [
-              el('summary', { text: T('laneDone', { n: mine.length - openAll.length }) }),
-              el(
-                'ul',
-                {},
-                doneList.map(function (t) {
-                  return el('li', {}, [
-                    el('span', { class: 'key', text: t.key }),
-                    button({
-                      class: 'link',
-                      text: titleOf(t),
-                      onclick: opens(t)
-                    }),
-                    dateChip(t)
-                  ]);
-                })
-              )
-            ]
-          )
-        : T('laneDone', { n: mine.length - openAll.length });
       root.appendChild(
         el('div', { class: 'lane' + personClass(p.id) }, [
           el('div', { class: 'head' }, [
@@ -3532,7 +3477,7 @@ td.what .overlap{margin-left:8px}
           !loaded
             ? emptyNote(loadingText())
             : openList.length
-              ? ul
+              ? el('ul', { class: 'todo' }, (all ? openList : openList.slice(0, LANE_MAX)).map(laneItem))
               : emptyNote(openAll.length ? T('laneNoMatch') : T('laneEmpty')),
           !filtering() && openList.length > LANE_MAX
             ? moreBtn(!!laneExpanded[p.id], openList.length - LANE_MAX, function () {
@@ -3540,10 +3485,56 @@ td.what .overlap{margin-left:8px}
                 renderLanes();
               })
             : null,
-          el('div', { class: 'foot' }, [foot])
+          el('div', { class: 'foot' }, [laneDone(p, doneList, mine.length - openAll.length)])
         ])
       );
     });
+  }
+  // an open task in a person's lane: status, key and title, then its feature, repo, what it waits on and its branch
+  function laneItem(t) {
+    var u = unmet(t),
+      bits = [t.feature, t.repo];
+    if (u.length) bits.push(T('waitingDeps', { k: u.join(', ') }));
+    if (t.branch) bits.push(t.branch);
+    return el('li', {}, [
+      el('span', { class: 't' }, [
+        statusChip(knownStatus(t)),
+        el('span', { class: 'key', text: t.key }),
+        button({ class: 'link', text: titleOf(t), onclick: opens(t) }),
+        dateChip(t),
+        agentMark(t),
+        newDot(isNew(t))
+      ]),
+      el('span', { class: 'd', text: bits.filter(Boolean).join(' · ') })
+    ]);
+  }
+  // done work stays folded under the lane, newest first, with the day it was finished
+  function laneDone(p, doneList, n) {
+    if (!doneList.length) return T('laneDone', { n: n });
+    return el(
+      'details',
+      {
+        class: 'done-list',
+        open: doneOpen[p.id] ? '' : null,
+        ontoggle: function (e) {
+          doneOpen[p.id] = e.currentTarget.open;
+        }
+      },
+      [
+        el('summary', { text: T('laneDone', { n: n }) }),
+        el(
+          'ul',
+          {},
+          doneList.map(function (t) {
+            return el('li', {}, [
+              el('span', { class: 'key', text: t.key }),
+              button({ class: 'link', text: titleOf(t), onclick: opens(t) }),
+              dateChip(t)
+            ]);
+          })
+        )
+      ]
+    );
   }
 
   function renderTable() {
@@ -3551,6 +3542,41 @@ td.what .overlap{margin-left:8px}
     if (loaded && featureFilter !== 'all' && fs.indexOf(featureFilter) < 0) featureFilter = 'all';
     // done work stays out of the table until asked for, except while searching or showing what is new
     var hideDone = !showDone && !searchText && !newOnly;
+    featureChips(fs, hideDone);
+    var body = $('rows');
+    body.textContent = '';
+    order = [];
+    if (!loaded) {
+      body.appendChild(tableNote(loadingText()));
+      return;
+    }
+    (featureFilter === 'all' ? fs : [featureFilter]).forEach(function (f) {
+      var all = tasks.filter(function (t) {
+        return featOf(t) === f;
+      });
+      var hits = sorted(all.filter(match));
+      if (!hits.length) return;
+      var list = hideDone
+          ? hits.filter(function (t) {
+              return knownStatus(t) !== 'done';
+            })
+          : hits,
+        shut = !!groupFold[f] && !filtering();
+      body.appendChild(groupRow(f, all, hits.length - list.length, shut));
+      if (shut) return;
+      list.forEach(function (t) {
+        order.push(t.id);
+        body.appendChild(itemRow(t));
+      });
+    });
+    if (!body.children.length) body.appendChild(tableNote(T('noMatch')));
+  }
+  // one line across the table: loading, or nothing matches
+  function tableNote(text) {
+    return el('tr', {}, [el('td', { colspan: '7', class: 'empty', text: text })]);
+  }
+  // a chip per feature with how many of its tasks show, and the switch that shows done work
+  function featureChips(fs, hideDone) {
     var fr = $('filters');
     fr.textContent = '';
     ['all'].concat(fs).forEach(function (f) {
@@ -3594,100 +3620,78 @@ td.what .overlap{margin-left:8px}
           }
         })
       );
-    var body = $('rows');
-    body.textContent = '';
-    order = [];
-    if (!loaded) {
-      body.appendChild(el('tr', {}, [el('td', { colspan: '7', class: 'empty', text: loadingText() })]));
-      return;
-    }
-    (featureFilter === 'all' ? fs : [featureFilter]).forEach(function (f) {
-      var all = tasks.filter(function (t) {
-        return featOf(t) === f;
-      });
-      var hits = sorted(all.filter(match));
-      if (!hits.length) return;
-      var list = hideDone
-          ? hits.filter(function (t) {
-              return knownStatus(t) !== 'done';
+  }
+  // a feature's header row, which folds the group: its name, how much is done and how much done work is hidden
+  function groupRow(f, all, hidden, shut) {
+    return el('tr', { class: 'group' }, [
+      el('th', { colspan: '7', scope: 'colgroup' }, [
+        button(
+          {
+            class: 'fold',
+            'aria-expanded': String(!shut),
+            onclick: function () {
+              if (groupFold[f]) delete groupFold[f];
+              else groupFold[f] = 1;
+              write('ab-groups', JSON.stringify(groupFold));
+              renderTable();
+              applyCursor();
+            }
+          },
+          [
+            el('span', { class: 'gname', text: f }),
+            el('span', {
+              class: 'n',
+              text:
+                T('doneOf', { d: countStatus(all, 'done'), n: all.length }) +
+                (hidden ? ' · ' + T('doneHidden', { n: hidden }) : '')
             })
-          : hits,
-        hidden = hits.length - list.length;
-      var dn = countStatus(all, 'done'),
-        shut = !!groupFold[f] && !filtering();
-      body.appendChild(
-        el('tr', { class: 'group' }, [
-          el('th', { colspan: '7', scope: 'colgroup' }, [
-            button(
-              {
-                class: 'fold',
-                'aria-expanded': String(!shut),
-                onclick: function () {
-                  if (groupFold[f]) delete groupFold[f];
-                  else groupFold[f] = 1;
-                  write('ab-groups', JSON.stringify(groupFold));
-                  renderTable();
-                  applyCursor();
-                }
-              },
-              [
-                el('span', { class: 'gname', text: f }),
-                el('span', {
-                  class: 'n',
-                  text: T('doneOf', { d: dn, n: all.length }) + (hidden ? ' · ' + T('doneHidden', { n: hidden }) : '')
-                })
-              ]
-            )
-          ])
-        ])
-      );
-      if (shut) return;
-      list.forEach(function (t) {
-        order.push(t.id);
-        var u = unmet(t),
-          ds = t.deps || [];
-        var deps = ds.length
-          ? el(
-              'span',
-              {},
-              ds.map(function (k, i) {
-                return el('span', {
-                  class: u.indexOf(k) >= 0 && knownStatus(t) !== 'done' ? 'wait' : 'ok',
-                  text: (i ? ', ' : '') + k
-                });
-              })
-            )
-          : el('span', { class: 'ok', text: T('none') });
-        body.appendChild(
-          el(
-            'tr',
-            {
-              class: 'item',
-              'data-k': t.id,
-              'aria-current': String(openId === t.id),
-              onclick: opens(t)
-            },
-            [
-              el('td', { class: 'keycell' }, [el('span', { class: 'key', text: t.key }), newDot(isNew(t))]),
-              el('td', { class: 'what' }, [
-                button({ text: titleOf(t) }),
-                overlapFlag(t),
-                t.repo || t.branch
-                  ? el('span', { class: 'sub' }, [repoTag(t), t.repo && t.branch ? ' ' : null, t.branch || null])
-                  : null
-              ]),
-              el('td', { class: 'deps' }, [deps]),
-              el('td', {}, [personChip(t.owner), ' ', agentMark(t)]),
-              el('td', {}, [statusChip(knownStatus(t))]),
-              el('td', { class: 'date' }, [dateCell(t)]),
-              el('td', { class: 'when', text: ago(lastTouch(t)) })
-            ]
-          )
-        );
-      });
-    });
-    if (!body.children.length)
-      body.appendChild(el('tr', {}, [el('td', { colspan: '7', class: 'empty', text: T('noMatch') })]));
+          ]
+        )
+      ])
+    ]);
+  }
+  function itemRow(t) {
+    return el(
+      'tr',
+      {
+        class: 'item',
+        'data-k': t.id,
+        'aria-current': String(openId === t.id),
+        onclick: opens(t)
+      },
+      [
+        el('td', { class: 'keycell' }, [el('span', { class: 'key', text: t.key }), newDot(isNew(t))]),
+        el('td', { class: 'what' }, [
+          button({ text: titleOf(t) }),
+          overlapFlag(t),
+          t.repo || t.branch
+            ? el('span', { class: 'sub' }, [repoTag(t), t.repo && t.branch ? ' ' : null, t.branch || null])
+            : null
+        ]),
+        el('td', { class: 'deps' }, [depsCell(t)]),
+        el('td', {}, [personChip(t.owner), ' ', agentMark(t)]),
+        el('td', {}, [statusChip(knownStatus(t))]),
+        el('td', { class: 'date' }, [dateCell(t)]),
+        el('td', { class: 'when', text: ago(lastTouch(t)) })
+      ]
+    );
+  }
+  // a task's dependencies, the ones still unfinished marked
+  function depsCell(t) {
+    var u = unmet(t),
+      ds = t.deps || [];
+    return ds.length
+      ? el(
+          'span',
+          {},
+          ds.map(function (k, i) {
+            return el('span', {
+              class: u.indexOf(k) >= 0 && knownStatus(t) !== 'done' ? 'wait' : 'ok',
+              text: (i ? ', ' : '') + k
+            });
+          })
+        )
+      : el('span', { class: 'ok', text: T('none') });
   }
 
   function renderFeed() {
@@ -3701,19 +3705,7 @@ td.what .overlap{margin-left:8px}
     var unread = notices.filter(noticeNew).length,
       shown = noticesAll ? notices : notices.slice(0, Math.max(3, unread));
     shown.forEach(function (n) {
-      var nw = noticeNew(n);
-      ul.appendChild(
-        el('li', { class: nw ? 'new' : null }, [
-          el('div', { class: 'at' }, [
-            el('span', { class: 'when' }, [stamp(n.at), newDot(nw)]),
-            el('span', { class: 'by' }, [
-              personChip(n.author),
-              n.kind === 'agent' ? el('span', { class: 'agent-mark', text: T('agent') }) : null
-            ])
-          ]),
-          el('div', { class: 'text', text: n.text || '' })
-        ])
-      );
+      ul.appendChild(noticeItem(n));
     });
     var canPost = loaded && writable() && me,
       more = notices.length > 3 && (noticesAll || shown.length < notices.length);
@@ -3745,43 +3737,61 @@ td.what .overlap{margin-left:8px}
         ])
       );
     if (canPost && (composing || draft)) {
-      var ta = el('textarea', {
-        id: 'noticeText',
-        'aria-label': T('noticeBtn'),
-        placeholder: T('noticePh', { p: personName(me) })
-      });
-      ta.value = draft;
-      var btn = button({ class: 'btn primary', text: T('noticeBtn') });
-      btn.addEventListener('click', function () {
-        var v = ta.value.trim();
-        if (!v) return;
-        btn.disabled = true;
-        var at = now();
-        postNotice(at, v)
-          .then(function () {
-            ta.value = '';
-            composing = false;
-            renderFeed();
-          })
-          .catch(function (e) {
-            writeFailed(e, 'postFail');
-          })
-          .then(function () {
-            btn.disabled = false;
-          });
-      });
-      var cancel = button({
-        class: 'btn',
-        text: T('cancel'),
-        onclick: function () {
+      ul.appendChild(noticeForm(draft));
+      if (hadFocus) $('noticeText').focus();
+    }
+  }
+  // a notice: when and by whom, then its text; one the viewer has not seen is marked
+  function noticeItem(n) {
+    var nw = noticeNew(n);
+    return el('li', { class: nw ? 'new' : null }, [
+      el('div', { class: 'at' }, [
+        el('span', { class: 'when' }, [stamp(n.at), newDot(nw)]),
+        el('span', { class: 'by' }, [
+          personChip(n.author),
+          n.kind === 'agent' ? el('span', { class: 'agent-mark', text: T('agent') }) : null
+        ])
+      ]),
+      el('div', { class: 'text', text: n.text || '' })
+    ]);
+  }
+  // writing a notice, with the draft that was there before a redraw
+  function noticeForm(draft) {
+    var ta = el('textarea', {
+      id: 'noticeText',
+      'aria-label': T('noticeBtn'),
+      placeholder: T('noticePh', { p: personName(me) })
+    });
+    ta.value = draft;
+    var btn = button({ class: 'btn primary', text: T('noticeBtn') });
+    btn.addEventListener('click', function () {
+      var v = ta.value.trim();
+      if (!v) return;
+      btn.disabled = true;
+      var at = now();
+      postNotice(at, v)
+        .then(function () {
           ta.value = '';
           composing = false;
           renderFeed();
-        }
-      });
-      ul.appendChild(el('li', { class: 'form' }, [warnLine(), ta, el('div', { class: 'form-row' }, [btn, cancel])]));
-      if (hadFocus) ta.focus();
-    }
+        })
+        .catch(function (e) {
+          writeFailed(e, 'postFail');
+        })
+        .then(function () {
+          btn.disabled = false;
+        });
+    });
+    var cancel = button({
+      class: 'btn',
+      text: T('cancel'),
+      onclick: function () {
+        ta.value = '';
+        composing = false;
+        renderFeed();
+      }
+    });
+    return el('li', { class: 'form' }, [warnLine(), ta, el('div', { class: 'form-row' }, [btn, cancel])]);
   }
 
   // numbered sections ("1. Roles") with "- " bullets become cards; lines before the first number are an intro card
