@@ -2,7 +2,7 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
-      "version": "1.18.3",
+      "version": "1.19.1",
       "date": "2026-10-26",
       "prs": [
         50
@@ -13,6 +13,23 @@
         ],
         "ko": [
           "README가 짧아졌어요. 설치는 명령 두 개(또는 프롬프트 하나), 무엇을 얻는지는 네 줄로 보이고, 참고 자료는 접어 두었어요."
+        ]
+      }
+    },
+    {
+      "version": "1.19.0",
+      "date": "2026-10-26",
+      "prs": [
+        49
+      ],
+      "lines": {
+        "en": [
+          "The kanban scrolls with the page both ways, so a wheel or a swipe over a column moves the page instead of getting stuck in a box.",
+          "The toolbar stays pinned at the top and the left edge, and column headers stick right under it; on a touch screen the columns still swipe sideways in their own row."
+        ],
+        "ko": [
+          "칸반이 페이지와 함께 가로 · 세로로 스크롤돼요. 칸 위에서 휠을 굴리거나 밀어도 상자 안에 갇히지 않고 페이지가 움직여요.",
+          "툴바는 위쪽과 왼쪽에 고정되고, 칸 머리글은 그 바로 아래에 붙어 있어요. 터치 화면에서는 칸들이 지금처럼 자기 줄 안에서 옆으로 넘어가요."
         ]
       }
     },
