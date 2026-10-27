@@ -471,6 +471,23 @@ for (const backend of backends) {
       }
     });
 
+    // the first page to watch after a quiet spell reads the board itself; it is not sent every row written meanwhile
+    test('a page that starts watching is not sent what was written before it watched', async (t) => {
+      if (store.kind !== 'sqlite') return t.skip('SQLite only: the site looks for other processes\' writes');
+      const other = await openSqlite({ file: join(dir, 'board.db'), boardUrl: BASE });
+      await other.apply(null, P, [{ op: 'set', path: `${C}/before-${R}`, data: { from: 'cli' } }]);
+      await store.apply(null, P, [{ op: 'set', path: `${C}/before-site-${R}`, data: { from: 'site' } }]);
+      const seen = [];
+      const stop = store.subscribe(P, (row) => seen.push(`${row.collection}/${row.doc_id}`));
+      try {
+        await new Promise((r) => setTimeout(r, 2600));
+        assert.deepEqual(seen.filter((x) => x.includes('/before')), [], 'rows written before the page watched stay unsent');
+      } finally {
+        stop?.();
+        other.close();
+      }
+    });
+
     test('a task is held by its owner: reassigning it hands it over', async () => {
       const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
       await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `tasks/${K('o1')}`, data: { key: K('o1'), title: 'reassigned', status: 'todo', deps: [], waitingOn: [], updatedAt: at } }] });
