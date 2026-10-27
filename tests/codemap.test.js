@@ -1262,3 +1262,20 @@ test('context: a task\'s touches, the paths its text names and the symbols it na
   assert.ok(performance.now() - t0 < 300, 'a long unbroken word, and a 262 KB spec, read in linear time');
   assert.deepEqual(G.context({ spec: `${'x '.repeat(10001)}src/store.ts` }).lines, [], 'only the first 20,000 characters are read');
 });
+
+// a paragraph kept on one line and followed by --- reads as a heading; the site refuses a whole map with a name or an
+// id over 1000 characters, so the builder keeps a section's name short
+test('a heading as long as a paragraph keeps the map within what the site accepts', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'codemap-long-'));
+  try {
+    writeFileSync(join(dir, 'index.js'), 'export function hello() { return 1; }\n');
+    writeFileSync(join(dir, 'README.md'), '# Title\n\n' + 'word '.repeat(300).trim() + '\n---\n\n# ' + 'x'.repeat(1500) + '\n');
+    const { chunks } = await mapRepo(dir, { repo: 'o/r' });
+    const nodes = chunks.flatMap((c) => c.nodes);
+    const long = nodes.filter((n) => n.i.length > 1000 || n.n.length > 1000);
+    assert.deepEqual(long.map((n) => n.i.slice(0, 40)), [], 'no id or name over 1000 characters');
+    assert.ok(nodes.some((n) => n.k === 'sec' && n.n.startsWith('word word')), 'the long section is still on the map');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
