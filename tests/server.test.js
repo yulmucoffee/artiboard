@@ -1702,3 +1702,34 @@ test('a page reads a row pushed without its value only when it shows that collec
   await new Promise((r) => setTimeout(r, 20));
   assert.deepEqual(reads, ['tasks'], 'only the row a listener shows is read');
 });
+
+// A listener whose first read failed (a server restart, a laptop waking before its network) reads again a minute
+// later, and then shows what was pushed meanwhile, instead of staying empty until the page reloads.
+test('a page reads again a listener whose first read failed', async () => {
+  let reads = 0, tick = null, es = null;
+  const json = (status, body) => Promise.resolve({ ok: status < 300, status, json: async () => body });
+  const window = { addEventListener() {} };
+  runInNewContext(readFileSync(new URL('../server/public/shim.js', import.meta.url), 'utf8'), {
+    window, setTimeout, clearTimeout,
+    setInterval: (fn) => { tick = fn; return 0; },
+    document: { addEventListener() {}, getElementById: () => null, hidden: false },
+    location: { pathname: '/p/demo', hash: '', search: '' }, history: { replaceState() {} },
+    EventSource: function () { es = this; setTimeout(() => this.onopen && this.onopen(), 0); },
+    fetch: async (url) => {
+      if (url === '/api/config') return json(200, { backend: 'sqlite', lang: 'en' });
+      if (url === '/api/me') return json(200, { uid: 'u', person: 'ana', role: 'member' });
+      if (/\/read$/.test(url) && ++reads === 1) return json(503, { code: 'unavailable', message: 'try again' });
+      if (/\/read$/.test(url)) return json(200, [{ collection: 'details', doc_id: 'X', version: 3, updated_at: '2026-01-01T00:00:00.000Z', data: { spec: 's' } }]);
+      return json(200, []);
+    },
+  });
+  const db = await window.claude.use('db');
+  const seen = [];
+  db.doc('details/X').onSnapshot((s) => seen.push(s.exists ? s.data().spec : null), (e) => seen.push('err ' + e.code));
+  await new Promise((r) => setTimeout(r, 50));
+  es.onmessage({ data: JSON.stringify({ collection: 'details', doc_id: 'X', version: 4, updated_at: '2026-01-01T00:00:01.000Z', data: { spec: 's2' } }) });
+  tick();
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(seen[0], 'err unavailable', 'the failed read says so');
+  assert.equal(seen[seen.length - 1], 's2', 'then the document arrives, with the change pushed while it waited');
+});

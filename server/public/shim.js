@@ -215,7 +215,14 @@
       emit(l);
     }
 
-    function fail(ls, e) { ls.forEach(function (l) { if (l.err) l.err(boardError(e)); }); }
+    function fail(ls, e) { ls.forEach(function (l) { l.failed = true; if (l.err) l.err(boardError(e)); }); }
+    // a first read that failed is read again when the connection comes back and every minute; what arrived for it
+    // meanwhile waits in pending and lands with that read
+    function retry() {
+      var ls = listeners.filter(function (l) { return l.failed && !l.ready; });
+      ls.forEach(function (l) { l.failed = false; });
+      if (ls.length) load(ls);
+    }
     // one request for the unlimited listeners: whole collections, or single documents of a collection
     function fetchPlain(ls) {
       if (!ls.length) return;
@@ -266,7 +273,7 @@
       tr.changed(cols, mark).then(function (rows) { catching = false; rows.forEach(function (row) { applyRow(row); }); }, function () { catching = false; });
     }
     function setLive(on) {
-      if (on) catchUp();
+      if (on) { retry(); catchUp(); }
       if (live === on) return;
       live = on;
       statusCbs.forEach(function (cb) { cb(on); });
@@ -275,10 +282,14 @@
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) { hiddenAt = Date.now(); return; }
       if (hiddenAt && Date.now() - hiddenAt > 30 * 60000) { listeners.forEach(function (l) { l.ready = false; l.pending = []; }); load(listeners.slice()); }
-      else catchUp();
+      else { retry(); catchUp(); }
     });
     // while the live connection is down, look for changes every minute instead
-    setInterval(function () { if (!live && !document.hidden) catchUp(); }, 60000);
+    setInterval(function () {
+      if (document.hidden) return;
+      retry();
+      if (!live) catchUp();
+    }, 60000);
 
     // A write shows at once: listeners get the changed document before the server answers, keeping its old version so
     // the server's own copy (one version up, with anything others wrote meanwhile) replaces it when it arrives.
