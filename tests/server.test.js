@@ -488,6 +488,54 @@ for (const backend of backends) {
       }
     });
 
+    // both stores answer the same: a missing or null value sorts last either way, numbers before strings, strings by
+    // their characters ('B' before 'a'); < and > compare a field only with a value of its own kind
+    test('both stores order and compare fields alike', async () => {
+      const col = `order-${R}`, rows = { a: 'b', b: 'B', c: 2, d: 10, e: null, f: undefined, g: 'a' };
+      await call(board, 'board_batch', { project: P, writes: Object.entries(rows).map(([id, v]) => (
+        { op: 'set', path: `${col}/${id}`, data: v === undefined ? {} : { v } })) });
+      const ids = async (args) => (await call(board, 'board_query', { project: P, collection: col, ...args })).value.docs.map((d) => d.id).join('');
+      assert.equal(await ids({ order_by: [{ field: 'v' }] }), 'cdbgaef', 'ascending: numbers, then strings by character, then null and missing');
+      assert.equal(await ids({ order_by: [{ field: 'v', dir: 'desc' }] }), 'agbdcef', 'descending keeps null and missing last');
+      assert.equal(await ids({ where: [{ field: 'v', op: '>', value: '' }] }), 'abg', '> a string matches strings only');
+      assert.equal(await ids({ where: [{ field: 'v', op: '>=', value: 2 }] }), 'cd', '>= a number matches numbers only');
+      assert.equal((await call(board, 'board_query', { project: P, collection: col, where: [{ field: 'v', op: '<', value: {} }] })).value.code, 'invalid_argument');
+      await call(board, 'board_batch', { project: P, writes: Object.keys(rows).map((id) => ({ op: 'delete', path: `${col}/${id}` })) });
+    });
+
+    test('a date that is no date leaves the project list working', async () => {
+      const k = K('baddate');
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `tasks/${k}`, data: { key: k, title: 'bad date', status: 'todo', updatedAt: '2999-11-31T10:00:00Z' } }] });
+      const listed = await call(board, 'board_projects');
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `tasks/${k}` }] });
+      assert.equal(listed.error, false, JSON.stringify(listed.value));
+      assert.ok(listed.value.some((p) => p.id === P));
+    });
+
+    test('a member may write meta/config with its people in another key order', async () => {
+      const member = await connect(tokens.member);
+      try {
+        const cfg = (await call(board, 'board_get', { project: P, path: 'meta/config' })).value;
+        const shuffled = cfg.data.people.map((p) => Object.fromEntries(Object.entries(p).reverse()));
+        const w = await call(member, 'board_batch', { project: P, writes: [{ op: 'update', path: 'meta/config', data: { people: shuffled } }] });
+        assert.equal(w.error, false, JSON.stringify(w.value));
+      } finally {
+        await member.close();
+      }
+    });
+
+    test('a document just under 256 KiB is kept by both stores', async () => {
+      // many short keys: Postgres prints each with a space after its colon and comma, which the size must not count
+      const data = {};
+      for (let i = 0, size = 2; size + 11 < 262144; i++) {
+        data['k' + String(i).padStart(5, '0')] = i % 10;
+        size += 11;
+      }
+      const w = await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `size-${R}/big`, data }] });
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `size-${R}/big` }] });
+      assert.equal(w.error, false, JSON.stringify(w.value).slice(0, 200));
+    });
+
     test('a task is held by its owner: reassigning it hands it over', async () => {
       const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
       await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `tasks/${K('o1')}`, data: { key: K('o1'), title: 'reassigned', status: 'todo', deps: [], waitingOn: [], updatedAt: at } }] });
@@ -1762,4 +1810,35 @@ test('a page reads again a listener whose first read failed', async () => {
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(seen[0], 'err unavailable', 'the failed read says so');
   assert.equal(seen[seen.length - 1], 's2', 'then the document arrives, with the change pushed while it waited');
+});
+
+// Supabase stamps a row with its transaction's start, so a write that commits after a later one can carry the earlier
+// stamp; catching up after a gap asks from a little before the newest stamp seen, and versions drop what came twice
+test('a page catching up gets a row committed late with an earlier stamp', async () => {
+  let visible = null;
+  const json = (status, body) => Promise.resolve({ ok: status < 300, status, json: async () => body });
+  const row = (id, at) => ({ collection: 'tasks', doc_id: id, version: 1, updated_at: at, data: { key: id } });
+  const server = [row('A', '2026-01-01T00:00:10.000Z')];
+  const window = { addEventListener() {} };
+  runInNewContext(readFileSync(new URL('../server/public/shim.js', import.meta.url), 'utf8'), {
+    window, setTimeout, clearTimeout, setInterval: () => 0,
+    document: { addEventListener: (k, fn) => { if (k === 'visibilitychange') visible = fn; }, getElementById: () => null, hidden: false },
+    location: { pathname: '/p/demo', hash: '', search: '' }, history: { replaceState() {} },
+    EventSource: function () {},
+    fetch: async (url, opts) => {
+      if (url === '/api/config') return json(200, { backend: 'sqlite', lang: 'en' });
+      if (url === '/api/me') return json(200, { uid: 'u', person: 'ana', role: 'member' });
+      const body = JSON.parse(opts.body);
+      if (body.since) return json(200, server.filter((r) => r.updated_at > body.since));
+      return json(200, server.slice());
+    },
+  });
+  const db = await window.claude.use('db');
+  let keys = '';
+  db.collection('tasks').onSnapshot((s) => { keys = s.docs.map((d) => d.id).sort().join(''); });
+  await new Promise((r) => setTimeout(r, 50));
+  server.push(row('B', '2026-01-01T00:00:05.000Z'));
+  visible();
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(keys, 'AB', 'the row stamped before the newest one seen arrives');
 });

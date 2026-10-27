@@ -52,6 +52,12 @@ export function checkField(field) {
 // What a member who is not an admin may not write, whatever the path to the store:
 // who is who (people/, meta/config.people) beyond linking their own account to their own person once, someone
 // else's notice cursor, posts under another name or none, and someone else's posts.
+function sameJson(a, b) {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null || Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length === kb.length && ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameJson(a[k], b[k]));
+}
 // Supabase's ab_apply (supabase/migrations) enforces the same.
 export function guardWrite(actor, w, collection, docId, cur, payload, index) {
   const deny = (why) => { throw new BoardError('permission_denied', why, index); };
@@ -59,7 +65,8 @@ export function guardWrite(actor, w, collection, docId, cur, payload, index) {
     deny('only admins change people/; a member links only their own account to their own person, once');
   }
   if (collection === 'cursors' && docId !== actor.person) deny(`a member moves only their own cursor (cursors/${actor.person})`);
-  const samePeople = (v) => JSON.stringify(v) === JSON.stringify(cur?.people);
+  // the same people however their keys are ordered, as Postgres compares jsonb
+  const samePeople = (v) => sameJson(v, cur?.people);
   if (collection === 'meta' && docId === 'config' && (w.op === 'delete' || !cur
       || (w.op === 'set' && !samePeople(payload.people)) || (w.op === 'update' && 'people' in payload && !samePeople(payload.people)))) {
     deny('only admins change meta/config.people');
