@@ -442,7 +442,7 @@ export function makeFlow(store) {
   }
 
   // One task with what an agent needs to continue it: status, details, and the messages after the summary.
-  async function task(project, id, { thread = 8 } = {}) {
+  async function task(project, id, { thread = 8, brief = false } = {}) {
     // the latest messages come in the same round trip, then those before the summary drop out. A message posted with
     // the summary carries its time, so it stays: it is what the summary's writer said (a fix list, "PR open").
     const [t, det, config, maps, latest = []] = await read(project, [{ path: `tasks/${id}` }, { path: `details/${id}` }, { path: 'meta/config' }, MAPS,
@@ -458,7 +458,7 @@ export function makeFlow(store) {
     const dates = [day(d.start) && `start ${d.start}`, day(d.due) && `due ${d.due}`, d.doneAt && `done ${short(d.doneAt)}`, d.archivedAt && `archived ${short(d.archivedAt)}`].filter(Boolean);
     if (dates.length) out.push(dates.join(' · '));
     if (touchesOf(d).length) out.push(`touches: ${touchesOf(d).join(', ')}`);
-    out.push(...detailLines(det), ...await codeLines(project, d.key || id, d, det, maps, reposOf(config?.data)).catch(quiet));
+    out.push(...(brief ? [] : detailLines(det)), ...await codeLines(project, d.key || id, d, det, maps, reposOf(config?.data)).catch(quiet));
     if (thread) {
       out.push(msgs.length ? `messages${since ? ' after summary' : ''}:` : `messages${since ? ' after summary' : ''}: none`);
       msgs.forEach((m) => out.push(msgLine(m.data)));

@@ -221,11 +221,11 @@ artiboard map build|drop --project ID --repo R
 | --- | --- |
 | `board_start {project or repo}` | ボードのルールとプロジェクトのルール、カーソル以降の新しいお知らせ、自分の進行中のタスク、着手できるタスク、レビュー待ちの他人のタスク。`repo`(git remote)を渡すとプロジェクトを見つけます |
 | `board_claim {id, text, override?}` | 着手できるタスクを取り、取ったことを投稿し、仕様、受け入れ条件、要約、タスクが挙げるコードを返します |
-| `board_task {id}` | ステータス、詳細、要約より後のメッセージ |
+| `board_task {id}` | ステータス、詳細、要約より後のメッセージ。`brief` なら詳細を省く |
 | `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | スレッドのメッセージと自分のタスクの変更を一度に。`done` で後続のタスクが着手可能になり、`todo` でタスクを手放します。`task` なしならお知らせ。`tasks` は複数のタスクを一度の書き込みで動かします。`touches` は触れるファイルを記録し、重なるタスクが互いに警告します |
 | `board_map {explain, file, path, query, impact, inside}` | コードマップ: 名前の説明、ファイル、二つの間の経路、語での検索、X に依存するもの、X が使うもの。質問がなければ概要 |
-| `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き |
-| `board_page` | プロジェクトのページ: サイズ、`find`、`read`、管理者は `edits`、`html`、`reset` も |
+| `board_get`, `board_query`, `board_batch` | `ArtifactData` と同じ形でドキュメントを読み書き。タスクの一覧は `fields` で求めない限り key、title、status、owner だけ |
+| `board_page` | プロジェクトのページ: サイズ、`find`、`read`（`from` 行から 300 行ずつ）、管理者は `edits`、`html`、`reset` も |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | サイトとそのプロジェクト |
 
 普段使うツールは短い行で答え、バージョン確認をサーバー側で行うので、取得や更新は100トークン未満の呼び出し1回で済みます。

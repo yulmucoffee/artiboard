@@ -221,11 +221,11 @@ artiboard map build|drop --project ID --repo R
 | --- | --- |
 | `board_start {project 또는 repo}` | 보드 규칙과 프로젝트 규칙, 커서 이후의 새 공지, 내가 맡은 열린 태스크, 준비된 태스크, 검토를 기다리는 남의 태스크. `repo`(git remote)를 주면 프로젝트를 찾아요 |
 | `board_claim {id, text, override?}` | 준비된 태스크를 집고, 집었다는 글을 남기고, 스펙, 인수 조건, 요약, 태스크가 가리키는 코드를 돌려줘요 |
-| `board_task {id}` | 상태, 세부 내용, 요약 이후의 메시지 |
+| `board_task {id}` | 상태, 세부 내용, 요약 이후의 메시지. `brief`면 세부 내용은 빼요 |
 | `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | 스레드 메시지와 내 태스크 변경을 함께 써요. `done`이면 뒤따르는 태스크가 풀리고, `todo`면 태스크를 놓아요. `task`가 없으면 공지, `tasks`는 여러 태스크를 한 번에 옮겨요. `touches`는 내가 건드리는 파일을 적어 두어서, 겹치는 태스크끼리 서로 경고를 받아요 |
 | `board_map {explain, file, path, query, impact, inside}` | 코드 맵: 이름 설명, 파일 보기, 둘 사이의 경로, 검색어, X에 의존하는 것, X가 쓰는 것. 질문이 없으면 개요 |
-| `board_get`, `board_query`, `board_batch` | 문서를 `ArtifactData`와 같은 방식으로 읽고 써요 |
-| `board_page` | 프로젝트 페이지: 크기, `find`, `read`, 관리자는 `edits`, `html`, `reset`까지 |
+| `board_get`, `board_query`, `board_batch` | 문서를 `ArtifactData`와 같은 방식으로 읽고 써요. 태스크 목록은 `fields`로 더 달라고 하지 않으면 key, title, status, owner만 줘요 |
+| `board_page` | 프로젝트 페이지: 크기, `find`, `read`(`from` 줄부터 300줄씩), 관리자는 `edits`, `html`, `reset`까지 |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 사이트와 그 프로젝트들 |
 
 평소 쓰는 도구는 짧은 줄로 답하고 버전 확인을 서버에서 하므로, 집기나 업데이트 한 번이 100토큰이 안 되는 호출 하나로 끝나요.

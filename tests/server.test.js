@@ -536,6 +536,31 @@ for (const backend of backends) {
       assert.equal(w.error, false, JSON.stringify(w.value).slice(0, 200));
     });
 
+    // what an agent reads stays in its context for the rest of the session, so routine answers stay small
+    test('tasks list by key, title, status and owner; a brief task leaves out its details; a page reads a part at a time', async () => {
+      const at = new Date().toISOString(), k = K('lean');
+      await call(board, 'board_batch', { project: P, writes: [
+        { op: 'set', path: `tasks/${k}`, data: { key: k, title: 'lean', status: 'todo', deps: [], waitingOn: [], branch: 'feat/lean', updatedAt: at } },
+        { op: 'set', path: `details/${k}`, data: { spec: 'docs/lean.md', acceptance: 'small answers' } },
+      ] });
+      const listed = (await call(board, 'board_query', { project: P, collection: 'tasks', where: [{ field: 'key', op: '==', value: k }] })).value.docs[0];
+      assert.deepEqual(Object.keys(listed.data).sort(), ['key', 'status', 'title'], 'tasks without fields: key, title, status, owner (none here)');
+      const asked = (await call(board, 'board_query', { project: P, collection: 'tasks', where: [{ field: 'key', op: '==', value: k }], fields: ['branch'] })).value.docs[0];
+      assert.deepEqual(asked.data, { branch: 'feat/lean' }, 'fields asked for come instead');
+      assert.match((await call(board, 'board_task', { project: P, id: k })).value, /^spec: docs\/lean\.md$/m);
+      assert.doesNotMatch((await call(board, 'board_task', { project: P, id: k, brief: true })).value, /^(spec|acceptance):/m, 'brief leaves out the details');
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `tasks/${k}` }, { op: 'delete', path: `details/${k}` }] });
+
+      const size = (await call(board, 'board_page', { project: P })).value.lines;
+      const first = (await call(board, 'board_page', { project: P, read: true })).value;
+      assert.equal(first.split('\n')[0], `version 0 (bundled) · lines 1-300 of ${size} · next: from 301`);
+      assert.equal(first.split('\n').length, 301, 'a header and 300 lines');
+      const last = (await call(board, 'board_page', { project: P, read: true, from: size })).value;
+      assert.equal(last.split('\n')[0], `version 0 (bundled) · lines ${size}-${size} of ${size}`);
+      const page = (await board.listTools()).tools.find((t) => t.name === 'board_page');
+      assert.ok(!('edits' in page.inputSchema.properties) && !/edits/.test(page.description), 'a site that keeps agents off pages lists no page edits');
+    });
+
     test('a task is held by its owner: reassigning it hands it over', async () => {
       const at = new Date().toISOString(), me = people.admin.person, them = people.member.person;
       await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `tasks/${K('o1')}`, data: { key: K('o1'), title: 'reassigned', status: 'todo', deps: [], waitingOn: [], updatedAt: at } }] });
