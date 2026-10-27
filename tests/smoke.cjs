@@ -892,6 +892,23 @@ const meLane = (d) => {
   await tick();
   ok(b.store['details/M1-2']?.summary === 'Started', 'a task with no details yet gets them with its first summary');
 
+  console.log('# a dependency that reopens and finishes again');
+  b = boot({ me: 'ana', user: { id: async () => 'u-ana', can: async () => true } });
+  all.push(b);
+  await tick();
+  const waits = [];
+  for (const status of ['done', 'doing', 'done']) {
+    b.sneak('tasks/M1-1', (c) => ({ ...c, status }));
+    b.notify();
+    await heal();
+    await heal();
+    waits.push(JSON.stringify(b.store['tasks/M1-2'].waitingOn));
+  }
+  ok(
+    waits.join(' ') === '[] ["M1-1"] []',
+    'the page repairs waitingOn each time, the same repair again too: ' + waits.join(' ')
+  );
+
   console.log('# a task with deps that are not a list');
   b = boot({
     docs: {

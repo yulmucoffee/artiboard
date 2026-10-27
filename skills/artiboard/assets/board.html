@@ -7104,11 +7104,16 @@ td.what .overlap{margin-left:8px}
             return;
           var sig = t.id + ':' + exp.join(',');
           if (healing[sig] || healOff) return;
+          // a repair in flight is not sent twice; once settled the same repair may be needed again (a dependency
+          // that reopens and finishes again)
           healing[sig] = 1;
           db.doc('tasks/' + t.id)
             .update({ waitingOn: exp })
             .catch(function (e) {
               if (e && e.code === 'invalid_argument') healOff = true;
+            })
+            .then(function () {
+              delete healing[sig];
             });
         });
       },
