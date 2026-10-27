@@ -6699,7 +6699,15 @@ td.what .overlap{margin-left:8px}
       var patch = { summary: ta.value.trim(), summaryAt: now() },
         o = { override: !mayChange(t, me, { summary: patch.summary }, false) };
       ok.disabled = true;
-      (detailsDoc ? db.doc('details/' + t.id).update(patch, o) : db.doc('details/' + t.id).set(patch, o))
+      // an update keeps the spec and acceptance beside the summary, even when this page could not read them; only a
+      // task with no details yet gets a new document
+      var ref = db.doc('details/' + t.id);
+      ref
+        .update(patch, o)
+        .catch(function (e) {
+          if (e && e.code === 'not_found') return ref.set(patch, o);
+          throw e;
+        })
         .then(function () {
           summaryEditing = false;
           renderSheet();

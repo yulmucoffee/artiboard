@@ -150,7 +150,11 @@ function boot({
         }
         return r;
       },
-      onSnapshot(cb) {
+      onSnapshot(cb, err) {
+        if (failRead.includes(p)) {
+          if (err) err({ code: 'unavailable' });
+          return () => {};
+        }
         const run = () =>
           cb({ exists: !!store[p], data: () => (store[p] ? Object.freeze({ ...store[p] }) : store[p]) });
         subs.push(run);
@@ -158,7 +162,8 @@ function boot({
         return () => subs.splice(subs.indexOf(run), 1);
       },
       acquire: async () => ({ acquired: true }),
-      update: (o, opt) => put(p, (c) => ({ ...c, ...o }), opt),
+      // as the stores do: an update needs the document to be there
+      update: (o, opt) => (store[p] ? put(p, (c) => ({ ...c, ...o }), opt) : Promise.reject({ code: 'not_found' })),
       set: (o) => put(p, () => o)
     };
   }
@@ -855,6 +860,37 @@ const meLane = (d) => {
     b.d.body.dataset.view === 'kanban' && b.w.location.hash === '',
     'a link that opens the board on a view lets go of it in the address'
   );
+
+  console.log('# a summary saved while the details could not be read');
+  b = boot({ failRead: ['details/M1-1'] });
+  all.push(b);
+  await tick();
+  await heal();
+  b.pick('ana');
+  await tick();
+  b.d.querySelector('#rows tr.item[data-k="M1-1"]').click();
+  await tick();
+  [...b.d.querySelectorAll('.sheet .summary-head .linkbtn')][0].click();
+  await tick();
+  b.d.getElementById('sumText').value = 'Tables in, seed left';
+  [...b.d.querySelectorAll('.sheet .block .btn.primary')].find((x) => /Save/.test(x.textContent)).click();
+  await tick();
+  await tick();
+  ok(
+    b.store['details/M1-1'].summary === 'Tables in, seed left' && b.store['details/M1-1'].spec === 'docs/db.md',
+    'the summary lands beside the spec and acceptance it could not read: ' + JSON.stringify(b.store['details/M1-1'])
+  );
+  b.key('Escape');
+  await tick();
+  b.d.querySelector('#rows tr.item[data-k="M1-2"]').click();
+  await tick();
+  [...b.d.querySelectorAll('.sheet .summary-head .linkbtn')][0].click();
+  await tick();
+  b.d.getElementById('sumText').value = 'Started';
+  [...b.d.querySelectorAll('.sheet .block .btn.primary')].find((x) => /Save/.test(x.textContent)).click();
+  await tick();
+  await tick();
+  ok(b.store['details/M1-2']?.summary === 'Started', 'a task with no details yet gets them with its first summary');
 
   console.log('# a task with deps that are not a list');
   b = boot({
