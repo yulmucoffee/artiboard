@@ -265,12 +265,14 @@
       if (queued.length === 1) Promise.resolve().then(function () { var ls = queued; queued = []; load(ls); });
       return function () { listeners = listeners.filter(function (x) { return x !== l; }); };
     }
-    // rows of the watched collections changed after the newest one seen
+    // rows of the watched collections changed since a little before the newest one seen: Supabase stamps a row with
+    // its transaction's start, so a write that commits after a later one can carry the earlier stamp. A row that
+    // comes twice is dropped by its version.
     function catchUp() {
       if (!mark || !listeners.length || catching) return;
       catching = true;
       var cols = listeners.map(function (l) { return l.collection; }).filter(function (c, i, a) { return a.indexOf(c) === i; });
-      tr.changed(cols, mark).then(function (rows) { catching = false; rows.forEach(function (row) { applyRow(row); }); }, function () { catching = false; });
+      tr.changed(cols, new Date(Date.parse(mark) - 30000).toISOString()).then(function (rows) { catching = false; rows.forEach(function (row) { applyRow(row); }); }, function () { catching = false; });
     }
     function setLive(on) {
       if (on) { retry(); catchUp(); }
