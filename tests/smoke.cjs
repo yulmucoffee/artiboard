@@ -150,7 +150,11 @@ function boot({
         }
         return r;
       },
-      onSnapshot(cb) {
+      onSnapshot(cb, err) {
+        if (failRead.includes(p)) {
+          if (err) err({ code: 'unavailable' });
+          return () => {};
+        }
         const run = () =>
           cb({ exists: !!store[p], data: () => (store[p] ? Object.freeze({ ...store[p] }) : store[p]) });
         subs.push(run);
@@ -158,7 +162,8 @@ function boot({
         return () => subs.splice(subs.indexOf(run), 1);
       },
       acquire: async () => ({ acquired: true }),
-      update: (o, opt) => put(p, (c) => ({ ...c, ...o }), opt),
+      // as the stores do: an update needs the document to be there
+      update: (o, opt) => (store[p] ? put(p, (c) => ({ ...c, ...o }), opt) : Promise.reject({ code: 'not_found' })),
       set: (o) => put(p, () => o)
     };
   }
@@ -854,6 +859,73 @@ const meLane = (d) => {
   ok(
     b.d.body.dataset.view === 'kanban' && b.w.location.hash === '',
     'a link that opens the board on a view lets go of it in the address'
+  );
+
+  console.log('# a summary saved while the details could not be read');
+  b = boot({ failRead: ['details/M1-1'] });
+  all.push(b);
+  await tick();
+  await heal();
+  b.pick('ana');
+  await tick();
+  b.d.querySelector('#rows tr.item[data-k="M1-1"]').click();
+  await tick();
+  [...b.d.querySelectorAll('.sheet .summary-head .linkbtn')][0].click();
+  await tick();
+  b.d.getElementById('sumText').value = 'Tables in, seed left';
+  [...b.d.querySelectorAll('.sheet .block .btn.primary')].find((x) => /Save/.test(x.textContent)).click();
+  await tick();
+  await tick();
+  ok(
+    b.store['details/M1-1'].summary === 'Tables in, seed left' && b.store['details/M1-1'].spec === 'docs/db.md',
+    'the summary lands beside the spec and acceptance it could not read: ' + JSON.stringify(b.store['details/M1-1'])
+  );
+  b.key('Escape');
+  await tick();
+  b.d.querySelector('#rows tr.item[data-k="M1-2"]').click();
+  await tick();
+  [...b.d.querySelectorAll('.sheet .summary-head .linkbtn')][0].click();
+  await tick();
+  b.d.getElementById('sumText').value = 'Started';
+  [...b.d.querySelectorAll('.sheet .block .btn.primary')].find((x) => /Save/.test(x.textContent)).click();
+  await tick();
+  await tick();
+  ok(b.store['details/M1-2']?.summary === 'Started', 'a task with no details yet gets them with its first summary');
+
+  console.log('# a dependency that reopens and finishes again');
+  b = boot({ me: 'ana', user: { id: async () => 'u-ana', can: async () => true } });
+  all.push(b);
+  await tick();
+  const waits = [];
+  for (const status of ['done', 'doing', 'done']) {
+    b.sneak('tasks/M1-1', (c) => ({ ...c, status }));
+    b.notify();
+    await heal();
+    await heal();
+    waits.push(JSON.stringify(b.store['tasks/M1-2'].waitingOn));
+  }
+  ok(
+    waits.join(' ') === '[] ["M1-1"] []',
+    'the page repairs waitingOn each time, the same repair again too: ' + waits.join(' ')
+  );
+
+  console.log('# a task with deps that are not a list');
+  b = boot({
+    docs: {
+      'tasks/M1-9': { key: 'M1-9', title: 'Odd deps', status: 'todo', deps: 'M1-1', waitingOn: 'M1-1', updatedAt: T0 }
+    }
+  });
+  all.push(b);
+  await tick();
+  const drawn = { doc: b.d.querySelectorAll('#rows tr.item').length };
+  for (const v of ['kanban', 'graph']) {
+    b.d.querySelector('button[data-view="' + v + '"]').click();
+    await tick();
+    drawn[v] = b.d.querySelectorAll(v === 'kanban' ? '.col .card' : '#graphWrap .node').length;
+  }
+  ok(
+    drawn.doc > 1 && drawn.kanban > 1 && drawn.graph > 1 && !b.errors.length,
+    'one task whose deps are a string leaves every view drawn: ' + JSON.stringify(drawn) + ' ' + b.errors.join(' ')
   );
 
   console.log('# a long done column');

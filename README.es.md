@@ -221,11 +221,11 @@ Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins
 | --- | --- |
 | `board_start {project o repo}` | Las reglas del tablero y las del proyecto, avisos nuevos desde tu cursor, tus tareas abiertas, tareas disponibles, tareas ajenas esperando revisión. Con `repo` (un git remote) encuentra el proyecto |
 | `board_claim {id, text, override?}` | Toma una tarea disponible, publica la toma y devuelve especificación, criterio de aceptación, resumen y el código que nombra la tarea |
-| `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen |
+| `board_task {id}` | Estado, detalles y los mensajes posteriores al resumen; `brief` omite los detalles |
 | `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | Un mensaje en el hilo más cambios en tu tarea. `done` desbloquea las que dependen de ella y `todo` libera la tarea; sin `task`, un aviso; `tasks` mueve varias en una sola escritura. `touches` registra los archivos que tocas, para que las tareas que se solapan se avisen entre sí |
 | `board_map {explain, file, path, query, impact, inside}` | El mapa de código: explicar un nombre, un archivo, el camino entre dos, palabras, qué depende de X, qué usa X. Sin pregunta: resumen |
-| `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData` |
-| `board_page` | La página del proyecto: tamaño, `find`, `read` y, para administradores, `edits`, `html`, `reset` |
+| `board_get`, `board_query`, `board_batch` | Documentos, leídos y escritos como lo hace `ArtifactData`; las tareas se listan con key, title, status y owner salvo que `fields` pida más |
+| `board_page` | La página del proyecto: tamaño, `find`, `read` (300 líneas cada vez, desde la línea `from`) y, para administradores, `edits`, `html`, `reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | El sitio y sus proyectos |
 
 Las herramientas de uso diario responden en líneas cortas y comprueban versiones en el servidor, así que tomar o actualizar una tarea es una sola llamada de menos de cien tokens.

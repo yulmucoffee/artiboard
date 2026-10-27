@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.22.0",
+      "date": "2026-10-27",
+      "prs": [
+        57
+      ],
+      "lines": {
+        "en": [
+          "A board that failed its first load loads again within a minute. A task whose deps are not a list no longer empties every view, and a saved summary keeps the spec.",
+          "Supabase sites answer like SQLite: one bad date no longer breaks the project list, and queries order alike. A long Markdown heading no longer costs a code map.",
+          "Agents read less: task lists show key, title, status and owner, board_task brief skips details, the page reads 300 lines at a time, the rules come once."
+        ],
+        "ko": [
+          "첫 불러오기에 실패한 보드는 1분 안에 다시 불러와요. deps가 목록이 아닌 태스크가 있어도 화면이 비지 않고, 요약을 저장해도 spec이 남아요.",
+          "Supabase 사이트가 SQLite와 같은 답을 줘요. 잘못된 날짜 하나가 프로젝트 목록을 깨지 않고, 정렬과 비교가 같아요. 긴 Markdown 제목도 코드 지도를 막지 않아요.",
+          "에이전트가 읽는 양이 줄었어요. 태스크 목록은 key·title·status·owner만, board_task brief는 세부를 빼고, 페이지는 300줄씩, 규칙은 세션에 한 번만 받아요."
+        ]
+      }
+    },
+    {
       "version": "1.21.2",
       "date": "2026-10-26",
       "prs": [

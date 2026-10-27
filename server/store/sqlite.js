@@ -256,7 +256,8 @@ export function openSqlite({ file, boardUrl }) {
   }
 
   // Writes from another process on the same file (the CLI while the site runs) reach open pages
-  // through a cheap look for newer rows every two seconds, only while someone is watching.
+  // through a cheap look for newer rows every two seconds, only while someone is watching. The first watcher after a
+  // quiet spell reads the board itself, so the look starts from the newest row there is, not from the last one sent.
   let seen = last, watching = 0, timer = null;
   function poll() {
     for (const r of q('select * from docs where updated_at > ? order by updated_at limit 500').all(seen)) {
@@ -267,7 +268,11 @@ export function openSqlite({ file, boardUrl }) {
   }
   function subscribe(project, fn) {
     changes.on(project, fn);
-    if (!watching++) { timer = setInterval(poll, 2000); timer.unref(); }
+    if (!watching++) {
+      seen = q('select max(updated_at) t from docs').get().t || seen;
+      timer = setInterval(poll, 2000);
+      timer.unref();
+    }
     return () => { changes.off(project, fn); if (!--watching) clearInterval(timer); };
   }
 

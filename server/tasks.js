@@ -38,9 +38,15 @@ export function statusOf(t) { return (t && t.status) || 'todo'; }
 // agent, which session, when); reassigning a task changes its owner and so its holder.
 export function holderOf(t) { return (t && t.owner) || null; }
 
+// a task's deps: the keys in its deps list. Nothing checks a written task's fields, so deps that are not a list, or
+// an entry that is not a key, read as no deps; every reader goes through here
+export function depsOf(t) {
+  return (t && Array.isArray(t.deps) ? t.deps : []).filter((k) => typeof k === 'string');
+}
+
 // the deps not done yet; isDone(key) says whether the task with that key is done
 export function unmetDeps(t, isDone) {
-  return (Array.isArray(t.deps) ? t.deps : []).filter((k) => typeof k === 'string' && !isDone(k));
+  return depsOf(t).filter((k) => !isDone(k));
 }
 
 // free to pick: to do, nobody holds it, nothing it waits on is left

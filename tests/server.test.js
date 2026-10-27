@@ -104,6 +104,19 @@ for (const backend of backends) {
       assert.equal((await call(board, 'board_get', { project: P, path: `people/${people.member.person}` })).value.data.uid, people.member.uid);
     });
 
+    // board_batch checks no field's shape, so an agent's slip can store deps or waitingOn as a string; the task rules
+    // read that as no deps, and every reader must too
+    test('a task whose deps are not a list reads as one without deps', async () => {
+      const at = new Date().toISOString(), k = K('odd');
+      assert.equal((await call(board, 'board_batch', { project: P, writes: [
+        { op: 'set', path: `tasks/${k}`, data: { key: k, title: 'odd deps', status: 'todo', deps: 'M1-1', waitingOn: 'M1-1', updatedAt: at } },
+      ] })).error, false);
+      const t = await call(board, 'board_task', { project: P, id: k });
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `tasks/${k}` }] });
+      assert.equal(t.error, false, String(t.value));
+      assert.ok(!/^deps /m.test(t.value), t.value);
+    });
+
     test('lists the tools, the projects and who is connected', async () => {
       const { tools } = await board.listTools();
       assert.deepEqual(tools.map((t) => t.name).sort(), ['board_batch', 'board_claim', 'board_create_project', 'board_get', 'board_login_link',
@@ -456,6 +469,96 @@ for (const backend of backends) {
         stop?.();
         other.close();
       }
+    });
+
+    // the first page to watch after a quiet spell reads the board itself; it is not sent every row written meanwhile
+    test('a page that starts watching is not sent what was written before it watched', async (t) => {
+      if (store.kind !== 'sqlite') return t.skip('SQLite only: the site looks for other processes\' writes');
+      const other = await openSqlite({ file: join(dir, 'board.db'), boardUrl: BASE });
+      await other.apply(null, P, [{ op: 'set', path: `${C}/before-${R}`, data: { from: 'cli' } }]);
+      await store.apply(null, P, [{ op: 'set', path: `${C}/before-site-${R}`, data: { from: 'site' } }]);
+      const seen = [];
+      const stop = store.subscribe(P, (row) => seen.push(`${row.collection}/${row.doc_id}`));
+      try {
+        await new Promise((r) => setTimeout(r, 2600));
+        assert.deepEqual(seen.filter((x) => x.includes('/before')), [], 'rows written before the page watched stay unsent');
+      } finally {
+        stop?.();
+        other.close();
+      }
+    });
+
+    // both stores answer the same: a missing or null value sorts last either way, numbers before strings, strings by
+    // their characters ('B' before 'a'); < and > compare a field only with a value of its own kind
+    test('both stores order and compare fields alike', async () => {
+      const col = `order-${R}`, rows = { a: 'b', b: 'B', c: 2, d: 10, e: null, f: undefined, g: 'a' };
+      await call(board, 'board_batch', { project: P, writes: Object.entries(rows).map(([id, v]) => (
+        { op: 'set', path: `${col}/${id}`, data: v === undefined ? {} : { v } })) });
+      const ids = async (args) => (await call(board, 'board_query', { project: P, collection: col, ...args })).value.docs.map((d) => d.id).join('');
+      assert.equal(await ids({ order_by: [{ field: 'v' }] }), 'cdbgaef', 'ascending: numbers, then strings by character, then null and missing');
+      assert.equal(await ids({ order_by: [{ field: 'v', dir: 'desc' }] }), 'agbdcef', 'descending keeps null and missing last');
+      assert.equal(await ids({ where: [{ field: 'v', op: '>', value: '' }] }), 'abg', '> a string matches strings only');
+      assert.equal(await ids({ where: [{ field: 'v', op: '>=', value: 2 }] }), 'cd', '>= a number matches numbers only');
+      assert.equal((await call(board, 'board_query', { project: P, collection: col, where: [{ field: 'v', op: '<', value: {} }] })).value.code, 'invalid_argument');
+      await call(board, 'board_batch', { project: P, writes: Object.keys(rows).map((id) => ({ op: 'delete', path: `${col}/${id}` })) });
+    });
+
+    test('a date that is no date leaves the project list working', async () => {
+      const k = K('baddate');
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `tasks/${k}`, data: { key: k, title: 'bad date', status: 'todo', updatedAt: '2999-11-31T10:00:00Z' } }] });
+      const listed = await call(board, 'board_projects');
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `tasks/${k}` }] });
+      assert.equal(listed.error, false, JSON.stringify(listed.value));
+      assert.ok(listed.value.some((p) => p.id === P));
+    });
+
+    test('a member may write meta/config with its people in another key order', async () => {
+      const member = await connect(tokens.member);
+      try {
+        const cfg = (await call(board, 'board_get', { project: P, path: 'meta/config' })).value;
+        const shuffled = cfg.data.people.map((p) => Object.fromEntries(Object.entries(p).reverse()));
+        const w = await call(member, 'board_batch', { project: P, writes: [{ op: 'update', path: 'meta/config', data: { people: shuffled } }] });
+        assert.equal(w.error, false, JSON.stringify(w.value));
+      } finally {
+        await member.close();
+      }
+    });
+
+    test('a document just under 256 KiB is kept by both stores', async () => {
+      // many short keys: Postgres prints each with a space after its colon and comma, which the size must not count
+      const data = {};
+      for (let i = 0, size = 2; size + 11 < 262144; i++) {
+        data['k' + String(i).padStart(5, '0')] = i % 10;
+        size += 11;
+      }
+      const w = await call(board, 'board_batch', { project: P, writes: [{ op: 'set', path: `size-${R}/big`, data }] });
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `size-${R}/big` }] });
+      assert.equal(w.error, false, JSON.stringify(w.value).slice(0, 200));
+    });
+
+    // what an agent reads stays in its context for the rest of the session, so routine answers stay small
+    test('tasks list by key, title, status and owner; a brief task leaves out its details; a page reads a part at a time', async () => {
+      const at = new Date().toISOString(), k = K('lean');
+      await call(board, 'board_batch', { project: P, writes: [
+        { op: 'set', path: `tasks/${k}`, data: { key: k, title: 'lean', status: 'todo', deps: [], waitingOn: [], branch: 'feat/lean', updatedAt: at } },
+        { op: 'set', path: `details/${k}`, data: { spec: 'docs/lean.md', acceptance: 'small answers' } },
+      ] });
+      const listed = (await call(board, 'board_query', { project: P, collection: 'tasks', where: [{ field: 'key', op: '==', value: k }] })).value.docs[0];
+      assert.deepEqual(Object.keys(listed.data).sort(), ['key', 'status', 'title'], 'tasks without fields: key, title, status, owner (none here)');
+      const asked = (await call(board, 'board_query', { project: P, collection: 'tasks', where: [{ field: 'key', op: '==', value: k }], fields: ['branch'] })).value.docs[0];
+      assert.deepEqual(asked.data, { branch: 'feat/lean' }, 'fields asked for come instead');
+      assert.match((await call(board, 'board_task', { project: P, id: k })).value, /^spec: docs\/lean\.md$/m);
+      assert.doesNotMatch((await call(board, 'board_task', { project: P, id: k, brief: true })).value, /^(spec|acceptance):/m, 'brief leaves out the details');
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `tasks/${k}` }, { op: 'delete', path: `details/${k}` }] });
+
+      const size = (await call(board, 'board_page', { project: P })).value.lines;
+      const first = (await call(board, 'board_page', { project: P, read: true })).value;
+      assert.equal(first.split('\n')[0], `version 0 (bundled) · lines 1-300 of ${size} · next: from 301`);
+      assert.equal(first.split('\n').length, 301, 'a header and 300 lines');
+      const last = (await call(board, 'board_page', { project: P, read: true, from: size })).value;
+      assert.equal(last.split('\n')[0], `version 0 (bundled) · lines ${size}-${size} of ${size}`);
+      const page = (await board.listTools()).tools.find((t) => t.name === 'board_page');
+      assert.ok(!('edits' in page.inputSchema.properties) && !/edits/.test(page.description), 'a site that keeps agents off pages lists no page edits');
     });
 
     test('a task is held by its owner: reassigning it hands it over', async () => {
@@ -1701,4 +1804,66 @@ test('a page reads a row pushed without its value only when it shows that collec
   for (const collection of ['map/acme--shop/chunks', 'tasks']) handlers[1]({ eventType: 'UPDATE', new: { project: 'demo', collection, doc_id: '0' } });
   await new Promise((r) => setTimeout(r, 20));
   assert.deepEqual(reads, ['tasks'], 'only the row a listener shows is read');
+});
+
+// A listener whose first read failed (a server restart, a laptop waking before its network) reads again a minute
+// later, and then shows what was pushed meanwhile, instead of staying empty until the page reloads.
+test('a page reads again a listener whose first read failed', async () => {
+  let reads = 0, tick = null, es = null;
+  const json = (status, body) => Promise.resolve({ ok: status < 300, status, json: async () => body });
+  const window = { addEventListener() {} };
+  runInNewContext(readFileSync(new URL('../server/public/shim.js', import.meta.url), 'utf8'), {
+    window, setTimeout, clearTimeout,
+    setInterval: (fn) => { tick = fn; return 0; },
+    document: { addEventListener() {}, getElementById: () => null, hidden: false },
+    location: { pathname: '/p/demo', hash: '', search: '' }, history: { replaceState() {} },
+    EventSource: function () { es = this; setTimeout(() => this.onopen && this.onopen(), 0); },
+    fetch: async (url) => {
+      if (url === '/api/config') return json(200, { backend: 'sqlite', lang: 'en' });
+      if (url === '/api/me') return json(200, { uid: 'u', person: 'ana', role: 'member' });
+      if (/\/read$/.test(url) && ++reads === 1) return json(503, { code: 'unavailable', message: 'try again' });
+      if (/\/read$/.test(url)) return json(200, [{ collection: 'details', doc_id: 'X', version: 3, updated_at: '2026-01-01T00:00:00.000Z', data: { spec: 's' } }]);
+      return json(200, []);
+    },
+  });
+  const db = await window.claude.use('db');
+  const seen = [];
+  db.doc('details/X').onSnapshot((s) => seen.push(s.exists ? s.data().spec : null), (e) => seen.push('err ' + e.code));
+  await new Promise((r) => setTimeout(r, 50));
+  es.onmessage({ data: JSON.stringify({ collection: 'details', doc_id: 'X', version: 4, updated_at: '2026-01-01T00:00:01.000Z', data: { spec: 's2' } }) });
+  tick();
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(seen[0], 'err unavailable', 'the failed read says so');
+  assert.equal(seen[seen.length - 1], 's2', 'then the document arrives, with the change pushed while it waited');
+});
+
+// Supabase stamps a row with its transaction's start, so a write that commits after a later one can carry the earlier
+// stamp; catching up after a gap asks from a little before the newest stamp seen, and versions drop what came twice
+test('a page catching up gets a row committed late with an earlier stamp', async () => {
+  let visible = null;
+  const json = (status, body) => Promise.resolve({ ok: status < 300, status, json: async () => body });
+  const row = (id, at) => ({ collection: 'tasks', doc_id: id, version: 1, updated_at: at, data: { key: id } });
+  const server = [row('A', '2026-01-01T00:00:10.000Z')];
+  const window = { addEventListener() {} };
+  runInNewContext(readFileSync(new URL('../server/public/shim.js', import.meta.url), 'utf8'), {
+    window, setTimeout, clearTimeout, setInterval: () => 0,
+    document: { addEventListener: (k, fn) => { if (k === 'visibilitychange') visible = fn; }, getElementById: () => null, hidden: false },
+    location: { pathname: '/p/demo', hash: '', search: '' }, history: { replaceState() {} },
+    EventSource: function () {},
+    fetch: async (url, opts) => {
+      if (url === '/api/config') return json(200, { backend: 'sqlite', lang: 'en' });
+      if (url === '/api/me') return json(200, { uid: 'u', person: 'ana', role: 'member' });
+      const body = JSON.parse(opts.body);
+      if (body.since) return json(200, server.filter((r) => r.updated_at > body.since));
+      return json(200, server.slice());
+    },
+  });
+  const db = await window.claude.use('db');
+  let keys = '';
+  db.collection('tasks').onSnapshot((s) => { keys = s.docs.map((d) => d.id).sort().join(''); });
+  await new Promise((r) => setTimeout(r, 50));
+  server.push(row('B', '2026-01-01T00:00:05.000Z'));
+  visible();
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(keys, 'AB', 'the row stamped before the newest one seen arrives');
 });

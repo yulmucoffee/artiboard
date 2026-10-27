@@ -4545,15 +4545,18 @@ function buildExtract(b, files) {
   }
 }
 
-// a name defined twice in one file gets its line appended to the second id, so every id names one node
+// a name defined twice in one file gets its line appended to the second id, so every id names one node. A section
+// takes the first 200 characters of its heading (a paragraph kept on one line and followed by --- is a heading too);
+// a node whose name or id would still pass the 1000 characters a site accepts is left out, not the whole map.
 function buildSymbols(b) {
   for (const [p, x] of b.parsed) {
     const doc = !!b.lang.get(p).doc, list = [];
-    for (const s of x.symbols) {
-      if (typeof s.name !== 'string' || !s.name || !(s.line >= 1)) continue;
+    for (const found of x.symbols) {
+      if (typeof found.name !== 'string' || !found.name || !(found.line >= 1)) continue;
+      const s = doc ? { ...found, name: found.name.slice(0, 200).trim() } : found;
       let id = `${p}#${doc ? buildSlug(s.name) : s.name}`;
       if (b.nodes.has(id)) id = `${id}@${s.line}`;
-      if (b.nodes.has(id)) continue;
+      if (b.nodes.has(id) || id.length > 1000 || s.name.length > 1000) continue;
       const node = { i: id, k: doc ? 'sec' : 'sym', n: s.name, f: p, l: s.line, t: s.kind };
       if (!doc && s.exported !== false) node.e = 1;
       if (!doc) {

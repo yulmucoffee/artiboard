@@ -221,11 +221,11 @@ artiboard map build|drop --project ID --repo R
 | --- | --- |
 | `board_start {project 或 repo}` | 看板规则和项目规则、游标之后的新公告、你未完成的任务、可领取的任务、等待评审的他人任务。传入 `repo`（git remote）时会找到项目 |
 | `board_claim {id, text, override?}` | 认领一个可领取的任务，发布认领消息，返回规格、验收标准、摘要以及任务提到的代码 |
-| `board_task {id}` | 状态、详情，以及摘要之后的消息 |
+| `board_task {id}` | 状态、详情，以及摘要之后的消息；`brief` 不含详情 |
 | `board_post {task \| tasks, text?, status?, branch?, pr?, start?, due?, repo?, summary?, touches?, override?}` | 一条讨论串消息，加上对你任务的修改。`done` 会解除依赖它的任务的阻塞，`todo` 会释放任务；不带 `task` 时发布公告；`tasks` 在一次写入里移动多个任务。`touches` 记录你触及的文件，任务重叠时会互相提醒 |
 | `board_map {explain, file, path, query, impact, inside}` | 代码地图：解释一个名称、一个文件、两者之间的路径、关键词、依赖 X 的内容、X 用到的内容。不带问题时：概览 |
-| `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同 |
-| `board_page` | 项目的页面：大小、`find`、`read`，管理员还有 `edits`、`html`、`reset` |
+| `board_get`, `board_query`, `board_batch` | 读写文档，方式与 `ArtifactData` 相同；任务列表只给 key、title、status 和 owner，除非用 `fields` 要更多 |
+| `board_page` | 项目的页面：大小、`find`、`read`（从 `from` 行起每次 300 行），管理员还有 `edits`、`html`、`reset` |
 | `board_projects`, `board_create_project`, `board_whoami`, `board_login_link` | 站点及其项目 |
 
 日常工具用简短的几行回答，并在服务器端校验版本，所以一次认领或更新就是一次不到一百个 token 的调用。

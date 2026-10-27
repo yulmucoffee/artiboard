@@ -49,6 +49,10 @@
     "thread": {
      "description": "Messages to show, default 8",
      "type": "integer"
+    },
+    "brief": {
+     "description": "No spec, acceptance or summary",
+     "type": "boolean"
     }
    },
    "required": [
@@ -347,7 +351,7 @@
  },
  {
   "name": "board_query",
-  "description": "Query one collection. Without where/order_by it lists by id; pass the last id as after to page.",
+  "description": "Query one collection. Without where/order_by it lists by id; pass the last id as after to page. tasks without fields: key, title, status, owner.",
   "inputSchema": {
    "type": "object",
    "properties": {
@@ -495,7 +499,7 @@
  },
  {
   "name": "board_page",
-  "description": "The project's board page. No options: version and size. find: numbered lines around a text. read: the whole page. Admins, where the site allows it, change it with edits (exact unique replacements), html or reset, passing if_version.",
+  "description": "The project's board page. No options: version and size. find: numbered lines around a text. read: the page, a part at a time.",
   "inputSchema": {
    "type": "object",
    "properties": {
@@ -513,31 +517,8 @@
     "read": {
      "type": "boolean"
     },
-    "edits": {
-     "type": "array",
-     "items": {
-      "type": "object",
-      "properties": {
-       "old": {
-        "type": "string"
-       },
-       "new": {
-        "type": "string"
-       }
-      },
-      "required": [
-       "old",
-       "new"
-      ]
-     }
-    },
-    "html": {
-     "type": "string"
-    },
-    "reset": {
-     "type": "boolean"
-    },
-    "if_version": {
+    "from": {
+     "description": "read: first line, 300 at a time",
      "type": "integer"
     }
    },
