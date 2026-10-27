@@ -1394,9 +1394,15 @@ td.what .overlap{margin-left:8px}
   // agent, which session, when); reassigning a task changes its owner and so its holder.
   function holderOf(t) { return (t && t.owner) || null; }
 
+  // a task's deps: the keys in its deps list. Nothing checks a written task's fields, so deps that are not a list, or
+  // an entry that is not a key, read as no deps; every reader goes through here
+  function depsOf(t) {
+    return (t && Array.isArray(t.deps) ? t.deps : []).filter((k) => typeof k === 'string');
+  }
+
   // the deps not done yet; isDone(key) says whether the task with that key is done
   function unmetDeps(t, isDone) {
-    return (Array.isArray(t.deps) ? t.deps : []).filter((k) => typeof k === 'string' && !isDone(k));
+    return depsOf(t).filter((k) => !isDone(k));
   }
 
   // free to pick: to do, nobody holds it, nothing it waits on is left
@@ -3238,7 +3244,7 @@ td.what .overlap{margin-left:8px}
   function readyRow(t) {
     var unlocks = tasks
       .filter(function (o) {
-        return (o.deps || []).indexOf(t.key) >= 0;
+        return depsOf(o).indexOf(t.key) >= 0;
       })
       .map(function (o) {
         return o.key;
@@ -3686,7 +3692,7 @@ td.what .overlap{margin-left:8px}
   // a task's dependencies, the ones still unfinished marked
   function depsCell(t) {
     var u = unmet(t),
-      ds = t.deps || [];
+      ds = depsOf(t);
     return ds.length
       ? el(
           'span',
@@ -5963,7 +5969,7 @@ td.what .overlap{margin-left:8px}
       if (busy[t.id]) return 0;
       busy[t.id] = 1;
       var m = -1;
-      (t.deps || []).forEach(function (k) {
+      depsOf(t).forEach(function (k) {
         var d = graphTask(k);
         if (d) m = Math.max(m, level(d));
       });
@@ -5985,9 +5991,11 @@ td.what .overlap{margin-left:8px}
       else {
         var bc = {};
         c.forEach(function (t) {
-          var ps = (t.deps || []).map(taskByKey).filter(function (d) {
-            return d && row[d.id] != null;
-          });
+          var ps = depsOf(t)
+            .map(taskByKey)
+            .filter(function (d) {
+              return d && row[d.id] != null;
+            });
           bc[t.id] = ps.length
             ? ps.reduce(function (s, d) {
                 return s + row[d.id];
@@ -6010,7 +6018,7 @@ td.what .overlap{margin-left:8px}
         var w = knownStatus(t) === 'done' ? 0 : 1,
           b = 0,
           p = null;
-        (t.deps || []).forEach(function (k) {
+        depsOf(t).forEach(function (k) {
           var d = graphTask(k);
           if (d && best[d.id] > b) {
             b = best[d.id];
@@ -6029,7 +6037,7 @@ td.what .overlap{margin-left:8px}
     for (var x = end; x; x = prev[x]) chain.unshift(x);
     var kids = {};
     ts.forEach(function (t) {
-      (t.deps || []).forEach(function (k) {
+      depsOf(t).forEach(function (k) {
         var d = graphTask(k);
         if (d) (kids[d.id] = kids[d.id] || []).push(t.id);
       });
@@ -6047,7 +6055,7 @@ td.what .overlap{margin-left:8px}
     function up(id) {
       var o = taskById(id);
       return o
-        ? (o.deps || [])
+        ? depsOf(o)
             .map(taskByKey)
             .filter(Boolean)
             .map(function (d) {
@@ -6193,7 +6201,7 @@ td.what .overlap{margin-left:8px}
     svg.appendChild(defs);
     m.cols.forEach(function (c) {
       c.forEach(function (t) {
-        (t.deps || []).forEach(function (k) {
+        depsOf(t).forEach(function (k) {
           var d = graphTask(k);
           if (!d) return;
           var x1 = cardX(m, d) + GRAPH.W,
@@ -6899,10 +6907,10 @@ td.what .overlap{margin-left:8px}
     );
   }
   function depBlocks(t) {
-    var deps = t.deps || [];
+    var deps = depsOf(t);
     var unlocks = tasks
       .filter(function (x) {
-        return (x.deps || []).indexOf(t.key) >= 0;
+        return depsOf(x).indexOf(t.key) >= 0;
       })
       .sort(byKey);
     return [

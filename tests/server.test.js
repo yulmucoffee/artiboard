@@ -104,6 +104,19 @@ for (const backend of backends) {
       assert.equal((await call(board, 'board_get', { project: P, path: `people/${people.member.person}` })).value.data.uid, people.member.uid);
     });
 
+    // board_batch checks no field's shape, so an agent's slip can store deps or waitingOn as a string; the task rules
+    // read that as no deps, and every reader must too
+    test('a task whose deps are not a list reads as one without deps', async () => {
+      const at = new Date().toISOString(), k = K('odd');
+      assert.equal((await call(board, 'board_batch', { project: P, writes: [
+        { op: 'set', path: `tasks/${k}`, data: { key: k, title: 'odd deps', status: 'todo', deps: 'M1-1', waitingOn: 'M1-1', updatedAt: at } },
+      ] })).error, false);
+      const t = await call(board, 'board_task', { project: P, id: k });
+      await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `tasks/${k}` }] });
+      assert.equal(t.error, false, String(t.value));
+      assert.ok(!/^deps /m.test(t.value), t.value);
+    });
+
     test('lists the tools, the projects and who is connected', async () => {
       const { tools } = await board.listTools();
       assert.deepEqual(tools.map((t) => t.name).sort(), ['board_batch', 'board_claim', 'board_create_project', 'board_get', 'board_login_link',

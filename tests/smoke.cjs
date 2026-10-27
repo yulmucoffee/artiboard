@@ -856,6 +856,25 @@ const meLane = (d) => {
     'a link that opens the board on a view lets go of it in the address'
   );
 
+  console.log('# a task with deps that are not a list');
+  b = boot({
+    docs: {
+      'tasks/M1-9': { key: 'M1-9', title: 'Odd deps', status: 'todo', deps: 'M1-1', waitingOn: 'M1-1', updatedAt: T0 }
+    }
+  });
+  all.push(b);
+  await tick();
+  const drawn = { doc: b.d.querySelectorAll('#rows tr.item').length };
+  for (const v of ['kanban', 'graph']) {
+    b.d.querySelector('button[data-view="' + v + '"]').click();
+    await tick();
+    drawn[v] = b.d.querySelectorAll(v === 'kanban' ? '.col .card' : '#graphWrap .node').length;
+  }
+  ok(
+    drawn.doc > 1 && drawn.kanban > 1 && drawn.graph > 1 && !b.errors.length,
+    'one task whose deps are a string leaves every view drawn: ' + JSON.stringify(drawn) + ' ' + b.errors.join(' ')
+  );
+
   console.log('# a long done column');
   const doneDocs = {};
   for (let i = 1; i <= 35; i++)
