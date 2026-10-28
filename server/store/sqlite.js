@@ -340,7 +340,11 @@ export function openSqlite({ file, boardUrl }) {
     q('update projects set archived_at = ? where id = ?').run(at, id);
     return { id, archived_at: at };
   }
-  async function dropProject(id) { return q('delete from projects where id = ?').run(id).changes > 0; }
+  async function dropProject(actor, id) {
+    if (roleOf(actor) !== 'admin') throw new BoardError('permission_denied', 'only admins delete a project');
+    if (!q('delete from projects where id = ?').run(id).changes) throw new BoardError('not_found', `no project ${id}`);
+    return { id };
+  }
   async function projectIds() { return q('select id from projects order by id').all().map((r) => r.id); }
 
   // ---- a project's own page, when it has one ----

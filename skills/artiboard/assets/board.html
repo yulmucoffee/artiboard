@@ -139,6 +139,21 @@ header.top{display:flex;flex-direction:column;gap:14px}
 .hint{margin-left:auto;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px}
 kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--surface);color:var(--text2)}
 @media (max-width:820px){.hint{display:none}}
+/* a site admin's project menu ends the toolbar's first line, so it stays in reach while the board scrolls and does
+   not ride on whatever line the toolbar wraps to last */
+.projmenu{position:relative;margin-left:auto}
+@media (min-width:561px){
+  .toolbar:has(>.projmenu:not([hidden])){padding-right:calc(var(--col-r,0px) + 44px)}
+  .projmenu{position:absolute;top:12px;right:var(--col-r,0px)}
+}
+.kebab{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:7px;background:transparent;color:var(--muted)}
+.kebab:hover,.kebab[aria-expanded="true"]{background:var(--sunk);color:var(--ink)}
+.menu{position:absolute;right:0;top:calc(100% + 6px);z-index:6;display:flex;flex-direction:column;min-width:180px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-hi)}
+.menu button{border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:6px;font-size:13px;color:var(--ink);white-space:nowrap}
+.menu button:hover,.menu button:focus-visible{background:var(--sunk)}
+.menu .danger{color:var(--danger)}
+/* an archived board is marked the way the project list marks its card */
+.tag.shelved{border:1px dashed var(--edge);border-radius:99px;padding:0 8px}
 
 /* chips */
 .who{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:99px;padding:1px 9px;white-space:nowrap;color:var(--pc,var(--muted));background:var(--ps,var(--sunk))}
@@ -424,6 +439,11 @@ body[data-view="kanban"] .board{width:max-content;min-width:100%}
 .sheet .bar .nav{display:flex;gap:2px;margin-left:auto}
 .sheet .bar .nav button,.sheet .bar .x{border:0;background:transparent;color:var(--muted);min-width:32px;height:32px;border-radius:6px;font-size:13px;line-height:1}
 .sheet .bar .x{font-size:20px}
+/* a question that takes one answer is the same dialog, small and in the middle */
+.sheet.confirm{top:50%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:min(440px,calc(100% - 32px));max-height:calc(100% - 32px);border:1px solid var(--line);border-radius:12px;padding:0;box-shadow:var(--shadow-hi)}
+.sheet.confirm .body{gap:12px}
+.sheet.confirm .acts{display:flex;justify-content:flex-end;gap:8px}
+.btn.danger{border-color:transparent;background:var(--danger);color:var(--on-accent)}
 .sheet .bar .nav button:hover,.sheet .bar .x:hover{background:var(--sunk)}
 .sheet .bar .nav button:disabled{opacity:.4;cursor:default}
 .sheet .body{flex:1;overflow-y:auto;padding:18px 20px 12px;display:flex;flex-direction:column;gap:18px}
@@ -588,6 +608,7 @@ td.what .overlap{margin-left:8px}
       <span id="mCount"></span>
       <span id="mUpdated"></span>
       <span id="mLive" class="live" hidden></span>
+      <span id="mArchived" class="tag shelved" hidden></span>
       <span id="meWrap" style="display:inline-flex;align-items:center;gap:8px"><b id="meLabel"></b>
         <span class="seg" role="group" id="meSel"></span>
       </span>
@@ -616,6 +637,15 @@ td.what .overlap{margin-left:8px}
       <button type="button" class="newbtn" id="mineBtn" aria-pressed="false" hidden></button>
       <button type="button" class="linkbtn" id="readAll" hidden></button>
       <span class="hint" aria-hidden="true" id="hint"></span>
+      <div class="projmenu" id="projMenu" hidden>
+        <button type="button" class="kebab" id="projMenuBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="projMenuList">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="3" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="13" r="1.5" fill="currentColor"/></svg>
+        </button>
+        <div class="menu" role="menu" id="projMenuList" hidden>
+          <button type="button" role="menuitem" id="projShelve"></button>
+          <button type="button" role="menuitem" class="danger" id="projDelete"></button>
+        </div>
+      </div>
     </div>
 
     <div class="view" id="viewDoc" hidden>
@@ -1022,7 +1052,26 @@ td.what .overlap{margin-left:8px}
       pickMe: 'Pick yourself once. The board remembers it for your account.',
       viewOnly: 'View only. You can read the board but not change it.',
       notYou: '{p} is linked to another account. What you post here will still show {p}.',
-      linkedElse: 'Your account is linked to {q}. What you post here will show {p}.'
+      linkedElse: 'Your account is linked to {q}. What you post here will show {p}.',
+      pj_menu: 'Project menu',
+      pj_archive: 'Archive project',
+      pj_restore: 'Restore project',
+      pj_delete: 'Delete project',
+      pj_archived: 'Archived',
+      pj_archiveHead: 'Archive {p}?',
+      pj_archiveBody:
+        'It keeps everything and can be restored. Until then it leaves the lists agents read and takes no writes.',
+      pj_archiveGo: 'Archive',
+      pj_archiveDone: 'Archived. Restore it from this menu.',
+      pj_restoreHead: 'Restore {p}?',
+      pj_restoreBody: 'It comes back to the lists agents read and takes writes again.',
+      pj_restoreGo: 'Restore',
+      pj_restoreDone: 'Restored.',
+      pj_deleteHead: 'Delete {p}?',
+      pj_deleteBody:
+        'This permanently deletes {p} and everything on its board: {n} tasks with their threads and details, the notices and the notes. It cannot be undone.',
+      pj_deleteGo: 'Delete',
+      pj_fail: 'Could not do that ({e})'
     },
     ko: {
       loading: '불러오는 중이에요.',
@@ -1341,7 +1390,25 @@ td.what .overlap{margin-left:8px}
       pickMe: '자기 이름을 한 번 고르세요. 판이 이 계정에 기억해요.',
       viewOnly: '보기 전용이에요. 판을 읽을 수만 있어요.',
       notYou: '{p}에는 다른 계정이 연결돼 있어요. 여기서 남기는 글도 {p}(으)로 보여요.',
-      linkedElse: '이 계정은 {q}에 연결돼 있어요. 여기서 남기면 {p}(으)로 보여요.'
+      linkedElse: '이 계정은 {q}에 연결돼 있어요. 여기서 남기면 {p}(으)로 보여요.',
+      pj_menu: '프로젝트 메뉴',
+      pj_archive: '프로젝트 보관',
+      pj_restore: '프로젝트 되살리기',
+      pj_delete: '프로젝트 삭제',
+      pj_archived: '보관됨',
+      pj_archiveHead: '{p}을(를) 보관할까요?',
+      pj_archiveBody: '모든 내용이 남고 되살릴 수 있어요. 그동안 에이전트가 보는 목록에서 빠지고, 아무도 쓸 수 없어요.',
+      pj_archiveGo: '보관',
+      pj_archiveDone: '보관했어요. 이 메뉴에서 되살릴 수 있어요.',
+      pj_restoreHead: '{p}을(를) 되살릴까요?',
+      pj_restoreBody: '에이전트가 보는 목록에 다시 나오고, 다시 쓸 수 있어요.',
+      pj_restoreGo: '되살리기',
+      pj_restoreDone: '되살렸어요.',
+      pj_deleteHead: '{p}을(를) 삭제할까요?',
+      pj_deleteBody:
+        '{p}와(과) 보드에 있는 모든 것(태스크 {n}개와 그 스레드·세부 내용, 공지, 노트)을 영구히 삭제해요. 되돌릴 수 없어요.',
+      pj_deleteGo: '삭제',
+      pj_fail: '하지 못했어요 ({e})'
     }
   };
   var STR = I18N.en;
@@ -2035,6 +2102,10 @@ td.what .overlap{margin-left:8px}
     noticesAll = false,
     composing = false,
     settingsOpen = false;
+  // a site admin's project menu: the site's session (an admin's only) and this project's row of the project list
+  var siteAdmin = null,
+    projectRow = null,
+    projectAsking = false;
   var laneExpanded = {},
     nowExpanded = {};
   var searchText = '',
@@ -3004,6 +3075,9 @@ td.what .overlap{margin-left:8px}
     lv.hidden = live == null || !loaded;
     lv.textContent = live ? T('live') : T('offline');
     lv.className = 'live' + (live ? '' : ' off');
+    var arch = $('mArchived');
+    arch.hidden = !(projectRow && projectRow.archived_at);
+    arch.textContent = T('pj_archived');
     renderProgress(c);
   }
   function renderRepos() {
@@ -3068,6 +3142,11 @@ td.what .overlap{margin-left:8px}
     mb.setAttribute('aria-pressed', String(mineOnly));
     $('qResult').textContent = filtering() && loaded ? T('results', { n: tasks.filter(match).length }) : '';
     $('noticeRead').hidden = !nn;
+    $('projMenu').hidden = !projectRow;
+    $('projMenuBtn').setAttribute('aria-label', T('pj_menu'));
+    $('projMenuBtn').title = T('pj_menu');
+    $('projShelve').textContent = projectRow && projectRow.archived_at ? T('pj_restore') : T('pj_archive');
+    $('projDelete').textContent = T('pj_delete');
   }
   $('meSel').addEventListener('click', function (e) {
     var b = e.target.closest('button');
@@ -6412,6 +6491,10 @@ td.what .overlap{margin-left:8px}
   }
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
+      if (projectAsking) {
+        closeProjectDialog();
+        return;
+      }
       if (settingsOpen) {
         closeSettings();
         return;
@@ -6427,7 +6510,7 @@ td.what .overlap{margin-left:8px}
       }
       return;
     }
-    if (settingsOpen) return;
+    if (settingsOpen || projectAsking) return;
     var t = e.target,
       tag = t && t.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
@@ -6570,6 +6653,106 @@ td.what .overlap{margin-left:8px}
   function sheetBlock(title, cls, kids) {
     return el('div', { class: 'block' + (cls ? ' ' + cls : '') }, [el('h3', { text: title })].concat(kids));
   }
+  // ---------- project menu: a self-hosted site's admin archives, restores or deletes this project ----------
+  // the site answers for its projects, so the page asks it rather than its own database
+  function siteCall(method, body) {
+    return siteAdmin.api(method, '/api/projects', body).then(function (r) {
+      return r
+        .json()
+        .catch(function () {
+          return {};
+        })
+        .then(function (out) {
+          if (!r.ok) throw { code: out.code || out.error || 'error' };
+          return out;
+        });
+    });
+  }
+  function loadProject() {
+    return siteCall('GET').then(function (ps) {
+      projectRow =
+        ps.filter(function (p) {
+          return p.id === siteAdmin.project;
+        })[0] || null;
+      renderHead();
+      renderToolbar();
+    });
+  }
+  function setMenu(open) {
+    $('projMenuList').hidden = !open;
+    $('projMenuBtn').setAttribute('aria-expanded', String(open));
+    if (open) $('projShelve').focus();
+  }
+  $('projMenuBtn').addEventListener('click', function () {
+    setMenu($('projMenuList').hidden);
+  });
+  $('projMenuList').addEventListener('keydown', function (e) {
+    var items = [$('projShelve'), $('projDelete')],
+      at = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      items[(at + 1) % 2].focus();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      setMenu(false);
+      $('projMenuBtn').focus();
+    } else if (e.key === 'Tab') setMenu(false);
+  });
+  document.addEventListener('click', function (e) {
+    if (!$('projMenuList').hidden && !e.target.closest('#projMenu')) setMenu(false);
+  });
+  $('projShelve').addEventListener('click', function () {
+    askProject(projectRow.archived_at ? 'restore' : 'archive');
+  });
+  $('projDelete').addEventListener('click', function () {
+    askProject('delete');
+  });
+  // one dialog per action and one answer: archive, restore or delete
+  function askProject(kind) {
+    setMenu(false);
+    if (openId) close();
+    if (settingsOpen) closeSettings();
+    var name = config.title || siteAdmin.project,
+      err = el('p', { class: 'err', hidden: '' }),
+      go = button({ class: kind === 'delete' ? 'btn danger' : 'btn primary', text: T('pj_' + kind + 'Go') });
+    go.addEventListener('click', function () {
+      go.disabled = true;
+      var id = siteAdmin.project;
+      (kind === 'delete' ? siteCall('DELETE', { id: id }) : siteCall('PATCH', { id: id, archived: kind === 'archive' }))
+        .then(function () {
+          if (kind === 'delete') return location.assign('/');
+          closeProjectDialog();
+          toast(T('pj_' + kind + 'Done'));
+          return loadProject();
+        })
+        .catch(function (e) {
+          go.disabled = false;
+          err.textContent = T('pj_fail', { e: errText(e) });
+          err.hidden = false;
+        });
+    });
+    var cancel = button({ class: 'btn', text: T('cancel'), onclick: closeProjectDialog });
+    projectAsking = true;
+    showDialog(
+      'pjTitle',
+      closeProjectDialog,
+      [el('h2', { id: 'pjTitle', text: T('pj_' + kind + 'Head', { p: name }) }), el('span', { class: 'spacer' })],
+      [
+        el('div', { class: 'body' }, [
+          el('p', { text: T('pj_' + kind + 'Body', { p: name, n: allTasks.length }) }),
+          err,
+          el('div', { class: 'acts' }, [cancel, go])
+        ])
+      ]
+    ).classList.add('confirm');
+    cancel.focus();
+  }
+  function closeProjectDialog() {
+    projectAsking = false;
+    $('sheetRoot').textContent = '';
+    focusBack($('projMenuBtn'));
+  }
+
   // ---------- board settings: name, one line, milestone, repositories (people stay with site admins) ----------
   function openSettings() {
     if (!writable()) return;
@@ -7130,6 +7313,13 @@ td.what .overlap{margin-left:8px}
 
   function start() {
     renderAll();
+    // only a self-hosted site's runtime has a session; an artifact board is one artifact with no project to put away
+    if (window.abSession)
+      window.abSession.then(function (s) {
+        if (s.me.role !== 'admin' || !s.project) return;
+        siteAdmin = s;
+        loadProject().catch(function () {});
+      });
     claude
       .use('user')
       .then(function (u) {

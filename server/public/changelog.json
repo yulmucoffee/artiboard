@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.23.1",
+      "date": "2026-10-28",
+      "prs": [
+        59
+      ],
+      "lines": {
+        "en": [
+          "Admins archive, restore or delete a project from the ⋮ menu on its board. Each asks once before it acts.",
+          "Project cards on the list are plain links again; archived boards still wait under Archived."
+        ],
+        "ko": [
+          "관리자는 보드의 ⋮ 메뉴에서 프로젝트를 보관하거나 되살리거나 삭제해요. 하기 전에 한 번 물어봐요.",
+          "프로젝트 목록의 카드는 다시 링크만 남았고, 보관된 보드는 여전히 보관함에 있어요."
+        ]
+      }
+    },
+    {
       "version": "1.23.0",
       "date": "2026-10-28",
       "prs": [

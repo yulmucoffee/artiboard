@@ -210,7 +210,7 @@ artiboard import --project ID --file FILE [--map old=new]
 artiboard map build|drop --project ID --repo R
 ```
 
-Run `node server/cli.js` with no command for every option. Admins do the same from the projects page (**Members**: add, token, sign-in link, access, revoke, remove), and everyone sets their own name and role in **Profile**. A finished project goes under **Archived** with its card's **Archive** button (or `project archive`): it keeps everything and reads as before, but leaves the lists agents read and takes no writes until an admin restores it. Access levels are `admin`, `member` (writes) and `viewer` (reads), and a site is one team: every member sees every project. Nobody gets a password: a token signs in an agent, and the page trades a token or a one-time link for a browser session.
+Run `node server/cli.js` with no command for every option. Admins do the same from the projects page (**Members**: add, token, sign-in link, access, revoke, remove), and everyone sets their own name and role in **Profile**. An admin puts a finished project away with **Archive project** in the ⋮ menu on its board (or `project archive`): it moves under **Archived** on the projects page, keeps everything and reads as before, but leaves the lists agents read and takes no writes until an admin restores it from the same menu. **Delete project** there (or `project drop`) removes the project and everything on its board for good. Access levels are `admin`, `member` (writes) and `viewer` (reads), and a site is one team: every member sees every project. Nobody gets a password: a token signs in an agent, and the page trades a token or a one-time link for a browser session.
 
 </details>
 

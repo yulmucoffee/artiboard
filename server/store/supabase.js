@@ -47,7 +47,11 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
     if (!rows.length) throw new BoardError('not_found', `no project ${id}`);
     return rows[0];
   }
-  async function dropProject(id) { return check(await sb.from('ab_projects').delete().eq('id', id).select('id')).length > 0; }
+  async function dropProject(actor, id) {
+    if (actor != null && (await memberByUid(actor))?.role !== 'admin') throw new BoardError('permission_denied', 'only admins delete a project');
+    if (!check(await sb.from('ab_projects').delete().eq('id', id).select('id')).length) throw new BoardError('not_found', `no project ${id}`);
+    return { id };
+  }
 
   async function getPage(project) {
     const p = check(await sb.from('ab_projects').select('id').eq('id', project).maybeSingle());

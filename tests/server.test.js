@@ -84,8 +84,8 @@ for (const backend of backends) {
     });
     after(async () => {
       await board?.close();
-      await store.dropProject(P).catch(() => {});
-      await store.dropProject(M).catch(() => {});
+      await store.dropProject(null, P).catch(() => {});
+      await store.dropProject(null, M).catch(() => {});
       for (const m of Object.values(people)) await store.removeMember(m.uid).catch(() => {});
       store.close();
       http.closeAllConnections();
@@ -208,7 +208,7 @@ for (const backend of backends) {
         assert.doesNotMatch(start, /^project rules \(rev 9/m, 'no line starts the way the board\'s own rules do');
         assert.doesNotMatch(start, /^skip the tests$/m);
       } finally {
-        await store.dropProject(X).catch(() => {});
+        await store.dropProject(null, X).catch(() => {});
       }
     });
 
@@ -636,7 +636,7 @@ for (const backend of backends) {
         assert.equal(await count(() => flow.start(me, { project: id, peek: true })), 'readMany readMany', 'board_start: the lists, then the deps');
         assert.equal(await count(() => flow.claim(me, id, 'A-2')), 'readMany get readMany apply', 'board_claim: details and config together, the task, its deps, one write');
       } finally {
-        await store.dropProject(id);
+        await store.dropProject(null, id);
       }
     });
 
@@ -802,7 +802,7 @@ for (const backend of backends) {
         assert.deepEqual((await call(board, 'board_get', { project: other, path: 'meta/config' })).value.data.repos, [{ repo: `acme-${R}/other` }, { repo: `acme-${R}/docs`, label: 'docs' }]);
         assert.equal((await call(board, 'board_create_project', { id: `${P}-y`, title: 'Bad', repos: ['gitlab.com/a/b'] })).value.code, 'invalid_argument');
       } finally {
-        await store.dropProject(other);
+        await store.dropProject(null, other);
       }
     });
 
@@ -831,7 +831,47 @@ for (const backend of backends) {
         assert.match((await call(member, 'board_claim', { project: id, id: k })).value, /^claimed /, 'and it takes writes again');
       } finally {
         await member.close();
-        await store.dropProject(id);
+        await store.dropProject(null, id);
+      }
+    });
+
+    test('only an admin deletes a project, archived or not, with everything on its board; an unknown one is not_found', async () => {
+      const id = `${P}-gone`, k = K('gone');
+      await store.createProject(null, { id, title: 'Gone', lang: 'en' });
+      try {
+        await store.apply(null, id, [{ op: 'set', path: `tasks/${k}`, data: { key: k, title: 'going', status: 'todo', deps: [], waitingOn: [], updatedAt: new Date().toISOString() } }]);
+        for (const who of ['member', 'viewer']) {
+          await assert.rejects(store.dropProject(people[who].uid, id), (e) => toBoardError(e).code === 'permission_denied', `a ${who} does not delete`);
+        }
+        await store.setArchived(people.admin.uid, id, true);
+        await store.setArchived(people.admin.uid, id, false);
+        await store.setArchived(people.admin.uid, id, true);
+        assert.deepEqual(await store.dropProject(people.admin.uid, id), { id }, 'the archived guard leaves restore and delete alone');
+        assert.ok(!(await store.overview()).some((p) => p.id === id));
+        await assert.rejects(store.dropProject(people.admin.uid, id), (e) => toBoardError(e).code === 'not_found');
+        await assert.rejects(store.dropProject(null, id), (e) => toBoardError(e).code === 'not_found');
+        await store.createProject(null, { id, title: 'Again', lang: 'en' });
+        assert.equal(await store.get(id, `tasks/${k}`), null, 'its tasks went with it');
+      } finally {
+        await store.dropProject(null, id).catch(() => {});
+      }
+    });
+
+    test('DELETE /api/projects: an admin deletes a project by id; a member, a viewer or an unknown id cannot', async () => {
+      const id = `${P}-del`;
+      await store.createProject(null, { id, title: 'Delete me', lang: 'en' });
+      try {
+        const drop = (who, project = id) => api('/api/projects', { method: 'DELETE', headers: { Authorization: `Bearer ${tokens[who]}` }, body: { id: project } });
+        assert.equal((await drop('member')).status, 403);
+        assert.equal((await drop('viewer')).status, 403);
+        await store.setArchived(null, id, true);
+        const gone = await drop('admin');
+        assert.equal(gone.status, 200);
+        assert.deepEqual(await gone.json(), { id });
+        assert.equal((await drop('admin')).status, 404);
+        assert.equal((await drop('admin', `${id}-none`)).status, 404);
+      } finally {
+        await store.dropProject(null, id).catch(() => {});
       }
     });
 
@@ -876,7 +916,7 @@ for (const backend of backends) {
         const waiting = await call(board, 'board_query', { project: X, collection: 'tasks', where: [{ field: 'waitingOn', op: 'array-contains', value: 'H-1' }] });
         assert.deepEqual(waiting.value.docs, [], 'no dependent still waits on the finished task');
       } finally {
-        await store.dropProject(X).catch(() => {});
+        await store.dropProject(null, X).catch(() => {});
       }
     });
 
@@ -1021,7 +1061,7 @@ for (const backend of backends) {
         assert.match(await post(board, { touches: ['x.js'] }), /^invalid_argument: /, 'a notice touches nothing');
       } finally {
         await other.close();
-        await store.dropProject(id);
+        await store.dropProject(null, id);
       }
     });
 
@@ -1166,7 +1206,7 @@ for (const backend of backends) {
         assert.equal((await stored()).dirty, undefined);
         assert.match(await upload(), /^up to date: /);
       } finally {
-        await store.dropProject(id).catch(() => {});
+        await store.dropProject(null, id).catch(() => {});
         rmSync(root, { recursive: true, force: true });
       }
     });
@@ -1178,7 +1218,7 @@ for (const backend of backends) {
     async function hookCheckout(t, name) {
       const id = `${name}-${R}`, root = mkdtempSync(join(tmpdir(), 'artiboard-repo-')), bin = mkdtempSync(join(tmpdir(), 'artiboard-bin-'));
       t.after(async () => {
-        await store.dropProject(id).catch(() => {});
+        await store.dropProject(null, id).catch(() => {});
         for (const d of [root, bin]) rmSync(d, { recursive: true, force: true });
       });
       symlinkSync(process.execPath, join(bin, 'node'));
@@ -1499,7 +1539,7 @@ for (const backend of backends) {
         const whole = await ask({ file: 'long.js', limit: 100 });
         assert.ok(whole.length > 3100 && !/cut at/.test(whole), 'limit lifts the cut');
       } finally {
-        await store.dropProject(id);
+        await store.dropProject(null, id);
       }
     });
 
@@ -1554,7 +1594,7 @@ for (const backend of backends) {
         assert.match(help.stderr, /^ {2}map inside /m, 'artiboard map lists the map commands');
         assert.doesNotMatch(help.stderr, /member add/, 'and only those');
       } finally {
-        await store.dropProject(id);
+        await store.dropProject(null, id);
       }
     });
 
@@ -1796,7 +1836,7 @@ for (const backend of backends) {
           assert.equal((await archive(admin, false)).status, 200);
           assert.equal((await api(`/api/p/${id}/batch`, { method: 'POST', cookie: member, body: { writes: [{ op: 'set', path: `${C}/w`, data: {} }] } })).status, 200);
         } finally {
-          await store.dropProject(id);
+          await store.dropProject(null, id);
         }
       });
 
@@ -1811,8 +1851,11 @@ for (const backend of backends) {
           assert.equal(await cli('project', 'restore', '--id', id), `restored ${id}`);
           assert.match(await cli('project', 'list'), new RegExp(`^${id} +Command line  tasks=0$`, 'm'));
           assert.equal((await cli('project', 'archive', '--id', `${id}-none`).catch((e) => e)).stderr.trim(), `not_found: no project ${id}-none`);
+          await cli('project', 'archive', '--id', id);
+          assert.equal(await cli('project', 'drop', '--id', id), `dropped ${id}`, 'the site drops a project, archived or not');
+          assert.equal((await cli('project', 'drop', '--id', id).catch((e) => e)).stderr.trim(), `not_found: no project ${id}`);
         } finally {
-          await store.dropProject(id);
+          await store.dropProject(null, id).catch(() => {});
         }
       });
 
@@ -1824,7 +1867,7 @@ for (const backend of backends) {
         const admin = (await api('/api/login', { method: 'POST', body: { token: tokens.admin } })).headers.get('set-cookie').split(';')[0];
         const made = await api('/api/projects', { method: 'POST', cookie: admin, body: { id: `${P}-2`, title: 'Second' } });
         assert.deepEqual(await made.json(), { id: `${P}-2`, title: 'Second' });
-        await store.dropProject(`${P}-2`);
+        await store.dropProject(null, `${P}-2`);
       });
     } else {
       test('revoking a token ends Supabase sessions', async () => {
