@@ -139,15 +139,21 @@ header.top{display:flex;flex-direction:column;gap:14px}
 .hint{margin-left:auto;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px}
 kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--surface);color:var(--text2)}
 @media (max-width:820px){.hint{display:none}}
-/* a site admin's project menu ends the toolbar, so it stays in reach while the board scrolls */
+/* a site admin's project menu ends the toolbar's first line, so it stays in reach while the board scrolls and does
+   not ride on whatever line the toolbar wraps to last */
 .projmenu{position:relative;margin-left:auto}
-@media (min-width:821px){.hint~.projmenu{margin-left:0}}
+@media (min-width:561px){
+  .toolbar:has(>.projmenu:not([hidden])){padding-right:calc(var(--col-r,0px) + 44px)}
+  .projmenu{position:absolute;top:12px;right:var(--col-r,0px)}
+}
 .kebab{display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:7px;background:transparent;color:var(--muted)}
 .kebab:hover,.kebab[aria-expanded="true"]{background:var(--sunk);color:var(--ink)}
 .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:6;display:flex;flex-direction:column;min-width:180px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-hi)}
 .menu button{border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:6px;font-size:13px;color:var(--ink);white-space:nowrap}
 .menu button:hover,.menu button:focus-visible{background:var(--sunk)}
 .menu .danger{color:var(--danger)}
+/* an archived board is marked the way the project list marks its card */
+.tag.shelved{border:1px dashed var(--edge);border-radius:99px;padding:0 8px}
 
 /* chips */
 .who{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:99px;padding:1px 9px;white-space:nowrap;color:var(--pc,var(--muted));background:var(--ps,var(--sunk))}
@@ -602,7 +608,7 @@ td.what .overlap{margin-left:8px}
       <span id="mCount"></span>
       <span id="mUpdated"></span>
       <span id="mLive" class="live" hidden></span>
-      <span id="mArchived" class="tag" hidden></span>
+      <span id="mArchived" class="tag shelved" hidden></span>
       <span id="meWrap" style="display:inline-flex;align-items:center;gap:8px"><b id="meLabel"></b>
         <span class="seg" role="group" id="meSel"></span>
       </span>
