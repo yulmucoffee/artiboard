@@ -20,7 +20,7 @@ const SECURITY = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
-const STATUS = { invalid_argument: 400, permission_denied: 403, not_yours: 403, not_found: 404, version_conflict: 409, already_exists: 409 };
+const STATUS = { invalid_argument: 400, permission_denied: 403, not_yours: 403, not_found: 404, version_conflict: 409, already_exists: 409, archived: 409 };
 const MAX_BODY = 2 * 1048576;
 const MAP_CHUNKS = /^map\/[^/]+\/chunks$/;
 // a code map upload: up to 60 chunks of 200,000 bytes and the index
@@ -268,6 +268,10 @@ export function makeApp({ store, cfg }) {
         if (req.method === 'POST') {
           const b = (await body(req)) || {};
           return send(res, 200, await store.createProject(member.uid, { id: b.id, title: b.title, lang: b.lang || cfg.lang }));
+        }
+        if (req.method === 'PATCH') {
+          const b = (await body(req)) || {};
+          return send(res, 200, await store.setArchived(member.uid, b.id, b.archived === true));
         }
         return send(res, 200, await store.overview());
       }

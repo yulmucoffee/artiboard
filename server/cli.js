@@ -41,6 +41,8 @@ const USAGE = `usage: artiboard <command> [options]   (--env FILE loads settings
 
   project add    --id ID --title T [--lang en|ko] [--repos owner/name,...]
   project repos  --id ID --repos owner/name,...   the GitHub repos a project's work lives in ("" for none)
+  project archive --id ID                    put a project away: it leaves the lists and takes no member's writes
+  project restore --id ID                    bring an archived project back
   project drop   --id ID                     delete a project and everything on its board
   project list
 
@@ -191,9 +193,17 @@ const commands = {
       await store.apply(null, o.id, [{ op: 'update', path: 'meta/config', data: { repos }, if_version: c.version }]);
       console.log(`${o.id}: ${repos.map((r) => r.repo + (r.label ? ` (${r.label})` : '')).join(', ') || 'no repos'}`);
     },
+    async archive() {
+      need('id');
+      await store.setArchived(null, o.id, true);
+      console.log(`archived ${o.id}; restore it with artiboard project restore --id ${o.id}`);
+    },
+    async restore() { need('id'); await store.setArchived(null, o.id, false); console.log(`restored ${o.id}`); },
     async drop() { need('id'); console.log((await store.dropProject(o.id)) ? `dropped ${o.id}` : `no project ${o.id}`); },
     async list() {
-      for (const p of await store.overview()) console.log(`${p.id.padEnd(16)} ${p.title}  tasks=${p.total}${reposOf(p).length ? '  repos=' + reposOf(p).map((r) => r.repo).join(',') : ''}`);
+      for (const p of await store.overview()) {
+        console.log(`${p.id.padEnd(16)} ${p.title}  tasks=${p.total}${reposOf(p).length ? '  repos=' + reposOf(p).map((r) => r.repo).join(',') : ''}${p.archived_at ? '  archived ' + p.archived_at.slice(0, 10) : ''}`);
+      }
     },
   },
 
