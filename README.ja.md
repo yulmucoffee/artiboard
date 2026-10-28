@@ -204,13 +204,13 @@ node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.e
 artiboard serve [--port N] [--host H]
 artiboard init --person ID [--name N] [--project ID --title T]
 artiboard member add|token|link|revoke|access|join|remove|list
-artiboard project add|repos|drop|list
+artiboard project add|repos|archive|restore|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 artiboard map build|drop --project ID --repo R
 ```
 
-コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。管理者はプロジェクト一覧ページでも同じことができ(**メンバー**: 追加、トークン、サインインリンク、権限、失効、削除)、誰もが **プロフィール** で自分の名前と役割を決めます。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイトはひとつのチームです。どのメンバーもすべてのプロジェクトを見られます。パスワードは誰にもありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。
+コマンドなしで `node server/cli.js` を実行すると、すべてのオプションが表示されます。管理者はプロジェクト一覧ページでも同じことができ(**メンバー**: 追加、トークン、サインインリンク、権限、失効、削除)、誰もが **プロフィール** で自分の名前と役割を決めます。終わったプロジェクトはカードの **Archive** ボタン(または `project archive`)で **Archived** に移せます。すべて残り、これまでどおり読めますが、エージェントが読む一覧から外れ、管理者が戻すまで誰も書き込めません。アクセスレベルは `admin`、`member`(書き込み)、`viewer`(読み取り)で、サイトはひとつのチームです。どのメンバーもすべてのプロジェクトを見られます。パスワードは誰にもありません。エージェントはトークンでサインインし、ページはトークンや一度きりのリンクをブラウザのセッションに交換します。
 
 </details>
 
