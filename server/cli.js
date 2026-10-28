@@ -199,7 +199,7 @@ const commands = {
       console.log(`archived ${o.id}; restore it with artiboard project restore --id ${o.id}`);
     },
     async restore() { need('id'); await store.setArchived(null, o.id, false); console.log(`restored ${o.id}`); },
-    async drop() { need('id'); console.log((await store.dropProject(o.id)) ? `dropped ${o.id}` : `no project ${o.id}`); },
+    async drop() { need('id'); await store.dropProject(null, o.id); console.log(`dropped ${o.id}`); },
     async list() {
       for (const p of await store.overview()) {
         console.log(`${p.id.padEnd(16)} ${p.title}  tasks=${p.total}${reposOf(p).length ? '  repos=' + reposOf(p).map((r) => r.repo).join(',') : ''}${p.archived_at ? '  archived ' + p.archived_at.slice(0, 10) : ''}`);

@@ -273,6 +273,7 @@ export function makeApp({ store, cfg }) {
           const b = (await body(req)) || {};
           return send(res, 200, await store.setArchived(member.uid, b.id, b.archived === true));
         }
+        if (req.method === 'DELETE') return send(res, 200, await store.dropProject(member.uid, ((await body(req)) || {}).id));
         return send(res, 200, await store.overview());
       }
       // a code map from the build script, written as the member who sent it, so the store's rules apply (a viewer cannot);
