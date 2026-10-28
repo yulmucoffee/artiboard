@@ -79,7 +79,8 @@ function boot({
   bump = null,
   versions = false,
   failRead = [],
-  hash = ''
+  hash = '',
+  site = null
 } = {}) {
   const store = { ...seed(), ...docs },
     subs = [],
@@ -177,6 +178,27 @@ function boot({
       for (const k in storage) w.localStorage.setItem(k, storage[k]);
       w.claude = { use: (n) => Promise.resolve(n === 'db' ? { collection: coll, doc } : n === 'user' ? user : null) };
       w.HTMLElement.prototype.scrollIntoView = () => {};
+      // a self-hosted site: the runtime names the project and hands the page the signed-in member and the site's API
+      if (site) {
+        w.AB_PROJECT = 'demo';
+        w.abSession = Promise.resolve({
+          me: { role: site.role },
+          project: 'demo',
+          api: (method, url, body) => {
+            site.calls.push({ method, url, body });
+            if (method === 'PATCH') site.archivedAt = body.archived ? T0 : null;
+            const out =
+              method === 'GET'
+                ? [{ id: 'demo', title: 'Test Board', archived_at: site.archivedAt || null }]
+                : { id: 'demo' };
+            return Promise.resolve({
+              ok: !site.fail,
+              status: site.fail ? 409 : 200,
+              json: async () => (site.fail ? { code: site.fail } : out)
+            });
+          }
+        });
+      }
     }
   });
   const w = dom.window;
@@ -194,6 +216,7 @@ function boot({
     errors,
     listened,
     reads,
+    site,
     notify,
     sneak,
     key: (k) => w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, bubbles: true })),
@@ -1761,6 +1784,111 @@ const meLane = (d) => {
   await tick();
   await tick();
   ok(!b.d.querySelector('.rows.ready .btn') && /View only/.test(note(b.d)), 'a refused write turns the page read-only');
+
+  console.log('# project menu on a self-hosted site');
+  ok(b.d.getElementById('projMenu').hidden, 'a board with no site (an artifact, the demo) has no project menu');
+  for (const role of ['member', 'viewer']) {
+    const sb = boot({ user: fakeUser('u_ana', role === 'member'), site: { role, calls: [] } });
+    all.push(sb);
+    await tick();
+    ok(sb.d.getElementById('projMenu').hidden && !sb.site.calls.length, 'a ' + role + ' gets no project menu');
+  }
+  const site = { role: 'admin', calls: [] };
+  b = boot({ user: fakeUser('u_ana', true), site });
+  all.push(b);
+  await tick();
+  await tick();
+  const kebab = b.d.getElementById('projMenuBtn'),
+    items = () => [...b.d.querySelectorAll('#projMenuList [role="menuitem"]')].map((x) => x.textContent),
+    dialog = () => b.d.querySelector('.sheet.confirm'),
+    choose = (i) => b.d.querySelectorAll('#projMenuList [role="menuitem"]')[i].click(),
+    asked = () => site.calls.filter((c) => c.method !== 'GET');
+  ok(
+    !b.d.getElementById('projMenu').hidden && kebab.getAttribute('aria-haspopup') === 'menu',
+    'an admin gets the project menu'
+  );
+  ok(b.d.getElementById('projMenuList').hidden, 'the menu starts closed');
+  kebab.click();
+  ok(
+    !b.d.getElementById('projMenuList').hidden &&
+      kebab.getAttribute('aria-expanded') === 'true' &&
+      items().join('|') === 'Archive project|Delete project' &&
+      b.d.activeElement === b.d.querySelector('#projMenuList [role="menuitem"]'),
+    'the menu opens on Archive and Delete, focus on the first'
+  );
+  b.d.activeElement.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  ok(
+    b.d.getElementById('projMenuList').hidden && b.d.activeElement === kebab,
+    'Escape closes the menu, focus back on it'
+  );
+  kebab.click();
+  choose(0);
+  await tick();
+  ok(
+    !!dialog() && /restored/.test(dialog().textContent) && /agents/.test(dialog().textContent),
+    'Archive asks once, saying it keeps everything and can be restored'
+  );
+  ok(b.d.activeElement && dialog().contains(b.d.activeElement), 'focus moves into the dialog');
+  [...dialog().querySelectorAll('button')].find((x) => x.textContent === 'Cancel').click();
+  await tick();
+  ok(
+    !dialog() && !asked().length && b.d.activeElement === kebab,
+    'Cancel closes it, asks nothing and gives focus back'
+  );
+  kebab.click();
+  choose(0);
+  b.key('Escape');
+  ok(!dialog() && !asked().length, 'so does Escape');
+  kebab.click();
+  choose(0);
+  b.d.querySelector('#sheetRoot .scrim').click();
+  ok(!dialog() && !asked().length, 'and a click outside');
+  kebab.click();
+  choose(0);
+  dialog().querySelector('.btn.primary').click();
+  await tick();
+  await tick();
+  ok(
+    JSON.stringify(asked()) ===
+      JSON.stringify([{ method: 'PATCH', url: '/api/projects', body: { id: 'demo', archived: true } }]),
+    'confirming archives this project'
+  );
+  ok(
+    !dialog() &&
+      !b.d.getElementById('mArchived').hidden &&
+      /Archived/.test(b.d.getElementById('mArchived').textContent),
+    'the board stays open and says it is archived'
+  );
+  kebab.click();
+  ok(items()[0] === 'Restore project', 'the menu now offers Restore');
+  choose(0);
+  dialog().querySelector('.btn.primary').click();
+  await tick();
+  await tick();
+  ok(
+    asked()[1].body.archived === false && b.d.getElementById('mArchived').hidden,
+    'Restore brings it back and the mark goes'
+  );
+  kebab.click();
+  choose(1);
+  ok(
+    /Test Board/.test(dialog().textContent) &&
+      /4 tasks/.test(dialog().textContent) &&
+      /cannot be undone/.test(dialog().textContent),
+    'Delete names the project and its tasks, and says it cannot be undone'
+  );
+  site.fail = 'permission_denied';
+  dialog().querySelector('.btn.danger').click();
+  await tick();
+  ok(!!dialog() && /permission_denied/.test(dialog().textContent), 'a refused delete says why and stays open');
+  delete site.fail;
+  dialog().querySelector('.btn.danger').click();
+  await tick();
+  ok(
+    JSON.stringify(asked().slice(-1)) ===
+      JSON.stringify([{ method: 'DELETE', url: '/api/projects', body: { id: 'demo' } }]),
+    'confirming deletes this project'
+  );
 
   const errs = all.flatMap((x) => x.errors);
   ok(errs.length === 0, 'no script errors ' + (errs.join('; ') || ''));
