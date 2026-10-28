@@ -204,13 +204,13 @@ node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.e
 artiboard serve [--port N] [--host H]
 artiboard init --person ID [--name N] [--project ID --title T]
 artiboard member add|token|link|revoke|access|join|remove|list
-artiboard project add|repos|drop|list
+artiboard project add|repos|archive|restore|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 artiboard map build|drop --project ID --repo R
 ```
 
-Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins hacen lo mismo desde la página de proyectos (**Members**: añadir, token, enlace de inicio de sesión, nivel de acceso, revocar, quitar), y cada persona fija su propio nombre y rol en **Profile**. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y un sitio es un solo equipo: cada miembro ve todos los proyectos. Nadie recibe contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador.
+Ejecuta `node server/cli.js` sin comando para ver todas las opciones. Los admins hacen lo mismo desde la página de proyectos (**Members**: añadir, token, enlace de inicio de sesión, nivel de acceso, revocar, quitar), y cada persona fija su propio nombre y rol en **Profile**. Un proyecto terminado pasa a **Archived** con el botón **Archive** de su tarjeta (o `project archive`): lo conserva todo y se sigue leyendo, pero sale de las listas que leen los agentes y no admite escrituras hasta que un admin lo restaura. Los niveles de acceso son `admin`, `member` (escribe) y `viewer` (lee), y un sitio es un solo equipo: cada miembro ve todos los proyectos. Nadie recibe contraseña: un token inicia la sesión de un agente, y la página cambia un token o un enlace de un solo uso por una sesión del navegador.
 
 </details>
 

@@ -61,9 +61,14 @@ section{display:flex;flex-direction:column;gap:14px}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent);font-size:13px;font-weight:500}
 .linkbtn:hover{text-decoration:underline;text-underline-offset:3px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
-.card{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;color:inherit;text-decoration:none;min-width:0;box-shadow:var(--shadow)}
+.card{position:relative;display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;min-width:0;box-shadow:var(--shadow)}
 .card:hover{border-color:var(--edge)}
 .card .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+/* the whole card opens the board; its one button sits above that link */
+.card .open{color:inherit;text-decoration:none}
+.card .open::after{content:'';position:absolute;inset:0;border-radius:inherit}
+.card .shelve{position:relative;align-self:flex-start;margin-top:2px}
+.card.archived{background:var(--sunk);box-shadow:none;border-style:dashed}
 .card strong{font-size:17px}
 .card .id{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
 .card .sub{color:var(--text2);font-size:13.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -168,8 +173,9 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
     <ul class="work" id="work"></ul>
   </section>
   <section>
-    <div class="sec-head"><h2 id="hBoards"></h2></div>
+    <div class="sec-head"><h2 id="hBoards"></h2><button type="button" class="linkbtn" id="archBtn" hidden></button></div>
     <div class="grid" id="list"></div>
+    <div class="grid" id="archived" hidden></div>
   </section>
   <section id="newSec" hidden>
     <div class="sec-head"><h2 id="hNew"></h2></div>
@@ -274,7 +280,14 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
       changes: 'Updates',
       older: 'Show {n} earlier versions',
       fewer: 'Show fewer',
-      fail: 'Could not do that ({e})'
+      fail: 'Could not do that ({e})',
+      showArchived: 'Archived ({n})',
+      hideArchived: 'Hide archived',
+      archivedTag: 'archived',
+      archive: 'Archive',
+      restore: 'Restore',
+      confirmArchive:
+        'Archive {p}? It keeps everything and can be restored, but leaves the lists agents read and takes no writes until then.'
     },
     ko: {
       working: '지금 작업 중',
@@ -345,7 +358,14 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
       changes: '업데이트 내역',
       older: '이전 버전 {n}개 보기',
       fewer: '접기',
-      fail: '하지 못했어요 ({e})'
+      fail: '하지 못했어요 ({e})',
+      showArchived: '보관함 ({n})',
+      hideArchived: '보관함 닫기',
+      archivedTag: '보관됨',
+      archive: '보관',
+      restore: '되살리기',
+      confirmArchive:
+        '{p}을(를) 보관할까요? 모든 내용이 남고 되살릴 수 있어요. 그동안 에이전트가 보는 목록에서 빠지고, 아무도 쓸 수 없어요.'
     }
   };
   var L = I18N.en;
@@ -473,62 +493,98 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
     $('newSec').hidden = me.role === 'viewer';
     $('list').appendChild(el('p', { class: 'empty', text: T('loading') }));
 
+    var showArchived = false;
+    // a board's card; an admin archives a live board from it or restores an archived one
+    function card(p) {
+      var bar = el('div', { class: 'progress', 'aria-hidden': 'true' });
+      ['done', 'review', 'doing', 'blocked', 'todo'].forEach(function (k) {
+        var n = p.tasks[k] || 0;
+        if (n) bar.appendChild(el('span', { style: 'width:' + (n / p.total) * 100 + '%;background:' + BAR[k] }));
+      });
+      var nums = [T('tasks', { n: p.total })]
+        .concat(
+          ['doing', 'review', 'blocked']
+            .filter(function (k) {
+              return p.tasks[k];
+            })
+            .map(function (k) {
+              return L.st[k] + ' ' + p.tasks[k];
+            })
+        )
+        .concat([T('done', { n: p.tasks.done || 0 })]);
+      var shelve =
+        me.role === 'admin'
+          ? el('button', {
+              type: 'button',
+              class: 'btn small shelve',
+              text: p.archived_at ? T('restore') : T('archive'),
+              onclick: function (e) {
+                if (!p.archived_at && !confirm(T('confirmArchive', { p: p.title }))) return;
+                var b = e.currentTarget;
+                b.disabled = true;
+                call('PATCH', '/api/projects', { id: p.id, archived: !p.archived_at }).then(load, function (err) {
+                  b.disabled = false;
+                  alert(T('fail', { e: err.message }));
+                });
+              }
+            })
+          : null;
+      return el('div', { class: 'card' + (p.archived_at ? ' archived' : '') }, [
+        el('div', { class: 'top' }, [
+          el('a', { class: 'open', href: '/p/' + p.id }, [el('strong', { text: p.title })]),
+          el('span', { class: 'id', text: '/p/' + p.id }),
+          p.archived_at ? el('span', { class: 'tag', text: T('archivedTag') }) : null
+        ]),
+        p.subtitle ? el('p', { class: 'sub', text: p.subtitle }) : null,
+        repos(p).length
+          ? el(
+              'div',
+              { class: 'repos' },
+              repos(p).map(function (r) {
+                return el('span', { text: r });
+              })
+            )
+          : null,
+        p.total ? bar : null,
+        el(
+          'div',
+          { class: 'nums' },
+          nums
+            .map(function (t) {
+              return el('span', { text: t });
+            })
+            .concat(p.last ? [el('span', { text: T('last', { t: ago(p.last) }) })] : [])
+        ),
+        shelve
+      ]);
+    }
     function load() {
       call('GET', '/api/projects').then(
-        function (ps) {
-          renderWork(ps);
-          var list = $('list');
-          list.textContent = '';
-          if (!ps.length) {
-            list.appendChild(el('p', { class: 'empty', text: T('none') }));
-            return;
-          }
-          ps.forEach(function (p) {
-            var bar = el('div', { class: 'progress', 'aria-hidden': 'true' });
-            ['done', 'review', 'doing', 'blocked', 'todo'].forEach(function (k) {
-              var n = p.tasks[k] || 0;
-              if (n) bar.appendChild(el('span', { style: 'width:' + (n / p.total) * 100 + '%;background:' + BAR[k] }));
+        function (all) {
+          var ps = all.filter(function (p) {
+              return !p.archived_at;
+            }),
+            put = all.filter(function (p) {
+              return p.archived_at;
             });
-            var nums = [T('tasks', { n: p.total })]
-              .concat(
-                ['doing', 'review', 'blocked']
-                  .filter(function (k) {
-                    return p.tasks[k];
-                  })
-                  .map(function (k) {
-                    return L.st[k] + ' ' + p.tasks[k];
-                  })
-              )
-              .concat([T('done', { n: p.tasks.done || 0 })]);
-            list.appendChild(
-              el('a', { class: 'card', href: '/p/' + p.id }, [
-                el('div', { class: 'top' }, [
-                  el('strong', { text: p.title }),
-                  el('span', { class: 'id', text: '/p/' + p.id })
-                ]),
-                p.subtitle ? el('p', { class: 'sub', text: p.subtitle }) : null,
-                repos(p).length
-                  ? el(
-                      'div',
-                      { class: 'repos' },
-                      repos(p).map(function (r) {
-                        return el('span', { text: r });
-                      })
-                    )
-                  : null,
-                p.total ? bar : null,
-                el(
-                  'div',
-                  { class: 'nums' },
-                  nums
-                    .map(function (t) {
-                      return el('span', { text: t });
-                    })
-                    .concat(p.last ? [el('span', { text: T('last', { t: ago(p.last) }) })] : [])
-                )
-              ])
-            );
+          renderWork(ps);
+          var list = $('list'),
+            shelf = $('archived'),
+            btn = $('archBtn');
+          list.textContent = '';
+          shelf.textContent = '';
+          if (!ps.length) list.appendChild(el('p', { class: 'empty', text: T('none') }));
+          ps.forEach(function (p) {
+            list.appendChild(card(p));
           });
+          put.forEach(function (p) {
+            shelf.appendChild(card(p));
+          });
+          if (!put.length) showArchived = false;
+          btn.hidden = !put.length;
+          btn.textContent = showArchived ? T('hideArchived') : T('showArchived', { n: put.length });
+          btn.setAttribute('aria-expanded', String(showArchived));
+          shelf.hidden = !showArchived;
         },
         function (e) {
           $('list').textContent = '';
@@ -536,6 +592,10 @@ td.actions select{min-height:28px;padding:0 8px;font-size:12.5px}
         }
       );
     }
+    $('archBtn').addEventListener('click', function () {
+      showArchived = !showArchived;
+      load();
+    });
     // who has what in hand, board by board; a board nobody is working on stays out
     function renderWork(ps) {
       var rows = ps.filter(function (p) {

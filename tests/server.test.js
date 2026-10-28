@@ -806,6 +806,35 @@ for (const backend of backends) {
       }
     });
 
+    test('an archived project keeps its data and is read as before, leaves the lists and takes no member\'s writes until restored', async () => {
+      const id = `${P}-old`, repo = `acme-${R}/old`, k = K('arch'), at = new Date().toISOString();
+      await store.createProject(null, { id, title: 'Old', lang: 'en', repos: [{ repo }] });
+      const member = await connect(tokens.member);
+      try {
+        await store.apply(null, id, [{ op: 'set', path: `tasks/${k}`, data: { key: k, title: 'kept', status: 'todo', deps: [], waitingOn: [], updatedAt: at } }]);
+        assert.match((await call(member, 'board_start', { repo, ready: 0, rules: false, peek: true })).value, new RegExp(`· ${id} ·`), 'a remote finds it while it is live');
+        await assert.rejects(store.setArchived(people.member.uid, id, true), (e) => toBoardError(e).code === 'permission_denied', 'only admins archive');
+        await assert.rejects(store.setArchived(people.admin.uid, `${id}-none`, true), (e) => toBoardError(e).code === 'not_found');
+        assert.match((await store.setArchived(people.admin.uid, id, true)).archived_at, /^\d{4}-\d\d-\d\dT/);
+
+        assert.match((await store.overview()).find((p) => p.id === id)?.archived_at || '', /^\d{4}-/, 'the project list still has it, marked');
+        assert.ok(!(await call(member, 'board_projects')).value.some((p) => p.id === id), 'agents no longer list it');
+        assert.match((await call(member, 'board_start', { repo, ready: 0, rules: false, peek: true })).value, /^not_found: /, 'nor find it from a remote');
+        assert.match((await call(member, 'board_task', { project: id, id: k })).value, /kept/, 'its tasks still read');
+        assert.match((await call(member, 'board_claim', { project: id, id: k })).value, /^archived: .*restore/, 'a member\'s write says why it stopped');
+        assert.equal((await call(board, 'board_batch', { project: id, writes: [{ op: 'update', path: `tasks/${k}`, data: { title: 'x' } }] })).value.code, 'archived', 'an admin\'s too');
+        assert.equal((await store.get(id, `tasks/${k}`)).data.title, 'kept');
+        await store.apply(null, id, [{ op: 'update', path: 'meta/config', data: { subtitle: 'put away' } }]);
+
+        assert.equal((await store.setArchived(null, id, false)).archived_at, null, 'the site restores it');
+        assert.equal((await store.overview()).find((p) => p.id === id).archived_at, null);
+        assert.match((await call(member, 'board_claim', { project: id, id: k })).value, /^claimed /, 'and it takes writes again');
+      } finally {
+        await member.close();
+        await store.dropProject(id);
+      }
+    });
+
     test('posts a notice and shows it once at the next start', async () => {
       await call(board, 'board_start', { project: P, ready: 0 });
       assert.equal((await call(board, 'board_post', { project: P, text: `smoke notice ${R}` })).value, 'posted notice');
@@ -1747,6 +1776,44 @@ for (const backend of backends) {
         delete people.newcomer;
         assert.ok(!(await call(board, 'board_get', { project: P, path: 'meta/config' })).value.data.people.some((x) => x.id === `new${R}`), 'removed from the boards too');
         assert.equal((await call(board, 'board_get', { project: P, path: `people/new${R}` })).value, null);
+      });
+
+      test('admins archive and restore a project from the page; a page cannot write to an archived board', async () => {
+        const id = `${P}-shelf`;
+        await store.createProject(null, { id, title: 'Shelf', lang: 'en' });
+        try {
+          const login = async (token) => (await api('/api/login', { method: 'POST', body: { token } })).headers.get('set-cookie').split(';')[0];
+          const [admin, member] = [await login(tokens.admin), await login(tokens.member)];
+          const archive = (cookie, archived) => api('/api/projects', { method: 'PATCH', cookie, body: { id, archived } });
+          assert.equal((await archive(member, true)).status, 403, 'members do not archive');
+          const put = await archive(admin, true);
+          assert.equal(put.status, 200);
+          assert.match((await put.json()).archived_at, /^\d{4}-/);
+          assert.ok((await (await api('/api/projects', { cookie: member })).json()).find((p) => p.id === id).archived_at, 'the list marks it');
+          const write = await api(`/api/p/${id}/batch`, { method: 'POST', cookie: member, body: { writes: [{ op: 'set', path: `${C}/w`, data: {} }] } });
+          assert.equal(write.status, 409);
+          assert.equal((await write.json()).code, 'archived');
+          assert.equal((await archive(admin, false)).status, 200);
+          assert.equal((await api(`/api/p/${id}/batch`, { method: 'POST', cookie: member, body: { writes: [{ op: 'set', path: `${C}/w`, data: {} }] } })).status, 200);
+        } finally {
+          await store.dropProject(id);
+        }
+      });
+
+      test('artiboard project archive and restore, and the list says which are archived', async () => {
+        const id = `${P}-cli`;
+        const env = { ...process.env, ARTIBOARD_BACKEND: 'sqlite', ARTIBOARD_DB: join(dir, 'board.db'), BOARD_URL: BASE };
+        const cli = async (...args) => (await runCli(process.execPath, [fileURLToPath(new URL('../server/cli.js', import.meta.url)), ...args], { env })).stdout.trim();
+        await store.createProject(null, { id, title: 'Command line', lang: 'en' });
+        try {
+          assert.equal(await cli('project', 'archive', '--id', id), `archived ${id}; restore it with artiboard project restore --id ${id}`);
+          assert.match(await cli('project', 'list'), new RegExp(`^${id} +Command line  tasks=0  archived \\d{4}-\\d\\d-\\d\\d$`, 'm'));
+          assert.equal(await cli('project', 'restore', '--id', id), `restored ${id}`);
+          assert.match(await cli('project', 'list'), new RegExp(`^${id} +Command line  tasks=0$`, 'm'));
+          assert.equal((await cli('project', 'archive', '--id', `${id}-none`).catch((e) => e)).stderr.trim(), `not_found: no project ${id}-none`);
+        } finally {
+          await store.dropProject(id);
+        }
       });
 
       test('a viewer page reads but cannot write; projects are listed and created from the page', async () => {

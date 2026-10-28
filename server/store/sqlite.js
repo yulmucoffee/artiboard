@@ -14,7 +14,7 @@ import { changedFields, holderOf, mayChange } from '../tasks.js';
 
 const SCHEMA = `
 create table if not exists projects (
-  id text primary key, title text not null, created_at text not null, created_by text);
+  id text primary key, title text not null, created_at text not null, created_by text, archived_at text);
 create table if not exists docs (
   project text not null references projects (id) on delete cascade,
   collection text not null, doc_id text not null, data text not null, version integer not null default 1,
@@ -91,6 +91,8 @@ export function openSqlite({ file, boardUrl }) {
   const db = new DatabaseSync(file);
   db.exec('pragma journal_mode = wal; pragma foreign_keys = on; pragma busy_timeout = 5000;');
   db.exec(SCHEMA);
+  // a file made before projects could be archived has no archived_at; create table above leaves an old table as it is
+  if (!db.prepare("select 1 from pragma_table_info('projects') where name = 'archived_at'").get()) db.exec('alter table projects add column archived_at text');
   // Tasks written before the owner alone held a task, whose claim names someone else: the claimer held it then, so
   // they own it now and nothing changes hands. Converges: a second open finds nothing to repair.
   db.prepare(`update docs set data = json_set(data, '$.owner', json_extract(data, '$.claimedBy.who')), version = version + 1
@@ -117,7 +119,9 @@ export function openSqlite({ file, boardUrl }) {
   const memberOf = (uid) => q('select uid, person, role from members where uid = ?').get(uid);
   const roleOf = (uid) => (uid == null ? 'admin' : q('select role from members where uid = ?').get(uid)?.role || null);
   function checkProject(project) {
-    if (!q('select 1 from projects where id = ?').get(project)) throw new BoardError('not_found', `no project ${project ?? 'null'}`);
+    const p = q('select archived_at from projects where id = ?').get(project);
+    if (!p) throw new BoardError('not_found', `no project ${project ?? 'null'}`);
+    return p;
   }
 
   async function get(project, path) {
@@ -170,7 +174,10 @@ export function openSqlite({ file, boardUrl }) {
     const member = actor == null ? null : memberOf(actor);
     const role = actor == null ? 'admin' : member?.role;
     if (!role || role === 'viewer') throw new BoardError('permission_denied', 'this account cannot write');
-    checkProject(project);
+    // the site itself (actor null) still seats and renames people on an archived board, so a restore finds it current
+    if (checkProject(project).archived_at && actor != null) {
+      throw new BoardError('archived', `project ${project} is archived: it reads as before and takes writes again once an admin restores it`);
+    }
     if (!Array.isArray(writes) || !writes.length || writes.length > 100) throw new BoardError('invalid_argument', 'writes must be an array of 1 to 100 entries');
     const touched = [];
     const out = tx(() => writes.map((w, i) => {
@@ -304,7 +311,7 @@ export function openSqlite({ file, boardUrl }) {
       }
       const working = [...held.values()].sort((a, b) => b.n - a.n || a.who.localeCompare(b.who))
         .map((w) => ({ ...w, tasks: w.tasks.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 3).map(({ at, ...t }) => t) }));
-      return { id: p.id, title: cfg.title || p.title, subtitle: cfg.subtitle || null, repos: Array.isArray(cfg.repos) ? cfg.repos : [], created_at: p.created_at, tasks, total, working, last: /^\d{4}-/.test(last || '') ? last : null };
+      return { id: p.id, title: cfg.title || p.title, subtitle: cfg.subtitle || null, repos: Array.isArray(cfg.repos) ? cfg.repos : [], created_at: p.created_at, archived_at: p.archived_at, tasks, total, working, last: /^\d{4}-/.test(last || '') ? last : null };
     }).sort((a, b) => (b.last || '').localeCompare(a.last || '') || a.created_at.localeCompare(b.created_at));
   }
 
@@ -326,6 +333,13 @@ export function openSqlite({ file, boardUrl }) {
     return { id, title };
   }
 
+  async function setArchived(actor, id, archived) {
+    if (roleOf(actor) !== 'admin') throw new BoardError('permission_denied', 'only admins archive or restore a project');
+    checkProject(id);
+    const at = archived ? now() : null;
+    q('update projects set archived_at = ? where id = ?').run(at, id);
+    return { id, archived_at: at };
+  }
   async function dropProject(id) { return q('delete from projects where id = ?').run(id).changes > 0; }
   async function projectIds() { return q('select id from projects order by id').all().map((r) => r.id); }
 
@@ -430,7 +444,7 @@ export function openSqlite({ file, boardUrl }) {
   async function endSession(sid) { if (sid) q('delete from sessions where hash = ?').run(hashToken(sid)); }
 
   return {
-    kind: 'sqlite', get, query, readMany, apply, readRows, subscribe, overview, createProject, dropProject, projectIds,
+    kind: 'sqlite', get, query, readMany, apply, readRows, subscribe, overview, createProject, setArchived, dropProject, projectIds,
     getPage, setPage, resetPage, memberForToken, memberByPerson, listMembers, addMember, setRole, setMemberName, removeMember, issueToken,
     revokeTokens, loginLink, startSession, memberForSession, endSession, close: () => db.close(),
   };

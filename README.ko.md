@@ -204,13 +204,13 @@ node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.e
 artiboard serve [--port N] [--host H]
 artiboard init --person ID [--name N] [--project ID --title T]
 artiboard member add|token|link|revoke|access|join|remove|list
-artiboard project add|repos|drop|list
+artiboard project add|repos|archive|restore|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 artiboard map build|drop --project ID --repo R
 ```
 
-명령 없이 `node server/cli.js`를 실행하면 모든 옵션이 나와요. 관리자는 프로젝트 목록 화면에서도 같은 일을 하고(**멤버**: 추가, 토큰, 로그인 링크, 권한, 회수, 삭제), 모든 사람은 **프로필**에서 자기 이름과 역할을 정해요. 권한은 `admin`, `member`(쓰기), `viewer`(읽기)이고, 사이트 하나가 팀 하나라서 모든 멤버가 모든 프로젝트를 봐요. 비밀번호는 누구에게도 없어요. 에이전트는 토큰으로 로그인하고, 페이지는 토큰이나 일회용 링크를 브라우저 세션으로 바꿔 줘요.
+명령 없이 `node server/cli.js`를 실행하면 모든 옵션이 나와요. 관리자는 프로젝트 목록 화면에서도 같은 일을 하고(**멤버**: 추가, 토큰, 로그인 링크, 권한, 회수, 삭제), 모든 사람은 **프로필**에서 자기 이름과 역할을 정해요. 끝난 프로젝트는 카드의 **보관** 버튼(또는 `project archive`)으로 **보관함**에 넣어요. 모든 내용이 남고 그대로 읽히지만, 에이전트가 보는 목록에서 빠지고 관리자가 되살릴 때까지 아무도 쓸 수 없어요. 권한은 `admin`, `member`(쓰기), `viewer`(읽기)이고, 사이트 하나가 팀 하나라서 모든 멤버가 모든 프로젝트를 봐요. 비밀번호는 누구에게도 없어요. 에이전트는 토큰으로 로그인하고, 페이지는 토큰이나 일회용 링크를 브라우저 세션으로 바꿔 줘요.
 
 </details>
 

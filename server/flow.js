@@ -195,11 +195,11 @@ export function makeFlow(store) {
     return (await Promise.all(parts)).flat();
   };
 
-  // The project a repository belongs to: the one whose meta/config.repos lists it.
+  // The project a repository belongs to: the live one whose meta/config.repos lists it.
   async function projectFor(repo) {
     const want = repoName(repo);
     if (!want) throw new BoardError('invalid_argument', 'repo is not a GitHub repository: pass owner/name or the git remote URL');
-    const hits = (await store.overview()).filter((p) => reposOf(p).some((r) => repoName(r.repo) === want)).map((p) => p.id);
+    const hits = (await store.overview()).filter((p) => !p.archived_at && reposOf(p).some((r) => repoName(r.repo) === want)).map((p) => p.id);
     if (!hits.length) throw new BoardError('not_found', `no project lists ${want}; board_projects shows each project's repos`);
     if (hits.length > 1) throw new BoardError('invalid_argument', `${want} is on ${hits.join(', ')}; pass project`);
     return hits[0];

@@ -41,6 +41,12 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
     }
     return { id, title };
   }
+  async function setArchived(actor, id, archived) {
+    if (actor != null && (await memberByUid(actor))?.role !== 'admin') throw new BoardError('permission_denied', 'only admins archive or restore a project');
+    const rows = check(await sb.from('ab_projects').update({ archived_at: archived ? now() : null }).eq('id', id).select('id, archived_at'));
+    if (!rows.length) throw new BoardError('not_found', `no project ${id}`);
+    return rows[0];
+  }
   async function dropProject(id) { return check(await sb.from('ab_projects').delete().eq('id', id).select('id')).length > 0; }
 
   async function getPage(project) {
@@ -116,7 +122,7 @@ export function openSupabase({ url, secretKey, publishableKey, boardUrl }) {
 
   return {
     kind: 'supabase', browser: { supabaseUrl: url, supabaseKey: publishableKey }, get, query, readMany, apply, overview, projectIds,
-    createProject, dropProject, getPage, setPage, resetPage, memberForToken, memberForJwt, memberByPerson, listMembers,
+    createProject, setArchived, dropProject, getPage, setPage, resetPage, memberForToken, memberForJwt, memberByPerson, listMembers,
     addMember, setRole, setMemberName, removeMember, issueToken, revokeTokens, loginLink, close() {},
   };
 }

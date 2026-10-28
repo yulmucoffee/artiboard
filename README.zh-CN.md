@@ -204,13 +204,13 @@ node "$HOME/.claude/skills/artiboard/scripts/codemap.mjs" --site https://board.e
 artiboard serve [--port N] [--host H]
 artiboard init --person ID [--name N] [--project ID --title T]
 artiboard member add|token|link|revoke|access|join|remove|list
-artiboard project add|repos|drop|list
+artiboard project add|repos|archive|restore|drop|list
 artiboard page show|set|reset --project ID
 artiboard import --project ID --file FILE [--map old=new]
 artiboard map build|drop --project ID --repo R
 ```
 
-不带命令运行 `node server/cli.js` 可查看全部选项。管理员在项目列表页也能做同样的事（**成员**：添加、令牌、登录链接、访问级别、吊销、移除），每个人都在 **个人资料** 里设置自己的显示名和角色。访问级别有 `admin`、`member`（可写）和 `viewer`（只读），一个站点就是一个团队：每个成员都能看到所有项目。没有人需要密码：令牌让 agent 登录，页面则用令牌或一次性链接换取浏览器会话。
+不带命令运行 `node server/cli.js` 可查看全部选项。管理员在项目列表页也能做同样的事（**成员**：添加、令牌、登录链接、访问级别、吊销、移除），每个人都在 **个人资料** 里设置自己的显示名和角色。完成的项目可用卡片上的 **Archive** 按钮（或 `project archive`）移入 **Archived**：所有内容都保留、照常可读，但会从 agent 读取的列表中消失，在管理员恢复之前任何人都无法写入。访问级别有 `admin`、`member`（可写）和 `viewer`（只读），一个站点就是一个团队：每个成员都能看到所有项目。没有人需要密码：令牌让 agent 登录，页面则用令牌或一次性链接换取浏览器会话。
 
 </details>
 

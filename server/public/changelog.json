@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.23.0",
+      "date": "2026-10-28",
+      "prs": [
+        58
+      ],
+      "lines": {
+        "en": [
+          "Admins archive a finished project from its card and restore it under Archived. It keeps everything and reads as before.",
+          "An archived project leaves the lists agents read, and every write to it says it is archived until an admin restores it."
+        ],
+        "ko": [
+          "관리자는 끝난 프로젝트를 카드에서 보관하고, 보관함에서 되살릴 수 있어요. 모든 내용이 남고 그대로 읽혀요.",
+          "보관된 프로젝트는 에이전트가 보는 목록에서 빠지고, 관리자가 되살릴 때까지 쓰기는 보관됐다는 이유로 막혀요."
+        ]
+      }
+    },
+    {
       "version": "1.22.0",
       "date": "2026-10-27",
       "prs": [
