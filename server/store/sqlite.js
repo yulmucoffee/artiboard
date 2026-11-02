@@ -12,6 +12,10 @@ import {
 } from '../core.js';
 import { changedFields, holderOf, mayChange } from '../tasks.js';
 
+// the fields the everyday tools filter tasks on; the query text below spells them the same way so their indexes apply.
+// Each index ends in doc_id, the order every query returns, so a page of one status or one owner reads only that page.
+const INDEXED = ['status', 'key', 'owner'];
+
 const SCHEMA = `
 create table if not exists projects (
   id text primary key, title text not null, created_at text not null, created_by text, archived_at text);
@@ -22,10 +26,8 @@ create table if not exists docs (
   primary key (project, collection, doc_id));
 create index if not exists docs_changed on docs (project, updated_at);
 create index if not exists docs_updated on docs (updated_at);
--- the fields the everyday tools filter tasks on; the query text below spells them the same way so these indexes apply
-create index if not exists docs_status on docs (project, collection, json_extract(data, '$."status"'));
-create index if not exists docs_key on docs (project, collection, json_extract(data, '$."key"'));
-create index if not exists docs_owner on docs (project, collection, json_extract(data, '$."owner"'));
+${INDEXED.map((f) => `drop index if exists docs_${f};
+create index if not exists docs_${f}_id on docs (project, collection, json_extract(data, '$."${f}"'), doc_id);`).join('\n')}
 create table if not exists members (
   uid text primary key, person text not null unique, name text, email text unique,
   role text not null default 'member', created_at text not null);
@@ -52,6 +54,11 @@ const same = (lv, lt, rv, rt) => `(${kind(lt)} = ${kind(rt)} and (${lt} in ('nul
 // field names are checked against [A-Za-z0-9_.], so the path can sit in the SQL text
 const jpath = (field) => `'$.${checkField(field).map((k) => `"${k}"`).join('.')}'`;
 
+const listOf = (v) => (Array.isArray(v) ? v : [v]);
+const strings = (vs) => vs.length > 0 && vs.every((x) => typeof x === 'string');
+// an indexed field in a list of strings: the index finds the rows, in no doc_id order
+const indexedIn = (w) => w.op === 'in' && INDEXED.includes(w.field) && strings(listOf(w.value));
+
 function condition(w, params) {
   const p = jpath(w.field), ex = `json_extract(data, ${p})`, ty = `json_type(data, ${p})`, v = w.value;
   const equal = () => { params.push(JSON.stringify([v])); return `exists (select 1 from json_each(?) r where ${same(ex, ty, 'r.value', 'r.type')})`; };
@@ -72,8 +79,8 @@ function condition(w, params) {
       params.push(JSON.stringify([v]));
       return `(${ty} = 'array' and exists (select 1 from json_each(data, ${p}) l, json_each(?) r where ${same('l.value', 'l.type', 'r.value', 'r.type')}))`;
     case 'in': {
-      const vs = Array.isArray(v) ? v : [v];
-      if (vs.length && vs.every((x) => typeof x === 'string')) { params.push(JSON.stringify(vs)); return `(${typed('')} and ${ex} in (select value from json_each(?)))`; }
+      const vs = listOf(v);
+      if (strings(vs)) { params.push(JSON.stringify(vs)); return `(${typed('')} and ${ex} in (select value from json_each(?)))`; }
       params.push(JSON.stringify(vs));
       return `exists (select 1 from json_each(?) r where ${same(ex, ty, 'r.value', 'r.type')})`;
     }
@@ -151,7 +158,11 @@ export function openSqlite({ file, boardUrl }) {
     });
     if (after != null && !ord.length) { conds.push('doc_id > ?'); params.push(String(after)); }
     const n = Math.max(1, Math.min(Number(limit) || 20, 200));
-    const sql = `select * from docs where ${conds.join(' and ')} order by ${[...ord, 'doc_id'].join(', ')} limit ${n}`;
+    // An indexed field equal to one value comes out of its index in doc_id order, a page at a time. One in a list
+    // does not, and with no statistics SQLite would rather walk the whole collection in doc_id order than sort:
+    // 100 keys on a board of 20,000 tasks read every task. A + on doc_id has it take the index and sort what matches.
+    const byId = (where || []).some(indexedIn) ? '+doc_id' : 'doc_id';
+    const sql = `select * from docs where ${conds.join(' and ')} order by ${[...ord, byId].join(', ')} limit ${n}`;
     return q(sql).all(...params).map(docOut);
   }
 

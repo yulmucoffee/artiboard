@@ -7383,6 +7383,7 @@ td.what .overlap{margin-left:8px}
         indexTasks();
         findOverlaps();
         loaded = true;
+        var opening = first;
         if (first) {
           first = false;
           // a browser opening the board for the first time treats the current state as seen; only later changes count as new
@@ -7400,7 +7401,9 @@ td.what .overlap{margin-left:8px}
         }
         renderAll();
         healWaiting();
-        if (!openId && location.hash.length > 1) followHash(true);
+        // the address the board opened at, once its tasks are here; after that only a change of address moves the
+        // board, so a task changing later leaves the view and the sheet as they are
+        if (opening && !openId && location.hash.length > 1) followHash(true);
       }
       db.collection('notices')
         .orderBy('at', 'desc')
