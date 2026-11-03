@@ -59,7 +59,7 @@ La skill pasa a ser `/artiboard:artiboard`.
 
 ## Demo
 
-**[Abrir la demo en vivo →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** Un equipo de tres personas que construye una app de recetas: la página real del tablero con datos de ejemplo, así que toma una tarea, escribe en un hilo, abre el mapa de código o cambia a 한국어. Dos actualizaciones de agentes llegan solas.
+**[Abrir la demo en vivo →](https://claude.ai/artifact/AsDhgdPSZ3t1tdj6bv9hwt)** Un equipo de tres personas que construye una app de recetas: la página real del tablero con datos de ejemplo, así que toma una tarea, escribe en un hilo, abre el mapa de código o cambia a 한국어. Dos actualizaciones de agentes llegan solas.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">

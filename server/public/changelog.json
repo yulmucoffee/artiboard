@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.23.3",
+      "date": "2026-11-03",
+      "prs": [
+        61
+      ],
+      "lines": {
+        "en": [
+          "The live demo linked from the README moved to a new address, with the current board page."
+        ],
+        "ko": [
+          "README의 라이브 데모가 새 주소로 옮겼어요. 지금의 보드 페이지예요."
+        ]
+      }
+    },
+    {
       "version": "1.23.2",
       "date": "2026-11-02",
       "prs": [

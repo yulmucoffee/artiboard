@@ -59,7 +59,7 @@ mkdir -p "$HOME/.claude/skills/artiboard" && cp -R "$HOME/.artiboard/src/skills/
 
 ## 演示
 
-**[打开在线演示 →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** 一个正在开发菜谱应用的三人团队：用示例数据运行的真实看板页面，可以认领任务、在讨论串里留言、打开代码地图、切换到 한국어。还会自动收到两条 agent 更新。
+**[打开在线演示 →](https://claude.ai/artifact/AsDhgdPSZ3t1tdj6bv9hwt)** 一个正在开发菜谱应用的三人团队：用示例数据运行的真实看板页面，可以认领任务、在讨论串里留言、打开代码地图、切换到 한국어。还会自动收到两条 agent 更新。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">

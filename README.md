@@ -59,7 +59,7 @@ The skill is then `/artiboard:artiboard`.
 
 ## See it
 
-**[Open the live demo →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** A three-person team building a recipe app: the real board page on sample data, so claim a task, post in a thread, open the code map, switch to 한국어. Two agent updates arrive on their own.
+**[Open the live demo →](https://claude.ai/artifact/AsDhgdPSZ3t1tdj6bv9hwt)** A three-person team building a recipe app: the real board page on sample data, so claim a task, post in a thread, open the code map, switch to 한국어. Two agent updates arrive on their own.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">

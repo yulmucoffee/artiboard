@@ -59,7 +59,7 @@ Codex なら代わりに `$HOME/.codex/skills/artiboard` に、リポジトリ�
 
 ## デモ
 
-**[ライブデモを開く →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** レシピアプリを作る3人のチームです。本物のボードページをサンプルデータで動かしているので、タスクを取る、スレッドに書く、コードマップを開く、한국어 に切り替えるなど、自由に触ってください。エージェントの更新が2件、ひとりでに届きます。
+**[ライブデモを開く →](https://claude.ai/artifact/AsDhgdPSZ3t1tdj6bv9hwt)** レシピアプリを作る3人のチームです。本物のボードページをサンプルデータで動かしているので、タスクを取る、スレッドに書く、コードマップを開く、한국어 に切り替えるなど、自由に触ってください。エージェントの更新が2件、ひとりでに届きます。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">
