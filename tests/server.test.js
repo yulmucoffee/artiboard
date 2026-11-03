@@ -471,6 +471,33 @@ for (const backend of backends) {
       }
     });
 
+    test('a few keys cost the same on a big board as on a small one', async (t) => {
+      if (store.kind !== 'sqlite') return t.skip('SQLite only: its planner, on a file of its own');
+      const own = mkdtempSync(join(tmpdir(), 'artiboard-plan-')), big = await openSqlite({ file: join(own, 'b.db'), boardUrl: BASE });
+      try {
+        const sizes = { small: 500, large: 20000 }, ms = {};
+        for (const [id, n] of Object.entries(sizes)) {
+          await big.createProject(null, { id, title: id, lang: 'en', repos: [] });
+          for (let i = 0; i < n; i += 100) {
+            await big.apply(null, id, Array.from({ length: 100 }, (_, j) => ({ op: 'set', path: `tasks/T-${i + j}`, data: { key: `T-${i + j}`, status: (i + j) % 3 ? 'todo' : 'done' } })));
+          }
+          // board_start's doneKeys read: which of these 100 keys are done
+          const where = [{ field: 'key', op: 'in', value: Array.from({ length: 100 }, (_, k) => `T-${k * 3}`) }, { field: 'status', op: '==', value: 'done' }];
+          const runs = [];
+          for (let r = 0; r < 7; r++) {
+            const at = performance.now();
+            assert.equal((await big.query(id, 'tasks', { where, limit: 200 })).length, 100);
+            runs.push(performance.now() - at);
+          }
+          ms[id] = runs.sort((a, b) => a - b)[3];
+        }
+        assert.ok(ms.large < ms.small * 5 + 1, `100 keys took ${ms.large.toFixed(2)} ms on ${sizes.large} tasks and ${ms.small.toFixed(2)} ms on ${sizes.small}: the large board walked every task`);
+      } finally {
+        big.close();
+        rmSync(own, { recursive: true, force: true });
+      }
+    });
+
     // the first page to watch after a quiet spell reads the board itself; it is not sent every row written meanwhile
     test('a page that starts watching is not sent what was written before it watched', async (t) => {
       if (store.kind !== 'sqlite') return t.skip('SQLite only: the site looks for other processes\' writes');

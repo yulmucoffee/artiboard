@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.23.2",
+      "date": "2026-11-02",
+      "prs": [
+        60
+      ],
+      "lines": {
+        "en": [
+          "Big self-hosted boards on SQLite start an agent's session faster: board_start on 20,000 tasks takes 43 ms instead of 900.",
+          "A board opened at #graph no longer jumps back to the graph when a task changes after you moved to another view."
+        ],
+        "ko": [
+          "SQLite로 띄운 큰 보드에서 에이전트 세션 시작이 빨라져요: 태스크 2만 개에서 board_start가 900ms 대신 43ms예요.",
+          "#graph 주소로 연 보드에서 다른 화면으로 옮긴 뒤 태스크가 바뀌어도 그래프로 되돌아가지 않아요."
+        ]
+      }
+    },
+    {
       "version": "1.23.1",
       "date": "2026-10-28",
       "prs": [

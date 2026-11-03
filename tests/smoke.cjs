@@ -174,6 +174,11 @@ function boot({
     pretendToBeVisual: true,
     beforeParse(w) {
       w.Math.random = () => 0;
+      const later = w.setTimeout.bind(w),
+        every = w.setInterval.bind(w);
+      w.setTimeout = (f, ms, ...a) => later(f, (ms || 0) / FAST, ...a);
+      w.setInterval = (f, ms, ...a) => every(f, (ms || 0) / FAST, ...a);
+      w.requestAnimationFrame = (f) => later(() => f(w.performance.now()), 16 / FAST);
       if (me) w.localStorage.setItem('ab-me', me);
       for (const k in storage) w.localStorage.setItem(k, storage[k]);
       w.claude = { use: (n) => Promise.resolve(n === 'db' ? { collection: coll, doc } : n === 'user' ? user : null) };
@@ -233,8 +238,12 @@ const fakeUser = (id, write) => ({
   isOwner: async () => false,
   canEdit: async () => false
 });
-const tick = () => new Promise((r) => setTimeout(r, 50));
-const heal = () => new Promise((r) => setTimeout(r, 600));
+// The page's timers run FAST times quicker than it asks, so heal waits out its 500 ms pause before it repairs
+// waitingOn in a tenth of that. A tick is real work, not a timer: a write, its snapshot and the frame that draws it.
+const FAST = 10;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const tick = () => wait(20);
+const heal = () => wait(500 / FAST + 50);
 let failed = 0;
 const ok = (c, m) => {
   console.log((c ? 'ok   ' : 'FAIL ') + m);
@@ -875,6 +884,11 @@ const meLane = (d) => {
   b.w.location.hash = '#graph';
   await tick();
   ok(b.d.body.dataset.view === 'graph' && b.w.location.hash === '#graph', 'a view named later opens and stays named');
+  b.d.querySelector('button[data-view="kanban"]').click();
+  b.sneak('tasks/M1-3', (c) => ({ ...c, title: 'Screen, renamed' }));
+  b.notify();
+  await tick();
+  ok(b.d.body.dataset.view === 'kanban', 'a task changing later leaves the view you moved to');
   b = boot({ hash: '#kanban' });
   all.push(b);
   await tick();
