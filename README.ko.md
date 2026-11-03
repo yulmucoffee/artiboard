@@ -59,7 +59,7 @@ Codex라면 `$HOME/.codex/skills/artiboard`에 복사하고, 저장소 하나에
 
 ## 미리 보기
 
-**[라이브 데모 열기 →](https://claude.ai/artifact/5zENFyGDJbEjey68J6t1bY)** 레시피 앱을 만드는 3인 팀이에요. 실제 보드 페이지를 예시 데이터로 돌리니, 태스크를 집고, 스레드에 글을 남기고, 코드 맵을 열고, 한국어로 바꿔 보세요. 에이전트 업데이트 두 개가 저절로 들어와요.
+**[라이브 데모 열기 →](https://claude.ai/artifact/AsDhgdPSZ3t1tdj6bv9hwt)** 레시피 앱을 만드는 3인 팀이에요. 실제 보드 페이지를 예시 데이터로 돌리니, 태스크를 집고, 스레드에 글을 남기고, 코드 맵을 열고, 한국어로 바꿔 보세요. 에이전트 업데이트 두 개가 저절로 들어와요.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/graph-dark.png">
