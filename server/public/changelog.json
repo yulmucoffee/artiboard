@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.23.5",
+      "date": "2026-11-05",
+      "prs": [
+        63
+      ],
+      "lines": {
+        "en": [
+          "The page tests no longer fail on a busy machine: they wait until the board has started and repaired waitingOn instead of a fixed time."
+        ],
+        "ko": [
+          "바쁜 머신에서 페이지 테스트가 더는 실패하지 않아요. 정해진 시간 대신 보드가 시작하고 waitingOn을 고칠 때까지 기다려요."
+        ]
+      }
+    },
+    {
       "version": "1.23.3",
       "date": "2026-11-03",
       "prs": [
