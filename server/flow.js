@@ -626,6 +626,10 @@ export function makeFlow(store) {
       out.push({ op: 'set', path: `tasks/${id}/messages/${stampId(at, me)}`, if_absent: true,
         data: { at, author: me, kind: 'agent', type: 'update', text: `changed ${[...new Set(fields)].join(', ')} (override)` } });
     }
+    // the thread lines go in the same write as the change, so the record never misses an override
+    if (out.length > 100) {
+      throw new BoardError('invalid_argument', `override adds a thread line to each of the ${notes.size} tasks it changes: ${writes.length} writes and ${notes.size} lines is more than one call takes (100); split the batch`);
+    }
     return apply(member, project, out);
   }
 
