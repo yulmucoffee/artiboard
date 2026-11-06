@@ -2,6 +2,21 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.23.6",
+      "date": "2026-11-06",
+      "prs": [
+        64
+      ],
+      "lines": {
+        "en": [
+          "A selected card at the top of a kanban column shows its whole outline, no longer cut off under the column heading."
+        ],
+        "ko": [
+          "칸반 칸 맨 위의 카드를 고르면 테두리가 칸 제목에 가려지지 않고 다 보여요."
+        ]
+      }
+    },
+    {
       "version": "1.23.5",
       "date": "2026-11-05",
       "prs": [

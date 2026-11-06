@@ -342,7 +342,7 @@ body[data-view="kanban"] .board{width:max-content;min-width:100%}
 .cols{display:flex;gap:12px;align-items:flex-start;width:max-content;padding-inline-end:max(16px,env(safe-area-inset-right,0px))}
 .col{flex:none;width:var(--colw);background:var(--sunk);border-radius:12px;display:flex;flex-direction:column}
 .col.two{width:calc(var(--colw) * 2 + 8px)}
-.col h3{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--tb-h,0px));z-index:2;display:flex;gap:8px;align-items:center;padding:10px 8px 8px 14px;font-size:13px;background:var(--sunk);border-radius:12px 12px 0 0}
+.col h3{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--tb-h,0px));z-index:2;display:flex;gap:8px;align-items:center;padding:10px 8px 4px 14px;font-size:13px;background:var(--sunk);border-radius:12px 12px 0 0}
 .col h3 .state{font-size:13px;color:var(--ink)}
 .col h3 .n{color:var(--muted);font-weight:500;font-size:12.5px}
 .col h3 .tools{margin-left:auto;display:flex;gap:2px}
@@ -352,7 +352,9 @@ body[data-view="kanban"] .board{width:max-content;min-width:100%}
 .colbtn.sure{color:var(--danger);background:var(--danger-soft)}
 .col.arch{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
 .col.arch h3{background:var(--bg)}
-.cards{display:flex;flex-direction:column;gap:6px;padding:0 8px 8px}
+/* the space between a column heading and its first card belongs to the cards, so the sticky heading does not cover a
+   selected card's outline */
+.cards{display:flex;flex-direction:column;gap:6px;padding:4px 8px 8px}
 .cards>.empty{padding:4px 4px 8px}
 .cards>.arch-hint{padding:0 4px 4px;font-size:12px;line-height:1.5}
 /* two equal tracks that never grow past the column: a title with a long path or link in it wraps inside its card
