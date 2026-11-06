@@ -40,6 +40,10 @@ create table if not exists codes (
   hash text primary key, uid text not null references members (uid) on delete cascade, expires_at integer not null);
 -- leases kept two viewers from linking one person at once; the people/ guard now lets a member link only their own
 drop table if exists leases;
+-- deletes, kept a while so another process watching the file announces them; the row itself is gone
+create table if not exists gone (
+  project text not null references projects (id) on delete cascade, collection text not null, doc_id text not null, at text not null);
+create index if not exists gone_at on gone (at);
 create table if not exists pages (
   project text primary key references projects (id) on delete cascade, html text not null, version integer not null,
   updated_at text not null, updated_by text);
@@ -110,7 +114,8 @@ export function openSqlite({ file, boardUrl }) {
   const q = (sql) => db.prepare(sql);
 
   // updated_at strictly increases, so "everything after the newest row I saw" never skips a row
-  let last = q('select max(updated_at) m from docs').get().m || '';
+  const newest = () => q('select max(m) m from (select max(updated_at) m from docs union all select max(at) from gone)').get().m;
+  let last = newest() || '';
   function stamp() {
     let at = now();
     if (at <= last) at = new Date(Date.parse(last) + 1).toISOString();
@@ -209,7 +214,11 @@ export function openSqlite({ file, boardUrl }) {
       const at = stamp();
       if (w.op === 'delete') {
         q('delete from docs where project = ? and collection = ? and doc_id = ?').run(project, c, d);
-        if (cur) touched.push({ collection: c, doc_id: d, gone: true });
+        if (cur) {
+          q('insert into gone (project, collection, doc_id, at) values (?, ?, ?, ?)').run(project, c, d, at);
+          q('delete from gone where at < ?').run(new Date(Date.parse(at) - 36e5).toISOString());
+          touched.push({ collection: c, doc_id: d, gone: true });
+        }
         return { path: w.path, deleted: !!cur };
       }
       let data;
@@ -277,17 +286,21 @@ export function openSqlite({ file, boardUrl }) {
   // through a cheap look for newer rows every two seconds, only while someone is watching. The first watcher after a
   // quiet spell reads the board itself, so the look starts from the newest row there is, not from the last one sent.
   let seen = last, watching = 0, timer = null;
+  // A delete leaves a row in gone for an hour, read in the same time order as the documents: many polls, and a page
+  // opened later reads the board itself.
   function poll() {
-    for (const r of q('select * from docs where updated_at > ? order by updated_at limit 500').all(seen)) {
+    const rows = q(`select project, collection, doc_id, data, version, updated_at from docs where updated_at > ?
+      union all select project, collection, doc_id, null, null, at from gone where at > ? order by updated_at limit 500`).all(seen, seen);
+    for (const r of rows) {
       seen = r.updated_at;
       if (seen > last) last = seen;
-      changes.emit(r.project, rowOut(r));
+      changes.emit(r.project, r.data == null ? { collection: r.collection, doc_id: r.doc_id, gone: true } : rowOut(r));
     }
   }
   function subscribe(project, fn) {
     changes.on(project, fn);
     if (!watching++) {
-      seen = q('select max(updated_at) t from docs').get().t || seen;
+      seen = newest() || seen;
       timer = setInterval(poll, 2000);
       timer.unref();
     }

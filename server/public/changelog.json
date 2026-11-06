@@ -2,6 +2,23 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.23.4",
+      "date": "2026-11-05",
+      "prs": [
+        62
+      ],
+      "lines": {
+        "en": [
+          "On a self-hosted SQLite board, a document deleted from the command line while the site runs now disappears from open pages without a reload.",
+          "An agent's override batch that is too long once a thread line is added to each task now says so and how to fix it, instead of a puzzling size error."
+        ],
+        "ko": [
+          "SQLite로 띄운 보드에서, 사이트가 도는 중에 명령줄로 지운 문서가 열린 페이지에서도 새로고침 없이 사라져요.",
+          "에이전트의 override 배치가 태스크마다 붙는 스레드 줄 때문에 너무 길어지면, 알 수 없는 크기 오류 대신 그 이유와 고치는 법을 알려 줘요."
+        ]
+      }
+    },
+    {
       "version": "1.23.3",
       "date": "2026-11-03",
       "prs": [
