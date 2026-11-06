@@ -471,6 +471,29 @@ for (const backend of backends) {
       }
     });
 
+    test('a delete from another process reaches open pages', async (t) => {
+      if (store.kind !== 'sqlite') return t.skip('SQLite only: two processes on one file');
+      await store.apply(null, P, [{ op: 'set', path: `${C}/doomed-${R}`, data: { n: 1 } }]);
+      const other = await openSqlite({ file: join(dir, 'board.db'), boardUrl: BASE });
+      const seen = [];
+      const stop = store.subscribe(P, (row) => seen.push(`${row.gone ? 'gone ' : ''}${row.collection}/${row.doc_id}`));
+      try {
+        await other.apply(null, P, [{ op: 'delete', path: `${C}/doomed-${R}` }]);
+        await new Promise((r) => setTimeout(r, 2600));
+        assert.ok(seen.includes(`gone ${C}/doomed-${R}`), `the other process's delete was announced (${seen.join(', ')})`);
+      } finally {
+        stop?.();
+        other.close();
+      }
+    });
+
+    test('an override batch too long for its thread lines says so', async () => {
+      const writes = Array.from({ length: 60 }, (_, i) => ({ op: 'update', path: `tasks/${K(`ob${i}`)}`, data: { due: '2026-12-01' } }));
+      const r = await call(board, 'board_batch', { project: P, override: true, writes });
+      assert.equal(r.value.code, 'invalid_argument');
+      assert.match(r.value.message, /override/, `the agent learns the override lines are what overflowed (${r.value.message})`);
+    });
+
     test('a few keys cost the same on a big board as on a small one', async (t) => {
       if (store.kind !== 'sqlite') return t.skip('SQLite only: its planner, on a file of its own');
       const own = mkdtempSync(join(tmpdir(), 'artiboard-plan-')), big = await openSqlite({ file: join(own, 'b.db'), boardUrl: BASE });

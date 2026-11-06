@@ -88,7 +88,9 @@ function boot({
     errors = [],
     listened = [],
     reads = [],
-    vers = {};
+    vers = {},
+    pending = new Set();
+  let page;
   const notify = () => subs.slice().forEach((s) => s());
   const put = (p, f, o) => {
     if (deny) return Promise.reject({ code: 'invalid_argument' });
@@ -97,7 +99,7 @@ function boot({
     writes.push(p);
     store[p] = f(store[p]);
     vers[p] = (vers[p] || 0) + 1;
-    setTimeout(notify, 0);
+    page.setTimeout(notify, 0);
     return Promise.resolve();
   };
   function snapColl(p, o) {
@@ -173,12 +175,20 @@ function boot({
     url: 'https://board.test/' + hash,
     pretendToBeVisual: true,
     beforeParse(w) {
+      page = w;
       w.Math.random = () => 0;
       const later = w.setTimeout.bind(w),
+        clear = w.clearTimeout.bind(w),
         every = w.setInterval.bind(w);
-      w.setTimeout = (f, ms, ...a) => later(f, (ms || 0) / FAST, ...a);
+      // settle() waits for the page's own timers and frames, and the snapshots on their way to it
+      w.setTimeout = (f, ms, ...a) => {
+        const id = later(() => (pending.delete(id), f(...a)), (ms || 0) / FAST);
+        pending.add(id);
+        return id;
+      };
+      w.clearTimeout = (id) => (pending.delete(id), clear(id));
       w.setInterval = (f, ms, ...a) => every(f, (ms || 0) / FAST, ...a);
-      w.requestAnimationFrame = (f) => later(() => f(w.performance.now()), 16 / FAST);
+      w.requestAnimationFrame = (f) => w.setTimeout(() => f(w.performance.now()), 16);
       if (me) w.localStorage.setItem('ab-me', me);
       for (const k in storage) w.localStorage.setItem(k, storage[k]);
       w.claude = { use: (n) => Promise.resolve(n === 'db' ? { collection: coll, doc } : n === 'user' ? user : null) };
@@ -224,6 +234,7 @@ function boot({
     site,
     notify,
     sneak,
+    busy: () => pending.size > 0,
     key: (k) => w.document.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, bubbles: true })),
     pick: (id) => {
       const x = w.document.querySelector('#meSel [data-me="' + id + '"]');
@@ -238,12 +249,19 @@ const fakeUser = (id, write) => ({
   isOwner: async () => false,
   canEdit: async () => false
 });
-// The page's timers run FAST times quicker than it asks, so heal waits out its 500 ms pause before it repairs
-// waitingOn in a tenth of that. A tick is real work, not a timer: a write, its snapshot and the frame that draws it.
+// The page's timers run FAST times quicker than it asks. A tick is real work, not a timer: a write, its snapshot and
+// the frame that draws it. Starting up and repairing waitingOn after a 500 ms pause take a chain of timers whose
+// length depends on how busy the machine is, so settle waits until the page has none left; a fixed wait there let a
+// late repair redraw the board between a click and its check.
 const FAST = 10;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const tick = () => wait(20);
-const heal = () => wait(500 / FAST + 50);
+const settle = async (b) => {
+  const end = Date.now() + 5000;
+  do await wait(5);
+  while (b.busy() && Date.now() < end);
+  if (b.busy()) throw new Error('the page keeps a timer going for 5 s');
+};
 let failed = 0;
 const ok = (c, m) => {
   console.log((c ? 'ok   ' : 'FAIL ') + m);
@@ -269,8 +287,7 @@ const meLane = (d) => {
   console.log('# no viewer identity (user capability absent)');
   let b = boot();
   const { d, store, key, w, listened } = b;
-  await tick();
-  await heal();
+  await settle(b);
   ok(d.getElementById('hTitle').textContent === 'Test Board', 'title comes from meta/config');
   ok(d.querySelectorAll('.lane').length === 3, 'one lane per person');
   ok(d.querySelectorAll('tr.item').length === 3, 'item table lists every open task');
@@ -478,7 +495,7 @@ const meLane = (d) => {
   };
   b.notify();
   await tick();
-  await heal();
+  await settle(b);
   ok(JSON.stringify(store['tasks/M1-2'].waitingOn) === '[]', 'finishing a task unblocks its dependents');
   ok(/New/.test(d.getElementById('newBtn').textContent), 'outside changes raise a new marker');
   store['meta/config'] = { ...store['meta/config'], lang: 'ko', title: '바뀜' };
@@ -508,8 +525,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   ok(isFolded(b.d, 'people') && !isFolded(b.d, 'rules'), 'folded sections stay folded after a reload');
   ok(!b.d.getElementById('viewKanban').hidden, 'the chosen view comes back');
   ok(!/New/.test(b.d.getElementById('newBtn').textContent), 'tasks seen before are not new again');
@@ -553,8 +569,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await tick();
+  await settle(b);
   const links = [...b.d.querySelectorAll('#repos .repo')];
   ok(
     links.length === 2 &&
@@ -649,8 +664,7 @@ const meLane = (d) => {
   console.log('# linked viewer');
   b = boot({ user: fakeUser('u_ben', true), docs: { 'people/ben': { uid: 'u_ben', at: T0 } }, me: 'ana' });
   all.push(b);
-  await tick();
-  await tick();
+  await settle(b);
   ok(meLane(b.d) === 'Ben' && !note(b.d), 'a linked account is its person, whatever this browser remembered');
   ok(/Claim as Ben/.test(b.d.querySelector('.rows.ready .btn').title), 'claims go to the linked person');
   ok(
@@ -669,8 +683,7 @@ const meLane = (d) => {
   console.log('# first pick links the account');
   b = boot({ user: fakeUser('u_cy', true) });
   all.push(b);
-  await tick();
-  await tick();
+  await settle(b);
   ok(/Pick yourself/.test(note(b.d)), 'an unlinked account is asked to pick itself');
   b.pick('cy');
   await tick();
@@ -683,8 +696,7 @@ const meLane = (d) => {
   );
   b = boot({ user: fakeUser('u_cy', true), docs: { 'people/ben': { uid: 'u_ben', at: T0 } }, me: 'ben' });
   all.push(b);
-  await tick();
-  await tick();
+  await settle(b);
   ok(
     [...b.d.querySelectorAll('#meSel button')].map((x) => x.dataset.me).join() === 'ana,cy',
     'an unlinked account chooses only among people no account holds'
@@ -699,8 +711,7 @@ const meLane = (d) => {
     docs: { 'meta/config': { ...seed()['meta/config'], people: [{ id: 'ana' }] } }
   });
   all.push(b);
-  await tick();
-  await tick();
+  await settle(b);
   await tick();
   ok(
     b.store['people/ana'] && b.store['people/ana'].uid === 'u_ana' && !note(b.d),
@@ -721,8 +732,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   ok(!!b.d.querySelector('.lane .date.late'), 'a due day in the past shows as late');
   ok(
     !!b.d.querySelector('.rows .why.alert') &&
@@ -766,8 +776,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   ok(!!b.d.querySelector('.lane .agent-mark.live'), 'an agent that just posted shows as live');
   b.d.querySelector('section[data-fold="activity"] .fold').click();
   await tick();
@@ -823,8 +832,7 @@ const meLane = (d) => {
   console.log('# archive');
   b = boot({ storage: { 'ab-view': 'kanban' } });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   const col = (k) => [...b.d.querySelectorAll('.col')].find((c) => c.querySelector('h3').textContent.startsWith(k));
@@ -874,8 +882,7 @@ const meLane = (d) => {
   console.log('# links');
   b = boot({ hash: '#M1-2' });
   all.push(b);
-  await tick();
-  await tick();
+  await settle(b);
   const sheetKey = () => b.d.querySelector('.sheet .bar .key')?.textContent;
   ok(sheetKey() === 'M1-2', "a link to a task's key opens its sheet");
   b.w.location.hash = '';
@@ -891,8 +898,7 @@ const meLane = (d) => {
   ok(b.d.body.dataset.view === 'kanban', 'a task changing later leaves the view you moved to');
   b = boot({ hash: '#kanban' });
   all.push(b);
-  await tick();
-  await tick();
+  await settle(b);
   ok(
     b.d.body.dataset.view === 'kanban' && b.w.location.hash === '',
     'a link that opens the board on a view lets go of it in the address'
@@ -901,8 +907,7 @@ const meLane = (d) => {
   console.log('# a summary saved while the details could not be read');
   b = boot({ failRead: ['details/M1-1'] });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   b.d.querySelector('#rows tr.item[data-k="M1-1"]').click();
@@ -932,13 +937,12 @@ const meLane = (d) => {
   console.log('# a dependency that reopens and finishes again');
   b = boot({ me: 'ana', user: { id: async () => 'u-ana', can: async () => true } });
   all.push(b);
-  await tick();
+  await settle(b);
   const waits = [];
   for (const status of ['done', 'doing', 'done']) {
     b.sneak('tasks/M1-1', (c) => ({ ...c, status }));
     b.notify();
-    await heal();
-    await heal();
+    await settle(b);
     waits.push(JSON.stringify(b.store['tasks/M1-2'].waitingOn));
   }
   ok(
@@ -953,7 +957,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
+  await settle(b);
   const drawn = { doc: b.d.querySelectorAll('#rows tr.item').length };
   for (const v of ['kanban', 'graph']) {
     b.d.querySelector('button[data-view="' + v + '"]').click();
@@ -980,7 +984,7 @@ const meLane = (d) => {
     };
   b = boot({ docs: doneDocs, storage: { 'ab-view': 'kanban', 'ab-kcol': JSON.stringify({ done: { two: true } }) } });
   all.push(b);
-  await tick();
+  await settle(b);
   const doneCol = () =>
     [...b.d.querySelectorAll('.col')].find((c) => c.querySelector('h3').textContent.startsWith('Done'));
   const doneMore = () => doneCol().querySelector('.morebtn');
@@ -1015,8 +1019,7 @@ const meLane = (d) => {
   console.log('# the page follows the task rules');
   b = boot({ docs: { 'tasks/M1-1': { ...seed()['tasks/M1-1'], owner: 'ben' } } });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   ok(
@@ -1042,8 +1045,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   [...b.d.querySelectorAll('tr.item')].find((r) => /M1-1/.test(r.textContent)).click();
@@ -1069,8 +1071,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   [...b.d.querySelectorAll('tr.item')].find((r) => /M1-1/.test(r.textContent)).click();
@@ -1090,8 +1091,7 @@ const meLane = (d) => {
   console.log('# two people claim at once');
   b = boot({ race: 'tasks/M1-1' });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   [...b.d.querySelectorAll('.rows.ready li')]
@@ -1112,8 +1112,7 @@ const meLane = (d) => {
 
   b = boot({ bump: 'tasks/M1-1' });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   [...b.d.querySelectorAll('.rows.ready li')]
@@ -1146,8 +1145,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   b.d.querySelector('tr.item[data-k="M1-1"]').click();
@@ -1196,8 +1194,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   ok(
     [...b.d.querySelectorAll('.col h3')].some((h) => /QA/.test(h.textContent)),
     'the kanban gets a column for it, named from meta/config.strings'
@@ -1327,8 +1324,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   ok(
@@ -1594,8 +1590,7 @@ const meLane = (d) => {
 
   b = boot();
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   b.pick('ana');
   await tick();
   b.d.querySelector('tr.item[data-k="M1-1"]').click();
@@ -1631,8 +1626,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   codemap(b.d)?.querySelector('.fold').click();
   await tick();
   ok(
@@ -1705,8 +1699,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   codemap(b.d)?.querySelector('.fold').click();
   await tick();
   ok(
@@ -1740,8 +1733,7 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   codemap(b.d)?.querySelector('.fold').click();
   await tick();
   await tick();
@@ -1761,15 +1753,13 @@ const meLane = (d) => {
     }
   });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   ok(!b.d.querySelector('tr.item .overlap'), "one holder's own tasks do not overlap each other");
 
   console.log('# view-only viewer');
   b = boot({ user: fakeUser('u_ana', false) });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   ok(/View only/.test(note(b.d)), 'header says the board is view only');
   ok(
     !b.d.querySelector('.rows.ready .btn') && !writeNotice(b.d) && !b.d.getElementById('noticeText'),
@@ -1791,8 +1781,7 @@ const meLane = (d) => {
   console.log('# viewer the platform said nothing about');
   b = boot({ user: fakeUser(null, null), deny: true });
   all.push(b);
-  await tick();
-  await heal();
+  await settle(b);
   ok(!note(b.d) && !!b.d.querySelector('.rows.ready .btn'), 'controls stay while write access is unknown');
   b.d.querySelector('.rows.ready .btn').click();
   await tick();
@@ -1804,14 +1793,13 @@ const meLane = (d) => {
   for (const role of ['member', 'viewer']) {
     const sb = boot({ user: fakeUser('u_ana', role === 'member'), site: { role, calls: [] } });
     all.push(sb);
-    await tick();
+    await settle(sb);
     ok(sb.d.getElementById('projMenu').hidden && !sb.site.calls.length, 'a ' + role + ' gets no project menu');
   }
   const site = { role: 'admin', calls: [] };
   b = boot({ user: fakeUser('u_ana', true), site });
   all.push(b);
-  await tick();
-  await tick();
+  await settle(b);
   const kebab = b.d.getElementById('projMenuBtn'),
     items = () => [...b.d.querySelectorAll('#projMenuList [role="menuitem"]')].map((x) => x.textContent),
     dialog = () => b.d.querySelector('.sheet.confirm'),
