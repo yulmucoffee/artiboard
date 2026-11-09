@@ -103,12 +103,15 @@ export function openSqlite({ file, boardUrl }) {
   db.exec('pragma journal_mode = wal; pragma foreign_keys = on; pragma busy_timeout = 5000;');
   db.exec(SCHEMA);
   // a file made before projects could be archived has no archived_at; create table above leaves an old table as it is
-  if (!db.prepare("select 1 from pragma_table_info('projects') where name = 'archived_at'").get()) db.exec('alter table projects add column archived_at text');
-  // Tasks written before the owner alone held a task, whose claim names someone else: the claimer held it then, so
-  // they own it now and nothing changes hands. Converges: a second open finds nothing to repair.
-  db.prepare(`update docs set data = json_set(data, '$.owner', json_extract(data, '$.claimedBy.who')), version = version + 1
-    where collection = 'tasks' and json_type(data, '$.claimedBy.who') = 'text'
-      and json_extract(data, '$.owner') is not json_extract(data, '$.claimedBy.who')`).run();
+  if (!db.prepare("select 1 from pragma_table_info('projects') where name = 'archived_at'").get()) {
+    db.exec('alter table projects add column archived_at text');
+    // Tasks written before the owner alone held a task, whose claim names someone else: the claimer held it then, so
+    // they own it now and nothing changes hands. Once, with the upgrade above: every file older than archiving had
+    // this repair on each open, and later an owner can differ from an earlier claim on purpose (a reassignment).
+    db.prepare(`update docs set data = json_set(data, '$.owner', json_extract(data, '$.claimedBy.who')), version = version + 1
+      where collection = 'tasks' and json_type(data, '$.claimedBy.who') = 'text'
+        and json_extract(data, '$.owner') is not json_extract(data, '$.claimedBy.who')`).run();
+  }
   const changes = new EventEmitter();
   changes.setMaxListeners(0);
   const q = (sql) => db.prepare(sql);

@@ -6,12 +6,14 @@
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createServer, request } from 'node:http';
+import { connect as connectSocket } from 'node:net';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { DatabaseSync } from 'node:sqlite';
 import { runInNewContext } from 'node:vm';
 import { gzipSync } from 'node:zlib';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -629,17 +631,30 @@ for (const backend of backends) {
       await call(board, 'board_batch', { project: P, writes: [{ op: 'delete', path: `tasks/${K('o1')}` }], override: true });
     });
 
-    test('a task whose claim names someone other than its owner belongs to the claimer once the store opens', async (t) => {
+    test('a task whose claim names someone other than its owner belongs to the claimer once, when a file from before archiving opens', async (t) => {
       if (store.kind !== 'sqlite') return t.skip('the Supabase migration repairs the same once');
-      const path = `tasks/${K('legacy')}`;
+      const path = `tasks/${K('legacy')}`, file = join(dir, 'board.db');
       await store.apply(null, P, [{ op: 'set', path, data: { key: K('legacy'), title: 'legacy', status: 'doing', owner: people.member.person, claimedBy: { who: people.admin.person, agent: true } } }]);
-      const again = await openSqlite({ file: join(dir, 'board.db'), boardUrl: BASE });
+      const reopen = async () => { const s = await openSqlite({ file, boardUrl: BASE }); try { return (await s.get(P, path)).data.owner; } finally { s.close(); } };
       try {
-        assert.equal((await again.get(P, path)).data.owner, people.admin.person, 'the claimer held it before, so nothing changes hands');
+        assert.equal(await reopen(), people.member.person, 'on a current file the owner was given the task after the claim: a reassignment stays');
+        const raw = new DatabaseSync(file);
+        raw.exec('alter table projects drop column archived_at');
+        raw.close();
+        assert.equal(await reopen(), people.admin.person, 'on an older file the claimer held it before, so nothing changes hands');
       } finally {
-        again.close();
         await store.apply(null, P, [{ op: 'delete', path }]);
       }
+    });
+
+    test('a request whose address is no URL gets a 400, and the server keeps answering', async () => {
+      const raw = (line) => new Promise((resolve, reject) => {
+        const sock = connectSocket(Number(new URL(BASE).port), '127.0.0.1', () => sock.end(`${line}\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n`));
+        let out = '';
+        sock.on('data', (d) => { out += d; }).on('end', () => resolve(out)).on('error', reject);
+      });
+      assert.match(await raw('GET //[invalid]/ HTTP/1.1'), /^HTTP\/1\.1 400 /);
+      assert.equal((await api('/api/config')).status, 200);
     });
 
     test('a claim or a post that loses a race rereads and decides again', async () => {
@@ -952,8 +967,8 @@ for (const backend of backends) {
       assert.equal((await call(board, 'board_get', { project: P, path })).value.version, 1, 'nobody overwrote the first');
     });
 
-    test('a task with more dependents than one write takes still finishes, and every dependent hears it', async () => {
-      const X = `hub-${R}`, at = new Date().toISOString(), n = 120;
+    test('a task with more dependents than one write or one read takes still finishes, and every dependent hears it', async () => {
+      const X = `hub-${R}`, at = new Date().toISOString(), n = 205;
       await store.createProject(null, { id: X, title: 'Hub', lang: 'en' });
       try {
         const task = (key, deps) => ({ op: 'set', path: `tasks/${key}`, data: { key, title: key, status: 'todo', deps, waitingOn: deps, updatedAt: at } });
@@ -2026,4 +2041,90 @@ test('a page catching up gets a row committed late with an earlier stamp', async
   visible();
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(keys, 'AB', 'the row stamped before the newest one seen arrives');
+});
+
+// A page on a self-hosted SQLite site, reading from server (rows by collection) and holding the event stream es.
+async function pageOn(server) {
+  const json = (status, body) => Promise.resolve({ ok: status < 300, status, json: async () => body });
+  const at = (r) => r.data.at || '';
+  const page = { es: null };
+  const window = { addEventListener() {} };
+  runInNewContext(readFileSync(new URL('../server/public/shim.js', import.meta.url), 'utf8'), {
+    window, setTimeout, clearTimeout, setInterval: () => 0,
+    document: { addEventListener() {}, getElementById: () => null, hidden: false },
+    location: { pathname: '/p/demo', hash: '', search: '' }, history: { replaceState() {} },
+    EventSource: function () { page.es = this; setTimeout(() => this.onopen?.(), 0); },
+    fetch: async (url, opts) => {
+      if (url === '/api/config') return json(200, { backend: 'sqlite', lang: 'en' });
+      if (url === '/api/me') return json(200, { uid: 'u', person: 'ana', role: 'member' });
+      const body = JSON.parse(opts.body);
+      if (body.since) return json(200, server.filter((r) => r.updated_at > body.since));
+      if (body.collection) return json(200, server.filter((r) => r.collection === body.collection).sort((a, b) => (at(a) < at(b) ? 1 : -1)).slice(0, body.limit));
+      return json(200, server.filter((r) => body.whole.includes(r.collection)));
+    },
+  });
+  page.db = await window.claude.use('db');
+  return page;
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('a page that was offline while a task was deleted drops it once it is back', async () => {
+  const row = (id) => ({ collection: 'tasks', doc_id: id, version: 1, updated_at: '2026-01-01T00:00:10.000Z', data: { key: id } });
+  const server = [row('A'), row('B')];
+  const page = await pageOn(server);
+  let keys = '';
+  page.db.collection('tasks').onSnapshot((s) => { keys = s.docs.map((d) => d.id).sort().join(''); });
+  await wait(50);
+  assert.equal(keys, 'AB');
+  page.es.onerror();
+  server.splice(0, 1);
+  page.es.onopen();
+  await wait(100);
+  assert.equal(keys, 'B', 'the delete it missed shows once the connection is back');
+});
+
+test('a window of the latest notices that loses one reads the next', async () => {
+  const notice = (id, at) => ({ collection: 'notices', doc_id: id, version: 1, updated_at: at, data: { at, text: id } });
+  const server = [notice('old', '2026-01-01T00:00:01.000Z'), notice('new', '2026-01-01T00:00:02.000Z')];
+  const page = await pageOn(server);
+  let shown = null;
+  page.db.collection('notices').orderBy('at', 'desc').limit(1).onSnapshot((s) => { shown = s.docs.map((d) => d.id).join(','); });
+  await wait(50);
+  assert.equal(shown, 'new');
+  server.splice(1, 1);
+  page.es.onmessage({ data: JSON.stringify({ collection: 'notices', doc_id: 'new', gone: true }) });
+  await wait(100);
+  assert.equal(shown, 'old', 'the older notice fills the window');
+});
+
+// The API answers at most max_rows rows; a board with more rows than that is read a page at a time, after the last
+// row of the page before, in (collection, doc_id) order
+test('a page on Supabase reads a board bigger than one response', async () => {
+  const PAGE = 1000, all = Array.from({ length: PAGE + 6 }, (_, i) => ({ collection: 'tasks', doc_id: `T-${String(i).padStart(4, '0')}`, version: 1, updated_at: '2026-01-01T00:00:00Z', data: {} }));
+  const filters = [];
+  const query = (st) => ({
+    select: () => query(st), eq: () => query(st), order: () => query(st), in: () => query(st), gt: () => query(st),
+    or: (f) => { filters.push(f); return query({ ...st, after: /doc_id\.gt\."([^"]+)"/.exec(f)?.[1] }); },
+    limit: (n) => query({ ...st, n }),
+    then: (ok, ko) => Promise.resolve({ data: all.filter((r) => !st.after || r.doc_id > st.after).slice(0, Math.min(st.n || Infinity, PAGE)), error: null }).then(ok, ko),
+  });
+  const channel = { on: () => channel, subscribe: (cb) => { cb('SUBSCRIBED'); return channel; } };
+  const sb = {
+    auth: { getSession: async () => ({ data: { session: { access_token: 't' } } }), signOut: async () => {} },
+    rpc: async () => ({ data: { user_id: 'u', person: 'ana', role: 'member' } }),
+    from: () => query({}), channel: () => channel,
+  };
+  const window = { supabase: { createClient: () => sb }, addEventListener() {} };
+  runInNewContext(readFileSync(new URL('../server/public/shim.js', import.meta.url), 'utf8'), {
+    window, setTimeout, clearTimeout, setInterval: () => 0,
+    document: { addEventListener() {}, getElementById: () => null, hidden: false },
+    location: { pathname: '/p/demo', hash: '', search: '' }, history: { replaceState() {} },
+    fetch: async () => ({ json: async () => ({ backend: 'supabase', supabaseUrl: 'https://db.example', supabaseKey: 'k', lang: 'en' }) }),
+  });
+  const db = await window.claude.use('db');
+  let n = 0;
+  db.collection('tasks').onSnapshot((s) => { n = s.size; });
+  await wait(50);
+  assert.equal(n, PAGE + 6, 'every task arrives');
+  assert.match(filters[filters.length - 1], /doc_id\.gt\."T-0999"/, 'the second page starts after the last row of the first');
 });

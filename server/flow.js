@@ -506,7 +506,11 @@ export function makeFlow(store) {
   // patch (one write per document); the rest get a write each. unblocked names the todo tasks now waiting on nothing.
   async function unblockDependents(project, keys, patches) {
     const finished = new Set(keys), seen = new Map(), more = [], unblocked = [];
-    for (const found of await Promise.all(keys.map((k) => query(project, 'tasks', { where: [{ field: 'deps', op: 'array-contains', value: k }], limit: 200 })))) {
+    const dependentsOf = async (k) => {
+      const where = [{ field: 'deps', op: 'array-contains', value: k }];
+      return rest(project, await query(project, 'tasks', { where, limit: 200 }), { collection: 'tasks', where });
+    };
+    for (const found of await Promise.all(keys.map(dependentsOf))) {
       for (const o of found) seen.set(o.id, o);
     }
     for (const o of seen.values()) {

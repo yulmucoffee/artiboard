@@ -103,18 +103,27 @@
   }
 
   function supabaseTransport(sb) {
-    var COLS = 'collection,doc_id,data,version,updated_at';
+    var COLS = 'collection,doc_id,data,version,updated_at', PAGE = 1000;
     function q(v) { return '"' + String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'; }
     function jsonPath(field) { return 'data->' + field.split('.').join('->'); }
     function rows(r) { if (r.error) throw r.error; return r.data; }
     function base() { return sb.from('ab_docs').select(COLS).eq('project', PROJECT); }
     return {
+      // the API answers at most max_rows (1000) rows at a time, so a bigger read goes on after the last row it got
+      // until a page comes back short
       plain: function (whole, docs) {
         var parts = whole.map(function (c) { return 'collection.eq.' + q(c); });
         Object.keys(docs).forEach(function (c) {
           if (whole.indexOf(c) < 0) parts.push('and(collection.eq.' + q(c) + ',doc_id.in.(' + docs[c].map(q).join(',') + '))');
         });
-        return base().or(parts.join(',')).then(rows);
+        function from(got, last) {
+          var past = last ? ',or(collection.gt.' + q(last.collection) + ',and(collection.eq.' + q(last.collection) + ',doc_id.gt.' + q(last.doc_id) + '))' : '';
+          return base().or('and(or(' + parts.join(',') + ')' + past + ')').order('collection').order('doc_id').limit(PAGE).then(rows).then(function (page) {
+            got = got.concat(page);
+            return page.length < PAGE ? got : from(got, page[page.length - 1]);
+          });
+        }
+        return from([], null);
       },
       limited: function (collection, orders, lim) {
         var x = base().eq('collection', collection);
@@ -155,10 +164,11 @@
   // Reads are shaped for a live page that should cost little:
   // - listeners registered together are fetched together: every unlimited listener in one request, each limited one apart
   // - after that, pushed rows are applied in place; nothing is re-read on a change
-  // - a reconnect or a return to the tab asks only for rows changed since the newest one seen
-  // - after a long absence everything is read again once, which also catches deletes that were missed
+  // - a return to the tab, or a minute without the live connection, asks only for rows changed since the newest one seen
+  // - when the live connection comes back, or after a long absence, everything is read again once: that is how a page
+  //   learns of deletes it missed
   function makeDb(tr) {
-    var listeners = [], queued = [], mark = '', live = false, hiddenAt = 0, statusCbs = [], catching = false;
+    var listeners = [], queued = [], mark = '', live = false, dropped = false, hiddenAt = 0, statusCbs = [], catching = false, reads = 0;
 
     function cmp(orders) {
       return function (a, b) {
@@ -189,21 +199,28 @@
       stamp(row.updated_at);
       listeners.forEach(function (l) {
         if (!matches(l, row)) return;
-        // not read yet: keep it for when the first read lands, which may be older
-        if (!l.ready) { l.pending.push({ row: row, gone: gone }); return; }
-        merge(l, row, gone);
+        // a read on its way may be older: keep the row to lay over it when it lands
+        if (l.reading || !l.ready) l.pending.push({ row: row, gone: gone });
+        if (l.ready) merge(l, row, gone);
       });
     }
     function merge(l, row, gone) {
       var i = l.rows.findIndex(function (r) { return r.doc_id === row.doc_id; });
-      if (gone) { if (i < 0) return; l.rows.splice(i, 1); }
+      if (gone) {
+        if (i < 0) return;
+        // a full window that loses a row reads the one after it
+        if (l.lim && l.rows.length === l.lim && !l.reading) load([l]);
+        l.rows.splice(i, 1);
+      }
       else if (i >= 0) { if (l.rows[i].version >= row.version) return; l.rows[i] = row; }
       else l.rows.push(row);
       // rows of one batch arrive one by one: hand the listener one snapshot for all of them
       if (!l.soon) l.soon = setTimeout(function () { l.soon = 0; if (listeners.indexOf(l) >= 0) emit(l); }, 30);
     }
-    function first(l, rows) {
-      if (listeners.indexOf(l) < 0) return;
+    // the rows a read brought, unless the listener stopped or a later read of it is on its way
+    function first(l, rows, read) {
+      if (listeners.indexOf(l) < 0 || l.reading !== read) return;
+      l.reading = 0;
       l.rows = rows;
       var p = l.pending; l.pending = [];
       p.forEach(function (x) {
@@ -215,11 +232,18 @@
       emit(l);
     }
 
-    function fail(ls, e) { ls.forEach(function (l) { l.failed = true; if (l.err) l.err(boardError(e)); }); }
-    // a first read that failed is read again when the connection comes back and every minute; what arrived for it
+    // a page already showing the rows keeps them when a read again fails
+    function fail(ls, reads, e) {
+      ls.forEach(function (l, i) {
+        if (l.reading !== reads[i]) return;
+        l.reading = 0; l.failed = true;
+        if (!l.ready && l.err) l.err(boardError(e));
+      });
+    }
+    // a read that failed is read again when the connection comes back and every minute; what arrived for it
     // meanwhile waits in pending and lands with that read
     function retry() {
-      var ls = listeners.filter(function (l) { return l.failed && !l.ready; });
+      var ls = listeners.filter(function (l) { return l.failed && !l.reading; });
       ls.forEach(function (l) { l.failed = false; });
       if (ls.length) load(ls);
     }
@@ -231,35 +255,40 @@
         if (l.docId == null) { if (whole.indexOf(l.collection) < 0) whole.push(l.collection); }
         else { docs[l.collection] = docs[l.collection] || []; if (docs[l.collection].indexOf(l.docId) < 0) docs[l.collection].push(l.docId); }
       });
+      var at = ls.map(function (l) { return l.reading; });
       tr.plain(whole, docs).then(function (rows) {
         rows.forEach(function (row) { stamp(row.updated_at); });
-        ls.forEach(function (l) { first(l, rows.filter(function (row) { return matches(l, row); })); });
-      }, function (e) { fail(ls, e); });
+        ls.forEach(function (l, i) { first(l, rows.filter(function (row) { return matches(l, row); }), at[i]); });
+      }, function (e) { fail(ls, at, e); });
     }
     function fetchLimited(l) {
+      var at = l.reading;
       tr.limited(l.collection, l.orders, l.lim).then(function (rows) {
         rows.forEach(function (row) { stamp(row.updated_at); });
-        first(l, rows);
-      }, function (e) { fail([l], e); });
+        first(l, rows, at);
+      }, function (e) { fail([l], [at], e); });
     }
     // the limited listeners that start together (recent activity: one per task) share one request
     function fetchLimitedMany(ls) {
       for (var k = 0; k < ls.length; k += 20) (function (part) {
+        var at = part.map(function (l) { return l.reading; });
         tr.limitedMany(part.map(function (l) { return { collection: l.collection, order: l.orders, limit: l.lim }; })).then(function (rows) {
           var by = part.map(function () { return []; });
           rows.forEach(function (row) { stamp(row.updated_at); if (by[row.i]) by[row.i].push(row); });
-          part.forEach(function (l, i) { first(l, by[i]); });
-        }, function (e) { fail(part, e); });
+          part.forEach(function (l, i) { first(l, by[i], at[i]); });
+        }, function (e) { fail(part, at, e); });
       })(ls.slice(k, k + 20));
     }
+    // a listener already showing rows keeps them while it is read again, and pushes meanwhile go over the new read
     function load(ls) {
+      ls.forEach(function (l) { if (l.ready) l.pending = []; l.reading = ++reads; });
       fetchPlain(ls.filter(function (l) { return !l.lim; }));
       var lim = ls.filter(function (l) { return l.lim; });
       if (lim.length > 1 && tr.limitedMany) fetchLimitedMany(lim);
       else lim.forEach(fetchLimited);
     }
     function listen(l) {
-      l.rows = []; l.pending = []; l.ready = false; l.last = null;
+      l.rows = []; l.pending = []; l.ready = false; l.last = null; l.reading = 0;
       listeners.push(l);
       queued.push(l);
       if (queued.length === 1) Promise.resolve().then(function () { var ls = queued; queued = []; load(ls); });
@@ -275,15 +304,17 @@
       tr.changed(cols, new Date(Date.parse(mark) - 30000).toISOString()).then(function (rows) { catching = false; rows.forEach(function (row) { applyRow(row); }); }, function () { catching = false; });
     }
     function setLive(on) {
-      if (on) { retry(); catchUp(); }
+      if (on && dropped) { dropped = false; load(listeners.slice()); }
+      else if (on) { retry(); catchUp(); }
       if (live === on) return;
+      if (live) dropped = true;
       live = on;
       statusCbs.forEach(function (cb) { cb(on); });
     }
     tr.subscribe(applyRow, setLive, function (row) { return listeners.some(function (l) { return matches(l, row); }); });
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) { hiddenAt = Date.now(); return; }
-      if (hiddenAt && Date.now() - hiddenAt > 30 * 60000) { listeners.forEach(function (l) { l.ready = false; l.pending = []; }); load(listeners.slice()); }
+      if (hiddenAt && Date.now() - hiddenAt > 30 * 60000) load(listeners.slice());
       else { retry(); catchUp(); }
     });
     // while the live connection is down, look for changes every minute instead

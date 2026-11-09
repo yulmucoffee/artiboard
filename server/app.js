@@ -225,7 +225,8 @@ export function makeApp({ store, cfg }) {
 
   // route: a name when Vercel calls one function per route, otherwise found from the URL
   return async function handle(req, res, route) {
-    const url = new URL(req.url, 'http://localhost');
+    let url;
+    try { url = new URL(req.url, 'http://localhost'); } catch { return send(res, 400, { error: 'bad_request' }); }
     const p = url.pathname;
     try {
       if (route === 'mcp' || p === '/mcp') return await mcp(req, res);
