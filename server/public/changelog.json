@@ -2,6 +2,25 @@
   "repo": "https://github.com/yulmucoffee/artiboard",
   "versions": [
     {
+      "version": "1.23.7",
+      "date": "2026-11-09",
+      "prs": [
+        66
+      ],
+      "lines": {
+        "en": [
+          "A board page on Supabase shows every task past the first 1,000 documents, and a page back online drops tasks deleted while it was away.",
+          "Deleting the newest notice or message shows the next one; finishing a task frees every task waiting on it, not only the first 200.",
+          "A SQLite board keeps a reassigned task with its new owner across restarts, and a request with a broken address gets a 400 instead of stopping the server."
+        ],
+        "ko": [
+          "Supabase 보드에 문서가 1,000개를 넘어도 작업이 다 보이고, 연결이 돌아오면 그사이 지워진 작업이 사라져요.",
+          "가장 최근 공지나 메시지를 지우면 그다음 것이 보이고, 작업을 끝내면 기다리던 작업이 200개를 넘어도 모두 풀려요.",
+          "SQLite 보드에서 넘긴 작업은 재시작해도 새 담당자에게 남고, 주소가 깨진 요청에는 서버가 멈추지 않고 400으로 답해요."
+        ]
+      }
+    },
+    {
       "version": "1.23.6",
       "date": "2026-11-06",
       "prs": [

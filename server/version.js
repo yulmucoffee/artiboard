@@ -1,2 +1,2 @@
 // written by scripts/stamp-version.mjs from package.json
-export const VERSION = '1.23.6';
+export const VERSION = '1.23.7';
